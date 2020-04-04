@@ -1,0 +1,186 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Quelldateien">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Headerdateien">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Ressourcendateien">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Quelldateien\native">
+      <UniqueIdentifier>{5ff20698-973e-477d-8c08-22f6451b3cee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\wow64">
+      <UniqueIdentifier>{9b97304f-da6c-4772-b09b-b9d220bc2b8f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\native\Injection Methods">
+      <UniqueIdentifier>{d5fa2704-bd0a-49aa-935a-dd175543f290}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\wow64\Injection Methods">
+      <UniqueIdentifier>{55a0bf0c-81f5-48b8-8bb9-1c73e57ccab7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\native\Start Routine Methods">
+      <UniqueIdentifier>{76d1c640-61f3-484e-ae41-7405af75b480}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\wow64\Start Routine Methods">
+      <UniqueIdentifier>{6fdc8522-3bbc-43c6-817e-43e093ce89f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\Injection Methods">
+      <UniqueIdentifier>{d3c5e067-fa7b-4ff9-9579-418c449c7978}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Handle Hijacking.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Import Handler.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Injection.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="NT Stuff.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Process Info.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Start Routine.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Tools.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Eject.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Error.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Symbol Parser.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="LoadLibraryExW.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
+    </ClInclude>
+    <ClInclude Include="LdrLoadDll.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
+    </ClInclude>
+    <ClInclude Include="LdrpLoadDll.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
+    </ClInclude>
+    <ClInclude Include="Manual Mapping.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
+    </ClInclude>
+    <ClInclude Include="Hook Scanner.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Remote Function WOW64.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Handle Hijacking.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="Process Info.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="Tools.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="Import Handler WOW64.cpp">
+      <Filter>Quelldateien\wow64</Filter>
+    </ClCompile>
+    <ClCompile Include="Injection WOW64.cpp">
+      <Filter>Quelldateien\wow64</Filter>
+    </ClCompile>
+    <ClCompile Include="Start Routine WOW64.cpp">
+      <Filter>Quelldateien\wow64</Filter>
+    </ClCompile>
+    <ClCompile Include="Eject.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="Manual Mapping.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="LoadLibraryExW.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="LdrLoadDll.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="LoadLibraryExW WOW64.cpp">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Manual Mapping WOW64.cpp">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="LdrLoadDll WOW64.cpp">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Import Handler.cpp">
+      <Filter>Quelldateien\native</Filter>
+    </ClCompile>
+    <ClCompile Include="Injection.cpp">
+      <Filter>Quelldateien\native</Filter>
+    </ClCompile>
+    <ClCompile Include="Start Routine.cpp">
+      <Filter>Quelldateien\native</Filter>
+    </ClCompile>
+    <ClCompile Include="NtCreateThreadEx.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread Hijacking.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="QueueUserAPC.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="SetWindowsHookEx.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="NtCreateThreadEx WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="QueueUserAPC WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="SetWindowsHookEx WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread Hijacking WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Symbol Parser.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="LdrpLoadDll.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="LdrpLoadDll WOW64.cpp">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Hook Scanner.cpp">
+      <Filter>Quelldateien\native</Filter>
+    </ClCompile>
+    <ClCompile Include="Hook Scanner WOW64.cpp">
+      <Filter>Quelldateien\wow64</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
