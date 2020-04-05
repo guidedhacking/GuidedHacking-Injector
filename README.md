@@ -57,14 +57,14 @@ DWORD TargetProcessId;
 
 INJECTIONDATAA data =
 {
-	0,
 	"",
 	TargetProcessId;,
 	INJECTION_MODE::IM_LoadLibraryExW,
 	LAUNCH_METHOD::LM_NtCreateThreadEx,
 	NULL,
 	0,
-	NULL
+	NULL,
+	true
 };
 
 strcpy(data.szDllPath, DllPathToInject);
