@@ -694,7 +694,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	}
 
 	if (_Flags & INJ_MM_RUN_DLL_MAIN)
-	{ 
+	{
 		_DllMain(pBase, DLL_PROCESS_ATTACH, nullptr);
 	}
 	

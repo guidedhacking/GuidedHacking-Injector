@@ -294,8 +294,6 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 			return SYMBOL_ERR_GUID_TO_ANSI_FAILED;
 		}
 
-
-
 		std::string guid_filtered;
 		for (UINT i = 0; i != l_GUID; ++i)
 		{
