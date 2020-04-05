@@ -27,11 +27,15 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		LOAD_NT_FUNC(RtlQueueApcWow64Thread,	h_nt_dll, "RtlQueueApcWow64Thread");
 #endif
 
+		char szRootPath[MAX_PATH]{ 0 };
+		GetOwnModulePathA(szRootPath, sizeof(MAX_PATH));
+		std::string RootPath = szRootPath;
+
 #ifdef _WIN64
-		sym_ntdll_wow64_ret		= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64,	"C:\\Windows\\SysWOW64\\ntdll.dll", false);
-		sym_ntdll_native_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, "C:\\Windows\\System32\\ntdll.dll", false);
+		sym_ntdll_wow64_ret		= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64,	std::string("C:\\Windows\\SysWOW64\\ntdll.dll"), RootPath, nullptr, false);
+		sym_ntdll_native_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, std::string("C:\\Windows\\System32\\ntdll.dll"), RootPath, nullptr, false);
 #else
-		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, "C:\\Windows\\System32\\ntdll.dll", false);
+		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, "C:\\Windows\\System32\\ntdll.dll", RootPath, nullptr, false);
 #endif
 	}
 

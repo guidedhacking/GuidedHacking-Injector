@@ -79,11 +79,12 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine);
 ///		On success: 0.
 ///		On failure: an errocode from Error.h.
 
-bool GetOwnModulePath(wchar_t * pOut, size_t BufferCchSize);
+bool GetOwnModulePathA(char		* pOut, size_t BufferCchSize);
+bool GetOwnModulePathW(wchar_t	* pOut, size_t BufferCchSize);
 //A function to get the filepath to the file of this image of the injector.
 //
 //Arguments:
-//		pOut (wchar_t*):
+//		pOut (TCHAR*):
 ///			Pointer to a widechar buffer to contain the full path.
 //		BufferCchSize (size_t):
 ///			Size of the buffer in characters.

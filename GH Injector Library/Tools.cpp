@@ -46,7 +46,28 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	return 0;
 }
 
-bool GetOwnModulePath(wchar_t * pOut, size_t BufferCchSize)
+bool GetOwnModulePathA(char * pOut, size_t BufferCchSize)
+{
+	DWORD mod_ret = GetModuleFileNameA(g_hInjMod, pOut, (DWORD)BufferCchSize);
+	if (!mod_ret || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+	{
+		return false;
+	}
+
+	HRESULT hr = StringCchLengthA(pOut, BufferCchSize, &BufferCchSize);
+	if (FAILED(hr) || !BufferCchSize)
+	{
+		return false;
+	}
+
+	pOut += BufferCchSize;
+	while (*(--pOut - 1) != '\\');
+	*pOut = '\0';
+
+	return true;
+}
+
+bool GetOwnModulePathW(wchar_t * pOut, size_t BufferCchSize)
 {
 	DWORD mod_ret = GetModuleFileNameW(g_hInjMod, pOut, (DWORD)BufferCchSize);
 	if (!mod_ret || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
@@ -112,7 +133,7 @@ bool IsElevatedProcess(HANDLE hTargetProc)
 void ErrorLog(ERROR_INFO * info)
 {
 	wchar_t pPath[MAX_PATH * 2]{ 0 };
-	if (!GetOwnModulePath(pPath, sizeof(pPath) / sizeof(pPath[0])))
+	if (!GetOwnModulePathW(pPath, sizeof(pPath) / sizeof(pPath[0])))
 	{
 		return;
 	}

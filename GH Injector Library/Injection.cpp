@@ -408,7 +408,7 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	hijack_data.Mode	= INJECTION_MODE::IM_LdrLoadDll;
 	hijack_data.Method	= LAUNCH_METHOD::LM_NtCreateThreadEx;
 	hijack_data.GenerateErrorLog = pData->GenerateErrorLog;
-	if (!GetOwnModulePath(hijack_data.szDllPath, sizeof(hijack_data.szDllPath) / sizeof(hijack_data.szDllPath[0])))
+	if (!GetOwnModulePathW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath) / sizeof(hijack_data.szDllPath[0])))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 

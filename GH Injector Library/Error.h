@@ -251,7 +251,8 @@
 #define SYMBOL_ERR_INVALID_FILE_ARCHITECTURE	0x40000004	//internal error		:	the architecture of the specified file doesn't match AMD64 or I386
 #define SYMBOL_ERR_CANT_ALLOC_MEMORY			0x40000005	//VirtualAlloc			:	can't allocate memory
 #define SYMBOL_ERR_NO_PDB_DEBUG_DATA			0x40000006	//internal error		:	debuge directory is emtpy or wrong type
-#define SYMBOL_ERR_CANT_GET_TEMP_PATH			0x40000007	//GetTempPathA			:	can't get path to the temp directory
+#define SYMBOL_ERR_PATH_DOESNT_EXIST			0x40000007	//CreateDirectoryA		:	path doesn't exit and can't be created
+#define SYMBOL_ERR_CANT_CREATE_DIRECTORY		0x40000008	//CreateDirectoryA		:	path doesn't exit and can't be created (x86/x64 subdirectory)
 #define SYMBOL_ERR_CANT_CONVERT_PDB_GUID		0x40000008	//StringFromGUID2		:	conversion of the GUID to string failed
 #define SYMBOL_ERR_GUID_TO_ANSI_FAILED			0x40000009	//wcstombs_s			:	conversion of GUID to ANSI string failed
 #define SYMBOL_ERR_DOWNLOAD_FAILED				0x4000000A	//URLDownloadToFileA	:	downloading the pdb file failed

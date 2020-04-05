@@ -59,7 +59,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 		si.wShowWindow	= SW_HIDE;
 		
 		wchar_t RootPath[MAX_PATH * 2]{ 0 };
-		if (!GetOwnModulePath(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
+		if (!GetOwnModulePathW(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
 		{
 			ErrorCode = HOOK_SCAN_ERR_CANT_GET_OWN_MODULE_PATH;
 

@@ -17,6 +17,7 @@
 //dank shit
 #include <vector>
 #include <ctime>
+#include <map>
 
 //session shit
 #include <wtsapi32.h>

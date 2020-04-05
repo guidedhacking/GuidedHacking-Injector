@@ -17,12 +17,14 @@ class SYMBOL_PARSER
 
 	bool m_Initialized;
 
+	bool VerifyExistingPdb(GUID guid);
+
 public:
 
 	SYMBOL_PARSER();
 	~SYMBOL_PARSER();
 
-	DWORD Initialize(const char * szModulePath, bool Redownload = false);
+	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 };
 
@@ -32,6 +34,33 @@ struct PdbInfo
 	GUID	Guid;
 	DWORD	Age;
 	char	PdbFileName[1];
+};
+
+//Thanks mambda
+//https://bitbucket.org/mambda/pdb-parser/src/master/
+struct PDBHeader7
+{
+	char signature[0x20];
+	int page_size;
+	int allocation_table_pointer;
+	int file_page_count;
+	int root_stream_size;
+	int reserved;
+	int root_stream_page_number_list_number;
+};
+
+struct RootStream7
+{
+	int num_streams;
+	int stream_sizes[1]; //num_streams
+};
+
+struct GUID_StreamData
+{
+	int ver;
+	int date;
+	int age;
+	GUID guid;
 };
 
 #ifdef  _WIN64

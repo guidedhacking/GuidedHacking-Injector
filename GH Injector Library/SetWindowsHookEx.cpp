@@ -6,7 +6,7 @@
 DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId, DWORD & Out, ERROR_DATA & error_data)
 {
 	wchar_t RootPath[MAX_PATH * 2]{ 0 };
-	if (!GetOwnModulePath(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
+	if (!GetOwnModulePathW(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
