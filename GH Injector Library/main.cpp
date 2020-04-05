@@ -28,7 +28,7 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 #endif
 
 		char szRootPath[MAX_PATH]{ 0 };
-		GetOwnModulePathA(szRootPath, sizeof(MAX_PATH));
+		GetOwnModulePathA(szRootPath, sizeof(szRootPath));
 		std::string RootPath = szRootPath;
 
 #ifdef _WIN64

@@ -345,6 +345,11 @@ using f_LdrpLoadDll = NTSTATUS (__fastcall*)
 	LDR_DATA_TABLE_ENTRY		**	ldr_out
 );
 
+using f_LdrpHandleTlsData = NTSTATUS(__fastcall*)
+(
+	BYTE * pImageBase
+);
+
 using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall*)
 (
 	void	*	hDll,
@@ -400,6 +405,7 @@ namespace NT
 	NT_FUNC(NtQueryInformationProcess);
 	NT_FUNC(NtQuerySystemInformation);
 	NT_FUNC(NtQueryInformationThread);
+	NT_FUNC(LdrpHandleTlsData);
 
 #ifdef _WIN64
 	NT_FUNC(RtlQueueApcWow64Thread);

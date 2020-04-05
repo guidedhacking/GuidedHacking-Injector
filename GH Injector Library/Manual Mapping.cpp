@@ -188,18 +188,47 @@ DWORD MANUAL_MAPPER::CopyData(ERROR_DATA & error_data)
 
 	if (Flags & INJ_MM_EXECUTE_TLS)
 	{
-		HINSTANCE hK32 = GetModuleHandle(TEXT("kernel32.dll"));
-
-		if (!hK32)
+		if (!NT::LdrpHandleTlsData)
 		{
-			INIT_ERROR_DATA(error_data, GetLastError());
+			HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
 
-			return INJ_ERR_REMOTEMODULE_MISSING;
+			if (!hNTDLL)
+			{
+				INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+				return INJ_ERR_REMOTEMODULE_MISSING;
+			}
+
+			if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+			{
+				INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+				return INJ_ERR_SYMBOL_INIT_NOT_DONE;
+			}
+
+			DWORD sym_ret = sym_ntdll_native_ret.get();
+			if (sym_ret != SYMBOL_ERR_SUCCESS)
+			{
+				INIT_ERROR_DATA(error_data, sym_ret);
+
+				return INJ_ERR_SYMBOL_INIT_FAIL;
+			}
+
+			DWORD rva = 0;
+			sym_ret = sym_ntdll_native.GetSymbolAddress("LdrpHandleTlsData", rva);
+			if (sym_ret != SYMBOL_ERR_SUCCESS || !rva)
+			{
+				INIT_ERROR_DATA(error_data, sym_ret);
+
+				return INJ_ERR_SYMBOL_GET_FAIL;
+			}
+
+			NT::LdrpHandleTlsData = ReCa<f_LdrpHandleTlsData>(ReCa<BYTE*>(hNTDLL) + rva);
 		}
 
-		data.pVirtualAlloc = ReCa<f_VirtualAlloc>(GetProcAddress(hK32, "VirtualAlloc"));
+		data.pLdrpHandleTlsData = NT::LdrpHandleTlsData;
 	}
-
+	
 	data.pModuleBase	= pTargetImageBase;
 	data.Flags			= Flags;
 
@@ -650,27 +679,10 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	if ((_Flags & INJ_MM_EXECUTE_TLS) && pOp->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].Size)
 	{
 		auto * pTLS = ReCa<IMAGE_TLS_DIRECTORY*>(pBase + pOp->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
-
+		
 		if (pTLS->StartAddressOfRawData)
 		{
-			auto _VirtualAlloc = pData->pVirtualAlloc;
-			if (!_VirtualAlloc)
-			{
-				return INJ_MM_VIRTUALALLOC_MISSING;
-			}
-
-			void * pTLSMemory = _VirtualAlloc(nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-			if (!pTLSMemory)
-			{
-				return INJ_MM_VIRTUALALLOC_FAIL;
-			}
-
-#ifdef _WIN64
-			__writegsqword(0x58, ReCa<DWORD64>(pTLSMemory));
-#else
-			__writefsdword(0x2C, ReCa<DWORD>(pTLSMemory));
-#endif
-			*ReCa<decltype(pTLS->StartAddressOfRawData)*>(pTLSMemory) = pTLS->StartAddressOfRawData;
+			pData->pLdrpHandleTlsData(pBase);
 		}
 
 		auto * pCallback = ReCa<PIMAGE_TLS_CALLBACK*>(pTLS->AddressOfCallBacks);
@@ -682,7 +694,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	}
 
 	if (_Flags & INJ_MM_RUN_DLL_MAIN)
-	{
+	{ 
 		_DllMain(pBase, DLL_PROCESS_ATTACH, nullptr);
 	}
 	

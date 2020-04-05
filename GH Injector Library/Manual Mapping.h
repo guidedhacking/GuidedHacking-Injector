@@ -12,7 +12,6 @@
 
 using f_LoadLibraryA		= decltype(LoadLibraryA)*;
 using f_GetModuleHandleA	= decltype(GetModuleHandleA)*;
-using f_VirtualAlloc		= decltype(VirtualAlloc)*;
 using f_GetProcAddress		= ULONG_PTR	(WINAPI*)(HINSTANCE hModule, const char * lpProcName);
 using f_DLL_ENTRY_POINT		= BOOL		(WINAPI*)(void * hDll, DWORD dwReason, void * pReserved);
 
@@ -59,7 +58,7 @@ struct MANUAL_MAPPING_DATA
 	f_GetModuleHandleA						pGetModuleHandleA;
 	f_GetProcAddress						pGetProcAddress;
 	f_RtlInsertInvertedFunctionTable		pRtlInsertInvertedFunctionTable;
-	f_VirtualAlloc							pVirtualAlloc;
+	f_LdrpHandleTlsData						pLdrpHandleTlsData;
 	BYTE								*	pModuleBase;
 	DWORD									Flags;
 };
@@ -109,7 +108,7 @@ struct MANUAL_MAPPING_DATA_WOW64
 	DWORD pGetModuleHandleA;
 	DWORD pGetProcAddress;
 	DWORD pRtlInsertInvertedFunctionTable;
-	DWORD pVirtualAlloc;
+	DWORD pLdrpHandleTlsData;
 	DWORD pModuleBase;
 	DWORD Flags;
 };
