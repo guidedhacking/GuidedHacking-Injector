@@ -85,3 +85,6 @@ https://www.joachim-bauch.de/tutorials/loading-a-dll-from-memory/
 
 I also want to thank Akaion for helping me with SEH support and their C# mapping library which was a great resource to learn from:
 https://github.com/Dewera/Lunar
+
+Big thanks to mambda who made this PDB parser which I could steal code from to verify GUIDs:
+https://bitbucket.org/mambda/pdb-parser/src/master/
