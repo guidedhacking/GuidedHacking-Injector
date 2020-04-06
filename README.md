@@ -77,14 +77,14 @@ InjectA(&data);
 
 ### Credits
 
-First of all I want to credit Joachim Bauch whose Memory Module Library was a great source to learn from:
+First of all I want to credit Joachim Bauch whose Memory Module Library was a great source to learn from:  
 https://github.com/fancycode/MemoryModule
 
-He also made a great write-up explaining the basics of mapping a moule:
+He also made a great write-up explaining the basics of mapping a moule:  
 https://www.joachim-bauch.de/tutorials/loading-a-dll-from-memory/
 
-I also want to thank Akaion for helping me with SEH support and their C# mapping library which was a great resource to learn from:
+I also want to thank Akaion for helping me with SEH support and their C# mapping library which was a great resource to learn from:  
 https://github.com/Dewera/Lunar
 
-Big thanks to mambda who made this PDB parser which I could steal code from to verify GUIDs:
+Big thanks to mambda who made this PDB parser which I could steal code from to verify GUIDs:  
 https://bitbucket.org/mambda/pdb-parser/src/master/
