@@ -75,6 +75,35 @@ typedef struct _UNICODE_STRING
 	wchar_t *	szBuffer;
 } UNICODE_STRING, *PUNICODE_STRING;
 
+typedef struct _RTL_BALANCED_NODE
+{
+	union
+	{
+		struct _RTL_BALANCED_NODE * Children[2];
+		struct
+		{
+			struct _RTL_BALANCED_NODE * Left;
+			struct _RTL_BALANCED_NODE * Right;
+		};
+	};
+	
+	union
+	{
+	    UCHAR Red : 1;
+		UCHAR Balance : 2;
+		ULONG_PTR ParentValue;
+	};
+} RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
+
+typedef struct _LDR_DDAG_NODE
+{
+#ifdef _WIN64
+	char data[0x50];
+#else
+	char data[0x30];
+#endif
+} LDR_DDAG_NODE, *PLDR_DDAG_NODE;
+
 typedef struct _LDR_DATA_TABLE_ENTRY
 {
 	LIST_ENTRY		InLoadOrderLinks;
@@ -85,18 +114,35 @@ typedef struct _LDR_DATA_TABLE_ENTRY
 		LIST_ENTRY InProgressLinks;
 	};
 
-	PVOID			DllBase;
-	PVOID			EntryPoint;
-	ULONG			SizeOfImage;
+	PVOID DllBase;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
 
 	UNICODE_STRING	FullDllName;
 	UNICODE_STRING	BaseDllName;
 
-	ULONG			Flags;
-	WORD			LoadCount;
-	WORD			TlsIndex;
+	ULONG	Flags;
+	WORD	ObsoleteLoadCount;
+	WORD	TlsIndex;
 
-	LIST_ENTRY		HashLinks;
+	LIST_ENTRY HashLinks;
+
+	ULONG TimedateStamp;
+	PVOID EntryPointActivationContext;
+	PVOID Lock;
+
+	LDR_DDAG_NODE *	DdagNode;
+
+	LIST_ENTRY	NodeModuleLink;
+	PVOID		LoadContext;
+	PVOID		ParentDllBase;
+	PVOID		SwitchBackContext;
+
+	RTL_BALANCED_NODE BaseAddressIndexNode;
+	RTL_BALANCED_NODE MappingInfoIndexNode;
+
+	ULONG_PTR		OriginalBase;
+	LARGE_INTEGER	LoadTime;
 } LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
 typedef struct _PEB_LDR_DATA
@@ -255,6 +301,31 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT32
 	UNICODE_STRING32			OriginalFullDllName;
 } LDRP_PATH_SEARCH_CONTEXT32, *PLDRP_PATH_SEARCH_CONTEXT32;
 
+typedef struct _LDR_DDAG_NODE32
+{
+	char data[0x30];
+} LDR_DDAG_NODE32, *PLDR_DDAG_NODE32;
+
+typedef struct _RTL_BALANCED_NODE32
+{
+	union
+	{
+		DWORD Children[2];
+		struct
+		{
+			DWORD Left;
+			DWORD Right;
+		};
+	};
+
+	union
+	{
+		UCHAR Red : 1;
+		UCHAR Balance : 2;
+		DWORD ParentValue;
+	};
+} RTL_BALANCED_NODE32, *PRTL_BALANCED_NODE32;
+
 typedef struct _LDR_DATA_TABLE_ENTRY32
 {
 	LIST_ENTRY32		InLoadOrderLinks;
@@ -268,25 +339,19 @@ typedef struct _LDR_DATA_TABLE_ENTRY32
 	ULONG				Flags;
 	WORD				LoadCount;
 	WORD				TlsIndex;
-	union
-	{
-		LIST_ENTRY32 HashLinks;
-		struct
-		{
-			ULONG SectionPointer;
-			ULONG CheckSum;
-		};
-	};
-	union
-	{
-		ULONG TimeDateStamp;
-		ULONG LoadedImports;
-	};
-	ULONG EntryPointActivationContext;
-	ULONG PatchInformation;
-	LIST_ENTRY32 ForwarderLinks;
-	LIST_ENTRY32 ServiceTagLinks;
-	LIST_ENTRY32 StaticLinks;
+	LIST_ENTRY32		HashLinks;
+	ULONG				TimedateStamp;
+	DWORD				EntryPointActivationContext;
+	DWORD				Lock;
+	DWORD				DdagNode;
+	LIST_ENTRY32		NodeModuleLink;
+	DWORD				LoadContext;
+	DWORD				ParentDllBase;
+	DWORD				SwitchBackContext;
+	RTL_BALANCED_NODE32	BaseAddressIndexNode;
+	RTL_BALANCED_NODE32	MappingInfoIndexNode;
+	DWORD				OriginalBase;
+	LARGE_INTEGER		LoadTime;
 } LDR_DATA_TABLE_ENTRY32, *PLDR_DATA_TABLE_ENTRY32;
 
 typedef struct _PEB_LDR_DATA32
@@ -391,6 +456,9 @@ using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall*)
 	void	*	pArg3
 );
 
+using f_LdrpModuleBaseAddressIndex	= RTL_BALANCED_NODE*;
+using f_LdrpMappingInfoIndex		= RTL_BALANCED_NODE*;
+
 #pragma endregion
 
 #define NT_FUNC(Function) inline f_##Function Function = nullptr;
@@ -406,6 +474,8 @@ namespace NT
 	NT_FUNC(NtQuerySystemInformation);
 	NT_FUNC(NtQueryInformationThread);
 	NT_FUNC(LdrpHandleTlsData);
+	NT_FUNC(LdrpModuleBaseAddressIndex);
+	NT_FUNC(LdrpMappingInfoIndex);
 
 #ifdef _WIN64
 	NT_FUNC(RtlQueueApcWow64Thread);

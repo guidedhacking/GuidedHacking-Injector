@@ -415,8 +415,14 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_CANT_GET_MODULE_PATH, error_data);
 	}
 
-	StringCbCatW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath), GH_INJ_MOD_NAMEW);	
-	
+	HRESULT hr = StringCbCatW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath), GH_INJ_MOD_NAMEW);	
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_STRINGC_XXX_FAIL, error_data);
+	}
+
 	DWORD OrigFlags	= pData->Flags;
 	if (pData->Flags & INJ_LOAD_DLL_COPY)
 	{
@@ -564,14 +570,14 @@ DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & err
 	}
 	else if (Flags & INJ_FAKE_HEADER)
 	{
-		void * pK32 = ReCa<void*>(GetModuleHandle(TEXT("kernel32.dll")));
+		void * pK32 = ReCa<void *>(GetModuleHandle(TEXT("kernel32.dll")));
 		if (!pK32)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
 			return INJ_ERR_GET_MODULE_HANDLE_FAIL;
-		}			   	
-		
+		}
+
 		if (!WriteProcessMemory(hTargetProc, hMod, pK32, 0x1000, nullptr))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
@@ -609,8 +615,8 @@ DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & err
 				list.Blink = entry.Blink;
 				WriteProcessMemory(hTargetProc, entry.Flink, &list, sizeof(LIST_ENTRY), nullptr);
 			}
-			
-			if(ReadProcessMemory(hTargetProc, entry.Blink, &list, sizeof(LIST_ENTRY), nullptr))
+
+			if (ReadProcessMemory(hTargetProc, entry.Blink, &list, sizeof(LIST_ENTRY), nullptr))
 			{
 				list.Flink = entry.Flink;
 				WriteProcessMemory(hTargetProc, entry.Blink, &list, sizeof(LIST_ENTRY), nullptr);
@@ -621,6 +627,152 @@ DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & err
 		Unlink(Entry.InLoadOrderLinks);
 		Unlink(Entry.InMemoryOrderLinks);
 		Unlink(Entry.HashLinks);
+
+		auto FindParentNodePtr = [hTargetProc](auto FindParentNodePtr, RTL_BALANCED_NODE * current, RTL_BALANCED_NODE * to_find)
+		{
+			if (!current)
+			{
+				return (RTL_BALANCED_NODE **)nullptr;
+			}
+
+			RTL_BALANCED_NODE node;
+			if (!ReadProcessMemory(hTargetProc, current, &node, sizeof(node), nullptr))
+			{
+				return (RTL_BALANCED_NODE **)nullptr;
+			}
+
+			if (node.Left == to_find)
+			{
+				return ADDRESS_OF(current, Left);
+			}
+			else if (node.Right == to_find)
+			{
+				return ADDRESS_OF(current, Right);
+			}
+
+			RTL_BALANCED_NODE ** ret = FindParentNodePtr(FindParentNodePtr, node.Left, to_find);
+
+			if (!ret)
+			{
+				ret = FindParentNodePtr(FindParentNodePtr, node.Right, to_find);
+			}
+
+			return ret;
+		};
+
+		auto RemoveNode = [=](RTL_BALANCED_NODE ** ppNode)
+		{
+			if (!ppNode)
+			{
+				return false;
+			}
+
+			RTL_BALANCED_NODE * pNode;
+			if (!ReadProcessMemory(hTargetProc, ppNode, &pNode, sizeof(pNode), nullptr))
+			{
+				return false;
+			}
+
+			RTL_BALANCED_NODE Node;
+			if (!ReadProcessMemory(hTargetProc, pNode, &Node, sizeof(Node), nullptr))
+			{
+				return false;
+			}
+
+			RTL_BALANCED_NODE * pNewValue = nullptr;
+
+			if (Node.Left)
+			{
+				if (Node.Right)
+				{
+					pNewValue = Node.Right;
+					Node.Right = nullptr;
+				}
+				else
+				{
+					pNewValue = Node.Left;
+					Node.Left = nullptr;
+				}
+
+			}
+			else if (Node.Right)
+			{
+				pNewValue = Node.Right;
+				Node.Right = nullptr;
+			}
+
+			if (!WriteProcessMemory(hTargetProc, ppNode, &pNewValue, sizeof(pNewValue), nullptr))
+			{
+				return false;
+			}
+
+			if (Node.Left)
+			{
+				auto pEmptyNode = FindParentNodePtr(FindParentNodePtr, pNode, nullptr);
+				if (!pEmptyNode)
+				{
+					return false;
+				}
+
+				if (!WriteProcessMemory(hTargetProc, pEmptyNode, &Node.Left, sizeof(Node.Left), nullptr))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		};
+
+		if (!NT::LdrpModuleBaseAddressIndex || !NT::LdrpMappingInfoIndex)
+		{
+			HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
+
+			if (hNTDLL)
+			{
+				if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready && sym_ntdll_native_ret.get() == SYMBOL_ERR_SUCCESS)
+				{
+					DWORD rva = 0;
+					DWORD sym_ret = SYMBOL_ERR_SUCCESS;
+
+					sym_ret = sym_ntdll_native.GetSymbolAddress("LdrpModuleBaseAddressIndex", rva);
+					if (sym_ret == SYMBOL_ERR_SUCCESS)
+					{
+						NT::LdrpModuleBaseAddressIndex = ReCa<f_LdrpModuleBaseAddressIndex>(ReCa<BYTE *>(hNTDLL) + rva);
+					}
+
+					sym_ret = sym_ntdll_native.GetSymbolAddress("LdrpMappingInfoIndex", rva);
+					if (sym_ret == SYMBOL_ERR_SUCCESS)
+					{
+						NT::LdrpMappingInfoIndex = ReCa<f_LdrpMappingInfoIndex>(ReCa<BYTE *>(hNTDLL) + rva);
+					}
+				}
+			}
+		}
+
+		if (NT::LdrpModuleBaseAddressIndex)
+		{
+			auto * pBaseAddressIndexNode = FindParentNodePtr(FindParentNodePtr, NT::LdrpModuleBaseAddressIndex, ADDRESS_OF(pEntry, BaseAddressIndexNode));
+			if (pBaseAddressIndexNode)
+			{
+				if (RemoveNode(pBaseAddressIndexNode))
+				{
+					printf("Unlinked from LdrpModuleBaseAddressIndex\n");
+				}
+			}
+		}
+
+		if (NT::LdrpMappingInfoIndex)
+		{
+			auto * pMappingInfoIndexNode = FindParentNodePtr(FindParentNodePtr, NT::LdrpMappingInfoIndex, ADDRESS_OF(pEntry, MappingInfoIndexNode));
+
+			if (pMappingInfoIndexNode)
+			{
+				if (RemoveNode(pMappingInfoIndexNode))
+				{
+					printf("Unlinked from LdrpMappingInfoIndex\n");
+				}
+			}
+		}
 
 		WORD MaxLength_Full = Entry.FullDllName.MaxLength;
 		WORD MaxLength_Base = Entry.BaseDllName.MaxLength;
@@ -633,11 +785,12 @@ DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & err
 		delete[] Buffer_Full;
 		delete[] Buffer_Base;
 
+		char DdagNode[sizeof(LDR_DDAG_NODE)]{ 0 };
+		WriteProcessMemory(hTargetProc, Entry.DdagNode, DdagNode, sizeof(DdagNode), nullptr);
+
 		LDR_DATA_TABLE_ENTRY entry_new{ 0 };
 		WriteProcessMemory(hTargetProc, pEntry, &entry_new, sizeof(entry_new), nullptr);
-
-		//todo LdrpModuleBaseAddressIndex (cancer)
 	}
-	
+
 	return INJ_ERR_SUCCESS;
 }

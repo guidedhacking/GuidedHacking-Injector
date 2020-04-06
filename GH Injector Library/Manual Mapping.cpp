@@ -37,7 +37,7 @@ DWORD MANUAL_MAPPER::AllocateMemory(ERROR_DATA & error_data)
 	if (Flags & INJ_MM_SHIFT_MODULE)
 	{
 		srand(GetTickCount64() & 0xFFFFFFFF);
-		ShiftOffset = ALIGN_UP(rand() % 0x1000 + 0x100, 0x10);
+		ShiftOffset = ALIGN_UP(rand() % 0x1000 + 0x100, 0x800);
 	}
 
 	DWORD ShellcodeSize = (DWORD)((ULONG_PTR)ManualMapping_Shell_End - (ULONG_PTR)ManualMapping_Shell);
@@ -407,6 +407,13 @@ DWORD MANUAL_MAPPER::SetPageProtections(ERROR_DATA & error_data)
 
 DWORD _ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data)
 {
+#ifdef _WIN64
+	if (Flags & INJ_MM_SHIFT_MODULE)
+	{
+		Flags ^= INJ_MM_SHIFT_MODULE;
+	}
+#endif
+
 	MANUAL_MAPPER Module{ 0 };
 	BYTE * pRawData = nullptr;
 		
@@ -710,8 +717,8 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 				for (; *szMod++; *szMod = '\0');
 				pImportDescr->Name = 0;
 
-				IMAGE_THUNK_DATA * pThunk	= ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->OriginalFirstThunk);
-				IMAGE_THUNK_DATA * pIAT		= ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->FirstThunk);
+				IMAGE_THUNK_DATA * pThunk	= ReCa<IMAGE_THUNK_DATA*>(pBase + pImportDescr->OriginalFirstThunk);
+				IMAGE_THUNK_DATA * pIAT		= ReCa<IMAGE_THUNK_DATA*>(pBase + pImportDescr->FirstThunk);
 
 				if (!pImportDescr->OriginalFirstThunk)
 				{
@@ -726,8 +733,8 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 					}
 					else
 					{
-						auto * pImport = ReCa<IMAGE_IMPORT_BY_NAME *>(pBase + (pThunk->u1.AddressOfData));
-						char * szFunc = pImport->Name;
+						auto * pImport	= ReCa<IMAGE_IMPORT_BY_NAME*>(pBase + (pThunk->u1.AddressOfData));
+						char * szFunc	= pImport->Name;
 						for (; *szFunc++; *szFunc = '\0');
 					}
 				}
@@ -767,8 +774,8 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 					}
 					else
 					{
-						auto * pImport = ReCa<IMAGE_IMPORT_BY_NAME *>(pBase + (pNameTable->u1.AddressOfData));
-						char * szFunc = pImport->Name;
+						auto * pImport	= ReCa<IMAGE_IMPORT_BY_NAME*>(pBase + (pNameTable->u1.AddressOfData));
+						char * szFunc	= pImport->Name;
 						for (; *szFunc++; *szFunc = '\0');
 					}
 				}

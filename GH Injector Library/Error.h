@@ -89,21 +89,19 @@
 
 ///////////////////
 ///ManualMap
-													//Source				: advanced error type	: error description
+															//Source				: advanced error type	: error description
 
-#define INJ_MM_ERR_NO_DATA				0x00400001	//ManualMapping_Shell	: -						: pData is NULL
-#define INJ_MM_LOADLIBRARYA_MISSING		0x00400002	//ManualMapping_Shell	: -						: can't resolve imports because pLoadLibraryA is NULL
-#define INJ_MM_GETMODULEHANDLEA_MISSING	0x00400003	//ManualMapping_Shell	: -						: can't resolve imports because pGetModuleHandleA is NULL
-#define INJ_MM_GETPROCADDRESS_MISSING	0x00400004	//ManualMapping_Shell	: -						: can't resolve imports because pGetProcAddress is NULL
-#define INJ_MM_CANT_LOAD_MODULE			0x00400005	//ManualMapping_Shell	: -						: can't load required module (GetModuleHandleA and LoadLibraryA returned NULL)
-#define INJ_MM_CANT_GET_IMPORT			0x00400006	//ManualMapping_Shell	: -						: can't load required import (GetProcAddress returned NULL)
-#define INJ_MM_CANT_LOAD_DELAY_MODULE	0x00400007	//ManualMapping_Shell	: -						: can't load required delayed module (GetModuleHandleA and LoadLibraryA returned NULL)
-#define INJ_MM_CANT_GET_DELAY_IMPORT	0x00400008	//ManualMapping_Shell	: -						: can't load required delayed import (GetProcAddress returned NULL)
-#define INJ_MM_KERNEL32_POINTER_MISSING	0x00400009	//ManualMapping_Shell	: -						: can't fake PE header since kernel32.dll reference is missing
-#define INJ_MM_FUNCTION_TABLE_MISSING	0x0040000A	//ManualMapping_Shell	: -						: function to enable exceptions handlers is missing (NULL)
-#define INJ_MM_ENABLING_SEH_FAILED		0x0040000B	//ManualMapping_Shell	: -						: function to enable exceptions handlers failed
-#define INJ_MM_VIRTUALALLOC_MISSING		0x0040000C	//ManualMapping_Shell	: -						: can't initialize static TLS because pVirtualAlloc is NULL
-#define INJ_MM_VIRTUALALLOC_FAIL		0x0040000D	//ManualMapping_Shell	: -						: can't initialize static TLS because VirtualAlloc failed
+#define INJ_MM_ERR_NO_DATA						0x00400001	//ManualMapping_Shell	: -						: pData is NULL
+#define INJ_MM_LOADLIBRARYA_MISSING				0x00400002	//ManualMapping_Shell	: -						: can't resolve imports because pLoadLibraryA is NULL
+#define INJ_MM_GETMODULEHANDLEA_MISSING			0x00400003	//ManualMapping_Shell	: -						: can't resolve imports because pGetModuleHandleA is NULL
+#define INJ_MM_GETPROCADDRESS_MISSING			0x00400004	//ManualMapping_Shell	: -						: can't resolve imports because pGetProcAddress is NULL
+#define INJ_MM_CANT_LOAD_MODULE					0x00400005	//ManualMapping_Shell	: -						: GetModuleHandleA and LoadLibraryA failed
+#define INJ_MM_CANT_GET_IMPORT					0x00400006	//ManualMapping_Shell	: -						: GetProcAddress failed
+#define INJ_MM_CANT_LOAD_DELAY_MODULE			0x00400007	//ManualMapping_Shell	: -						: can't load required delayed module (GetModuleHandleA and LoadLibraryA failed)
+#define INJ_MM_CANT_GET_DELAY_IMPORT			0x00400008	//ManualMapping_Shell	: -						: can't load required delayed import (GetProcAddress failed)
+#define INJ_MM_KERNEL32_POINTER_MISSING			0x00400009	//ManualMapping_Shell	: -						: can't fake PE header since kernel32.dll reference is missing
+#define INJ_MM_FUNCTION_TABLE_MISSING			0x0040000A	//ManualMapping_Shell	: -						: function pointer to RtlInsertInvertedFunctionTable is missing
+#define INJ_MM_ENABLING_SEH_FAILED				0x0040000B	//ManualMapping_Shell	: -						: RtlInsertInvertedFunctionTable failed
 
 
 

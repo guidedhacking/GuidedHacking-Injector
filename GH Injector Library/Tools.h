@@ -33,6 +33,8 @@
 #define MDWD(p) (DWORD)((ULONG_PTR)p & 0xFFFFFFFF)
 //Macro to convert void* into 32-bit DWORD.
 
+#define ADDRESS_OF(obj, member) reinterpret_cast<decltype(&obj->member)>(reinterpret_cast<UINT_PTR>(obj) + reinterpret_cast<UINT_PTR>(&((reinterpret_cast<decltype(obj)>(0)->member))))
+//insane macro to do cool stuff
 
 //Global variable to store the base address of the current image of the injector. Initialized in DllMain.
 inline HINSTANCE g_hInjMod = NULL;
@@ -127,8 +129,6 @@ bool IsElevatedProcess(HANDLE hTargetProc);
 //Returnvalue (bool):
 ///		true:	process is elevated.
 ///		false:	process is not elevated.
-
-bool EnablePrivilege(const TCHAR * szPrivilege);
 
 void ErrorLog(ERROR_INFO * info);
 //A function used to generate an error log file in case shit hit the fan for some reason.

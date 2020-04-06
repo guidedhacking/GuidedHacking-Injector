@@ -16,6 +16,8 @@ namespace REMOTE
 	FUNC_WOW64(GetModuleHandleA);
 	FUNC_WOW64(GetProcAddress);
 	FUNC_WOW64(RtlInsertInvertedFunctionTable);
+	FUNC_WOW64(LdrpModuleBaseAddressIndex);
+	FUNC_WOW64(LdrpMappingInfoIndex);
 };
 
 #endif

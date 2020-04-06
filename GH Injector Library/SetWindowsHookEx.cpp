@@ -28,6 +28,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
 		swhex_info.close();
+
 		return SR_SWHEX_ERR_CANT_OPEN_INFO_TXT;
 	}
 

@@ -38,6 +38,10 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, "C:\\Windows\\System32\\ntdll.dll", RootPath, nullptr, false);
 #endif
 	}
+	else if (dwReason == DLL_PROCESS_DETACH)
+	{
+		
+	}
 
 #ifdef _DEBUG
 

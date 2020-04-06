@@ -7,12 +7,11 @@
 
 SYMBOL_PARSER::SYMBOL_PARSER()
 {
-	m_Initialized = false;
-	m_SymbolTable = 0;
-	m_Filesize = 0;
-	m_hPdbFile = nullptr;
-	m_hProcess = nullptr;
-
+	m_Initialized	= false;
+	m_SymbolTable	= 0;
+	m_Filesize		= 0;
+	m_hPdbFile		= nullptr;
+	m_hProcess		= nullptr;
 }
 
 SYMBOL_PARSER::~SYMBOL_PARSER()
