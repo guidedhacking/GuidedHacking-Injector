@@ -69,23 +69,14 @@
     <ClInclude Include="Symbol Parser.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="LoadLibraryExW.h">
-      <Filter>Headerdateien\Injection Methods</Filter>
-    </ClInclude>
-    <ClInclude Include="LdrLoadDll.h">
-      <Filter>Headerdateien\Injection Methods</Filter>
-    </ClInclude>
-    <ClInclude Include="LdrpLoadDll.h">
-      <Filter>Headerdateien\Injection Methods</Filter>
-    </ClInclude>
     <ClInclude Include="Manual Mapping.h">
       <Filter>Headerdateien\Injection Methods</Filter>
     </ClInclude>
     <ClInclude Include="Hook Scanner.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="Remote Function WOW64.h">
-      <Filter>Headerdateien</Filter>
+    <ClInclude Include="Injection Internal.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -104,9 +95,6 @@
     <ClCompile Include="Import Handler WOW64.cpp">
       <Filter>Quelldateien\wow64</Filter>
     </ClCompile>
-    <ClCompile Include="Injection WOW64.cpp">
-      <Filter>Quelldateien\wow64</Filter>
-    </ClCompile>
     <ClCompile Include="Start Routine WOW64.cpp">
       <Filter>Quelldateien\wow64</Filter>
     </ClCompile>
@@ -119,19 +107,7 @@
     <ClCompile Include="Manual Mapping.cpp">
       <Filter>Quelldateien\native\Injection Methods</Filter>
     </ClCompile>
-    <ClCompile Include="LoadLibraryExW.cpp">
-      <Filter>Quelldateien\native\Injection Methods</Filter>
-    </ClCompile>
-    <ClCompile Include="LdrLoadDll.cpp">
-      <Filter>Quelldateien\native\Injection Methods</Filter>
-    </ClCompile>
-    <ClCompile Include="LoadLibraryExW WOW64.cpp">
-      <Filter>Quelldateien\wow64\Injection Methods</Filter>
-    </ClCompile>
     <ClCompile Include="Manual Mapping WOW64.cpp">
-      <Filter>Quelldateien\wow64\Injection Methods</Filter>
-    </ClCompile>
-    <ClCompile Include="LdrLoadDll WOW64.cpp">
       <Filter>Quelldateien\wow64\Injection Methods</Filter>
     </ClCompile>
     <ClCompile Include="Import Handler.cpp">
@@ -170,17 +146,17 @@
     <ClCompile Include="Symbol Parser.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="LdrpLoadDll.cpp">
-      <Filter>Quelldateien\native\Injection Methods</Filter>
-    </ClCompile>
-    <ClCompile Include="LdrpLoadDll WOW64.cpp">
-      <Filter>Quelldateien\wow64\Injection Methods</Filter>
-    </ClCompile>
     <ClCompile Include="Hook Scanner.cpp">
       <Filter>Quelldateien\native</Filter>
     </ClCompile>
     <ClCompile Include="Hook Scanner WOW64.cpp">
       <Filter>Quelldateien\wow64</Filter>
+    </ClCompile>
+    <ClCompile Include="Injection Generic.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Injection Generic WOW64.cpp">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

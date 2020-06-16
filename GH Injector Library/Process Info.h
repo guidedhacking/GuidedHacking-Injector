@@ -43,6 +43,8 @@ class ProcessInfo
 
 	UINT_PTR m_WaitFunctionReturnAddress[6] = { 0 };
 
+	HINSTANCE m_hWin32U;
+
 #ifdef _WIN64
 	DWORD m_WaitFunctionReturnAddress_WOW64[6] = { 0 };
 #endif

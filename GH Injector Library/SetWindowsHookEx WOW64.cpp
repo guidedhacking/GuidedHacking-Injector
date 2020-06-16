@@ -6,16 +6,11 @@
 
 DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId, DWORD & Out, ERROR_DATA & error_data)
 {
-	wchar_t RootPath[MAX_PATH * 2]{ 0 };
-	if (!GetOwnModulePathW(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
-	{
-		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+	wchar_t RootPath[MAX_PATH]{ 0 };
+	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
 
-		return SR_SWHEX_ERR_CANT_QUERY_INFO_PATH;
-	}
-
-	wchar_t InfoPath[sizeof(RootPath) / sizeof(RootPath[0])]{ 0 };
-	memcpy(InfoPath, RootPath, sizeof(RootPath));
+	wchar_t InfoPath[MAX_PATH]{ 0 };
+	StringCbCopyW(InfoPath, sizeof(InfoPath), g_RootPathW.c_str());
 	StringCbCatW(InfoPath, sizeof(InfoPath), SM_INFO_FILENAME86);
 
 	if (FileExists(InfoPath))

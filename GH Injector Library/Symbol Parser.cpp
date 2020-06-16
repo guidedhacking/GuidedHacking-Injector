@@ -2,9 +2,6 @@
 
 #include "Symbol Parser.h"
 
-#pragma comment(lib, "DbgHelp.lib")
-#pragma comment(lib, "Urlmon.lib")
-
 SYMBOL_PARSER::SYMBOL_PARSER()
 {
 	m_Initialized	= false;

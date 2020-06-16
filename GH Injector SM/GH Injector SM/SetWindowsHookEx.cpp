@@ -1,7 +1,6 @@
 #include "pch.h"
 
 #include "main.h"
-#pragma comment(lib, "Psapi.lib")
 
 BOOL CALLBACK EnumWindowsCallback(HWND hWnd, LPARAM lParam)
 {

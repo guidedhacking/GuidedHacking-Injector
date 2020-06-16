@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Process Info.h"
-#include "Import Handler.h"
+#include "Tools.h"
 
 enum class SR_REMOTE_STATE : ULONG_PTR
 {
@@ -21,16 +21,7 @@ using f_Routine = DWORD(__stdcall*)(void * pArg);
 #define SR_REMOTE_TIMEOUT 2000
 //Routine timeout in ms
 
-#define ALIGN_64 __declspec(align(8))
-#define ALIGN_86 __declspec(align(4))
-
-#ifdef _WIN64
-#define ALIGN ALIGN_64
-#else
-#define ALIGN ALIGN_86
-#endif
-
-struct SR_REMOTE_DATA
+ALIGN struct SR_REMOTE_DATA
 {
 	ALIGN SR_REMOTE_STATE	State;
 	ALIGN DWORD				Ret;
@@ -76,14 +67,14 @@ DWORD SR_QueueUserAPC		(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, 			
 //Subroutines called by StartRoutine.
 
 #ifdef _WIN64
-struct SR_REMOTE_DATA_WOW64
+ALIGN_86 struct SR_REMOTE_DATA_WOW64
 {
-	DWORD State;
-	DWORD Ret;
-	DWORD LastWin32Error;
-	DWORD pArg;
-	DWORD pRoutine;
-	DWORD Buffer;
+	ALIGN_86 DWORD State;
+	ALIGN_86 DWORD Ret;
+	ALIGN_86 DWORD LastWin32Error;
+	ALIGN_86 DWORD pArg;
+	ALIGN_86 DWORD pRoutine;
+	ALIGN_86 DWORD Buffer;
 };
 
 #define SR_REMOTE_DATA_BUFFER_WOW64 SR_REMOTE_DATA_BUFFER_86

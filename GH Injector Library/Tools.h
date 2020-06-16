@@ -1,17 +1,17 @@
 #pragma once
 
-#include "NT Stuff.h"
-#include "Symbol Parser.h"
+#include "Import Handler.h"
 
 //Filenames and errorlog setup
 
-#define GH_INJ_VERSION L"3.4"
 
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
+#define GH_INJ_VERSIONW L"3.4"
 
 #define GH_INJ_MOD_NAME64A "GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86A "GH Injector - x86.dll"
+#define GH_INJ_VERSIONA "3.4"
 
 #ifdef _WIN64
 #define GH_INJ_MOD_NAMEW GH_INJ_MOD_NAME64W
@@ -23,21 +23,18 @@
 
 #ifdef UNICODE
 #define GH_INJ_MOD_NAME GH_INJ_MOD_NAMEW
+#define GH_INJ_VERSION GH_INJ_VERSIONW
 #else
 #define GH_INJ_MOD_NAME GH_INJ_MOD_NAMEA
+#define GH_INJ_VERSION GH_INJ_VERSIONA
 #endif
-
-#define MPTR(d) (void*)(ULONG_PTR)d
-//Macro to convert 32-bit DWORD into void*.
-
-#define MDWD(p) (DWORD)((ULONG_PTR)p & 0xFFFFFFFF)
-//Macro to convert void* into 32-bit DWORD.
-
-#define ADDRESS_OF(obj, member) reinterpret_cast<decltype(&obj->member)>(reinterpret_cast<UINT_PTR>(obj) + reinterpret_cast<UINT_PTR>(&((reinterpret_cast<decltype(obj)>(0)->member))))
-//insane macro to do cool stuff
 
 //Global variable to store the base address of the current image of the injector. Initialized in DllMain.
 inline HINSTANCE g_hInjMod = NULL;
+
+//Global variables to store the root directory of the module
+inline std::string	g_RootPathA;
+inline std::wstring	g_RootPathW;
 
 struct ERROR_INFO
 	//A structure used to pass information to the error log function.

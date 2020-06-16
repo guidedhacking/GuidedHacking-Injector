@@ -7,12 +7,7 @@ std::vector<SYSTEM_HANDLE_TABLE_ENTRY_INFO> EnumProcessHandles();
 
 NTSTATUS EnumHandles(char * pBuffer, ULONG Size, ULONG * SizeOut, UINT & Count)
 {
-	if (!NT::NtQuerySystemInformation)
-	{
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	NTSTATUS ntRet = NT::NtQuerySystemInformation(SYSTEM_INFORMATION_CLASS::SystemHandleInformation, pBuffer, Size, SizeOut);
+	NTSTATUS ntRet = NATIVE::NtQuerySystemInformation(SYSTEM_INFORMATION_CLASS::SystemHandleInformation, pBuffer, Size, SizeOut);
 
 	if (NT_FAIL(ntRet))
 	{

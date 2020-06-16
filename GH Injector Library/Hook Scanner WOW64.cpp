@@ -4,16 +4,19 @@
 
 #include "Hook Scanner.h"
 
-bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc)
+bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc, HANDLE hRefProcess)
 {
-	if(!GetProcAddressEx_WOW64((HANDLE)Info.pReference, Info.hModuleBase, Info.FunctionName.c_str(), Info.pFunc))
+	DWORD Address = 0;
+	if(!GetProcAddressEx_WOW64(hRefProcess, Info.hModuleBase, Info.FunctionName, Address))
 	{
-		Info.ErrorCode = HOOK_SCAN_ERR_GETPROCADDRESS_FAILED;;
+		Info.ErrorCode = HOOK_SCAN_ERR_GETPROCADDRESS_FAILED;
 
 		return false;
 	}
 
-	if (!ReadProcessMemory((HANDLE)Info.pReference, Info.pFunc, Info.OriginalBytes, sizeof(Info.OriginalBytes), nullptr))
+	Info.pFunc = MPTR(Address);
+
+	if (!ReadProcessMemory(hRefProcess, Info.pFunc, Info.OriginalBytes, sizeof(Info.OriginalBytes), nullptr))
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED;
 
@@ -27,8 +30,7 @@ bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc)
 
 		return false;
 	}
-
-
+	
 	for (int i = 0; i != HOOK_SCAN_BYTE_COUNT; ++i)
 	{
 		if (Info.OriginalBytes[i] != Buffer[i])

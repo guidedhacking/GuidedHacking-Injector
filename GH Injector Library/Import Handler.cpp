@@ -2,274 +2,120 @@
 
 #include "Import Handler.h"
 
-#ifdef UNICODE
-#undef MODULEENTRY32
-#undef Module32First
-#undef Module32Next
-#endif
+using namespace NATIVE;
 
-#undef GetModuleHandleEx
+#define S_FUNC(f) f, #f
 
-HINSTANCE GetModuleHandleEx(HANDLE hTargetProc, const TCHAR * szModuleName)
+template <typename T>
+DWORD LoadExportedFunction(T & Function, const char * szFunction)
 {
-#ifdef UNICODE
-	return GetModuleHandleExW(hTargetProc, szModuleName);
+	Function = ReCa<T>(GetProcAddress(g_hNTDLL, szFunction));
+	if (!Function)
+	{
+		return GetLastError();
+	}
+
+	return INJ_ERR_SUCCESS;
+}
+
+template <typename T>
+DWORD LoadNtSymbolNative(T & Function, const char * szFunction)
+{
+	DWORD RVA = 0;
+	DWORD sym_ret = sym_ntdll_native.GetSymbolAddress(szFunction, RVA);
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		return sym_ret;
+	}
+
+	Function = ReCa<T>(ReCa<UINT_PTR>(g_hNTDLL) + RVA);
+
+	return INJ_ERR_SUCCESS;
+}
+
+DWORD ResolveImports(ERROR_DATA & error_data)
+{
+	g_hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
+
+	HINSTANCE hK32 = GetModuleHandle(TEXT("kernel32.dll"));
+
+	WIN32_FUNC_INIT(LoadLibraryExW, hK32);
+	WIN32_FUNC_INIT(GetLastError, hK32);
+	if (!NATIVE::pLoadLibraryExW || !NATIVE::pGetLastError) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(LdrLoadDll)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(LdrUnloadDll)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(LdrGetDllHandleEx)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(LdrGetProcedureAddress)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(LdrLockLoaderLock)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(LdrUnlockLoaderLock)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(NtQueryInformationProcess)))	return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtQuerySystemInformation)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtQueryInformationThread)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(RtlMoveMemory)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlAllocateHeap)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlFreeHeap)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(RtlAnsiStringToUnicodeString))) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlUnicodeStringToAnsiString))) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlInitUnicodeString)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlHashUnicodeString)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(RtlRbInsertNodeEx)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlRbRemoveNode)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	
+	if (LoadExportedFunction(S_FUNC(NtOpenFile)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtReadFile)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtSetInformationFile)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtQueryInformationFile)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtCreateSection)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtMapViewOfSection)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtUnmapViewOfSection)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(NtClose)))						return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(NtAllocateVirtualMemory)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtFreeVirtualMemory)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(NtProtectVirtualMemory)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(RtlGetSystemTimePrecise)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+
+	if (LoadExportedFunction(S_FUNC(NtCreateThreadEx)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlQueueApcWow64Thread)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	
+	if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
+	}
+	
+	DWORD sym_ret = sym_ntdll_native_ret.get();
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		INIT_ERROR_DATA(error_data, sym_ret);
+
+		return INJ_ERR_SYMBOL_INIT_FAIL;
+	}
+
+	if (LoadNtSymbolNative(S_FUNC(LdrpLoadDll)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolNative(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolNative(S_FUNC(RtlInsertInvertedFunctionTable)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolNative(S_FUNC(LdrpHandleTlsData)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolNative(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolNative(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolNative(S_FUNC(LdrpHashTable)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolNative(S_FUNC(LdrpHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	
+#ifdef _WIN64
+	return ResolveImports_WOW64(error_data);
 #else
-	return GetModuleHandleExA(hTargetProc, szModuleName);
+	return INJ_ERR_SUCCESS;
 #endif
-}
-
-HINSTANCE GetModuleHandleExA(HANDLE hTargetProc, const char * szModuleName)
-{
-	MODULEENTRY32 ME32{ 0 };
-	ME32.dwSize = sizeof(ME32);
-	
-	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetProcessId(hTargetProc));
-	if (hSnap == INVALID_HANDLE_VALUE)
-	{
-		while (GetLastError() == ERROR_BAD_LENGTH)
-		{
-			hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetProcessId(hTargetProc));
-		
-			if (hSnap != INVALID_HANDLE_VALUE)
-			{
-				break;
-			}
-		}
-	}
-	
-	if (hSnap == INVALID_HANDLE_VALUE || !hSnap)
-	{
-		return NULL;
-	}
-	
-	BOOL bRet = Module32First(hSnap, &ME32);
-	do
-	{
-		if (!_stricmp(ME32.szModule, szModuleName))
-		{
-			break;
-		}
-
-		bRet = Module32Next(hSnap, &ME32);
-	} 
-	while (bRet);
-	
-	CloseHandle(hSnap);
-
-	if (!bRet)
-	{
-		return NULL;
-	}
-
-	return ME32.hModule;
-}
-
-HINSTANCE GetModuleHandleExW(HANDLE hTargetProc, const wchar_t * szModuleName)
-{
-	MODULEENTRY32W ME32{ 0 };
-	ME32.dwSize = sizeof(ME32);
-
-	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetProcessId(hTargetProc));
-	if (hSnap == INVALID_HANDLE_VALUE)
-	{
-		while (GetLastError() == ERROR_BAD_LENGTH)
-		{
-			hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetProcessId(hTargetProc));
-
-			if (hSnap != INVALID_HANDLE_VALUE)
-			{
-				break;
-			}
-		}
-	}
-
-	if (hSnap == INVALID_HANDLE_VALUE || !hSnap)
-	{
-		return NULL;
-	}
-
-	BOOL bRet = Module32FirstW(hSnap, &ME32);
-	do
-	{
-		if (!_wcsicmp(ME32.szModule, szModuleName))
-		{
-			break;
-		}
-
-		bRet = Module32NextW(hSnap, &ME32);
-	} while (bRet);
-
-	CloseHandle(hSnap);
-
-	if (!bRet)
-	{
-		return NULL;
-	}
-
-	return ME32.hModule;
-}
-
-bool GetProcAddressEx(HANDLE hTargetProc, const TCHAR * szModuleName, const char * szProcName, void * &pOut)
-{
-	return GetProcAddressEx(hTargetProc, GetModuleHandleEx(hTargetProc, szModuleName), szProcName, pOut);
-}
-
-bool GetProcAddressEx(HANDLE hTargetProc, HINSTANCE hModule, const char * szProcName, void * &pOut)
-{
-	BYTE * modBase = ReCa<BYTE*>(hModule);
-
-	if (!modBase)
-	{
-		return false;
-	}
-
-	BYTE * pe_header = new BYTE[0x1000];
-	if (!pe_header)
-	{
-		return false;
-	}
-
-	if (!ReadProcessMemory(hTargetProc, modBase, pe_header, 0x1000, nullptr))
-	{
-		delete[] pe_header;
-
-		return false;
-	}
-
-	auto * pNT			= ReCa<IMAGE_NT_HEADERS*>(pe_header + ReCa<IMAGE_DOS_HEADER*>(pe_header)->e_lfanew);
-	auto * pExportEntry	= &pNT->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-
-	auto ExportSize		= pExportEntry->Size;
-	auto ExportDirRVA	= pExportEntry->VirtualAddress;
-	
-	if (!ExportSize)
-	{
-		delete[] pe_header;
-
-		return false;
-	}
-
-	BYTE * export_data = new BYTE[ExportSize];
-	if (!export_data)
-	{
-		delete[] pe_header;
-
-		return false;
-	}
-
-	if (!ReadProcessMemory(hTargetProc, modBase + ExportDirRVA, export_data, ExportSize, nullptr))
-	{
-		delete[] export_data;
-		delete[] pe_header;
-
-		return false;
-	}
-		
-	BYTE * localBase	= export_data - ExportDirRVA;
-	auto pExportDir		= ReCa<IMAGE_EXPORT_DIRECTORY*>(export_data);
-
-	auto Forward = [&](DWORD FuncRVA) -> bool
-	{
-		char pFullExport[MAX_PATH]{ 0 };
-		size_t len_out = 0;
-
-		HRESULT hr = StringCchLengthA(ReCa<char*>(localBase + FuncRVA), sizeof(pFullExport), &len_out);
-		if (FAILED(hr) || !len_out) 
-		{
-			return false;
-		}
-
-		memcpy(pFullExport, ReCa<char*>(localBase + FuncRVA), len_out);
-
-		char * pFuncName = strchr(pFullExport, '.');
-		*(pFuncName++) = '\0';
-		if (*pFuncName == '#')
-		{
-			pFuncName = ReCa<char *>(LOWORD(atoi(++pFuncName)));
-		}
-
-#ifdef UNICODE
-
-		wchar_t ModNameW[MAX_PATH]{ 0 };
-		size_t SizeOut = 0;
-
-		if (mbstowcs_s(&SizeOut, ModNameW, pFullExport, MAX_PATH))
-		{
-			return GetProcAddressEx(hTargetProc, ModNameW, pFuncName, pOut);
-		}
-		else
-		{
-			return false;
-		}
-
-#else
-
-		return GetProcAddressEx(hTargetProc, pFullExport, pFuncName, pOut);
-
-#endif
-	};
-
-	if ((ReCa<ULONG_PTR>(szProcName) & 0xFFFFFF) <= MAXWORD)
-	{
-		WORD Base		= LOWORD(pExportDir->Base - 1);
-		WORD Ordinal	= LOWORD(szProcName) - Base;
-		DWORD FuncRVA	= ReCa<DWORD*>(localBase + pExportDir->AddressOfFunctions)[Ordinal];
-		
-		delete[] export_data;
-		delete[] pe_header;
-
-		if (FuncRVA >= ExportDirRVA && FuncRVA < ExportDirRVA + ExportSize)
-		{
-			return Forward(FuncRVA);
-		}
-
-		return modBase + FuncRVA;
-	}
-
-	DWORD max		= pExportDir->NumberOfNames - 1;
-	DWORD min		= 0;
-	DWORD FuncRVA	= 0;
-
-	while (min <= max)
-	{
-		DWORD mid = (min + max) / 2;
-
-		DWORD CurrNameRVA	= ReCa<DWORD*>(localBase + pExportDir->AddressOfNames)[mid];
-		char * szName		= ReCa<char*>(localBase + CurrNameRVA);
-
-		int cmp = strcmp(szName, szProcName);
-		if (cmp < 0)
-		{
-			min = mid + 1;
-		}
-		else if (cmp > 0)
-		{
-			max = mid - 1;
-		}
-		else
-		{
-			WORD Ordinal = ReCa<WORD*>(localBase + pExportDir->AddressOfNameOrdinals)[mid];
-			FuncRVA = ReCa<DWORD*>(localBase + pExportDir->AddressOfFunctions)[Ordinal];
-
-			break;
-		}
-	}
-
-	delete[] export_data;
-	delete[] pe_header;
-
-	if (!FuncRVA)
-	{
-		return false;
-	}
-	
-	if (FuncRVA >= ExportDirRVA && FuncRVA < ExportDirRVA + ExportSize)
-	{
-		return Forward(FuncRVA);
-	}
-	
-	pOut = modBase + FuncRVA;
-
-	return true;
 }

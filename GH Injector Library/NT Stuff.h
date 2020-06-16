@@ -6,7 +6,7 @@
 
 #include "pch.h"
 
-#pragma region nt defines
+#pragma region nt (un)defines
 
 #ifndef NT_FAIL
 	#define NT_FAIL(status) (status < 0)
@@ -16,12 +16,21 @@
 	#define NT_SUCCESS(status) (status >= 0)
 #endif
 
+#ifdef RtlMoveMemory
+#undef RtlMoveMemory
+#endif
+
 #define THREAD_CREATE_FLAGS_CREATE_SUSPENDED	0x00000001
 #define THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH  0x00000002
 #define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER	0x00000004
 
+#define OBJ_CASE_INSENSITIVE 0x00000040
+
+#define STATUS_SUCCESS				0x00000000
 #define STATUS_UNSUCCESSFUL			0xC0000001
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
+
+#define LDR_GET_DLL_HANDLE_EX_UNCHANGED_REFCOUNT   0x00000001
 
 typedef LONG KPRIORITY;
 
@@ -59,14 +68,38 @@ typedef enum class _KWAIT_REASON
 	WrQueue	= 0x0F
 } KWAIT_REASON;
 
-typedef enum class _OBEJECT_TYPE_NUMBER : BYTE
+typedef enum class _OBEJECT_TYPE_NUMBER
 {
 	Process = 0x07
 } OBJECT_TYPE_NUMBER;
 
+typedef enum class _SECTION_INHERIT
+{
+	ViewShare = 1,
+	ViewUnmap = 2
+} SECTION_INHERIT;
+
+enum class LDR_DDAG_STATE
+{
+	LdrModulesReadyToRun = 9
+};
+
+typedef enum _FILE_INFORMATION_CLASS
+{
+	FileStandardInformation = 5,
+	FilePositionInformation = 14
+} FILE_INFORMATION_CLASS, * PFILE_INFORMATION_CLASS;
+
 #pragma endregion
 
 #pragma region structs
+
+typedef struct _ANSI_STRING
+{
+	USHORT	Length;
+	USHORT	MaxLength;
+	char *  szBuffer;
+} ANSI_STRING, *PANSI_STRING;
 
 typedef struct _UNICODE_STRING
 {
@@ -74,6 +107,12 @@ typedef struct _UNICODE_STRING
 	WORD		MaxLength;
 	wchar_t *	szBuffer;
 } UNICODE_STRING, *PUNICODE_STRING;
+
+typedef struct _LDRP_UNICODE_STRING_BUNDLE
+{
+	UNICODE_STRING	String;
+	WCHAR			StaticBuffer[128];
+} LDRP_UNICODE_STRING_BUNDLE, *PLDRP_UNICODE_STRING_BUNDLE;
 
 typedef struct _RTL_BALANCED_NODE
 {
@@ -95,13 +134,45 @@ typedef struct _RTL_BALANCED_NODE
 	};
 } RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
 
+typedef struct _RTL_RB_TREE
+{
+	RTL_BALANCED_NODE * Root;
+	RTL_BALANCED_NODE * Min;
+} RTL_RB_TREE, *PRTL_RB_TREE;
+
+struct _LDR_DDAG_NODE;
+
+typedef struct _LDRP_INCOMING_DEPENDENCY
+{
+	_LDRP_INCOMING_DEPENDENCY * Next;
+	_LDR_DDAG_NODE * Node;
+} LDRP_INCOMING_DEPENDENCY, *PLDRP_INCOMING_DEPENDENCY;
+
+typedef struct _LDRP_DEPENDENCY
+{
+	_LDRP_DEPENDENCY			*	Next;
+	_LDR_DDAG_NODE				*	DependencyNode;
+	_LDRP_INCOMING_DEPENDENCY	*	IncomingDependenciesLink;
+	_LDR_DDAG_NODE				*	ParentNode;
+} LDRP_DEPENDENCY, *PLDRP_DEPENDENCY;
+
+typedef struct _LDRP_CSLIST
+{
+	PSINGLE_LIST_ENTRY Tail;
+} LDRP_CSLIST, * PLDRP_CSLIST;
+
 typedef struct _LDR_DDAG_NODE
 {
-#ifdef _WIN64
-	char data[0x50];
-#else
-	char data[0x30];
-#endif
+	LIST_ENTRY					Modules;
+	PVOID						ServiceTagList;
+	ULONG						LoadCount;
+	ULONG						LoadWhileUnloadingCount;
+	ULONG						LowestLink;
+	PLDRP_DEPENDENCY			Dependencies;
+	PLDRP_INCOMING_DEPENDENCY	IncomingDependencies;
+	LDR_DDAG_STATE				State;
+	PVOID						CondenseLink;
+	ULONG						PreorderNumber;
 } LDR_DDAG_NODE, *PLDR_DDAG_NODE;
 
 typedef struct _LDR_DATA_TABLE_ENTRY
@@ -143,6 +214,13 @@ typedef struct _LDR_DATA_TABLE_ENTRY
 
 	ULONG_PTR		OriginalBase;
 	LARGE_INTEGER	LoadTime;
+	ULONG			BaseNameHashValue;
+	ULONG			LoadReason;
+
+	ULONG ImplicitPathOptions;
+	ULONG ReferenceCount;
+	ULONG DependentLoadFlags;
+	UCHAR SigningLevel;
 } LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
 typedef struct _PEB_LDR_DATA
@@ -266,6 +344,20 @@ typedef struct _SYSTEM_PROCESS_INFORMATION
 	SYSTEM_THREAD_INFORMATION Threads[1];
 } SYSTEM_PROCESS_INFORMATION, *PSYSTEM_PROCESS_INFORMATION;
 
+typedef struct _FILE_STANDARD_INFORMATION 
+{
+	LARGE_INTEGER AllocationSize;
+	LARGE_INTEGER EndOfFile;
+	ULONG         NumberOfLinks;
+	BOOLEAN       DeletePending;
+	BOOLEAN       Directory;
+} FILE_STANDARD_INFORMATION, * PFILE_STANDARD_INFORMATION;
+
+typedef struct _FILE_POSITION_INFORMATION
+{
+	LARGE_INTEGER CurrentByteOffset;
+} FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
+
 typedef union _LDRP_PATH_SEARCH_OPTIONS
 {
 	ULONG32 Flags;
@@ -281,19 +373,76 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT
 	UNICODE_STRING				DllSearchPath;
 	BOOLEAN						AllocatedOnLdrpHeap;
 	LDRP_PATH_SEARCH_OPTIONS	SearchOptions;
-	UNICODE_STRING				OriginalFullDllName;
+	LDRP_UNICODE_STRING_BUNDLE	OriginalFullDllName;
 } LDRP_PATH_SEARCH_CONTEXT, *PLDRP_PATH_SEARCH_CONTEXT;
+
+typedef union _LDRP_LOAD_CONTEXT_FLAGS
+{
+	ULONG32 Flags;
+	struct
+	{
+		ULONG32 Redirected					: 1;
+		ULONG32 BaseNameOnly				: 1;
+		ULONG32 HasFullPath					: 1;
+		ULONG32 KnownDll					: 1;
+		ULONG32 SystemImage					: 1;
+		ULONG32 ExecutableImage				: 1;
+		ULONG32 AppContainerImage			: 1;
+		ULONG32 CallInit					: 1;
+		ULONG32 UserAllocated				: 1;
+		ULONG32 SearchOnlyFirstPathSegment	: 1;
+		ULONG32 RedirectedByAPISet			: 1;
+	};
+} LDRP_LOAD_CONTEXT_FLAGS, * PLDRP_LOAD_CONTEXT_FLAGS;
+
+typedef struct _OBJECT_ATTRIBUTES 
+{
+	ULONG				Length;
+	HANDLE				RootDirectory;
+	UNICODE_STRING	*	ObjectName;
+	ULONG				Attributes;
+	PVOID				SecurityDescriptor;
+	PVOID				SecurityQualityOfService;
+}  OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
+
+#define InitializeObjectAttributes(p, n, a, r, s) \
+{ \
+	(p)->Length = sizeof(OBJECT_ATTRIBUTES); \
+	(p)->RootDirectory				= r; \
+	(p)->Attributes					= a; \
+	(p)->ObjectName					= n; \
+	(p)->SecurityDescriptor			= s; \
+	(p)->SecurityQualityOfService	= NULL; \
+}
+
+typedef struct _IO_STATUS_BLOCK 
+{
+	union 
+	{
+		NTSTATUS Status;
+		PVOID Pointer;
+	} DUMMYUNIONNAME;
+
+	ULONG_PTR Information;
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
 
 #ifdef _WIN64
 
-typedef struct _UNICODE_STRING32
+typedef ALIGN_86 struct _ANSI_STRING32
+{
+	WORD	Length;
+	WORD	MaxLength;
+	DWORD	szBuffer;
+} ANSI_STRING32, *PANSI_STRING32;
+
+typedef ALIGN_86 struct _UNICODE_STRING32
 {
 	WORD	Length;
 	WORD	MaxLength;
 	DWORD	szBuffer;
 } UNICODE_STRING32, *PUNICODE_STRING32;
 
-typedef struct _LDRP_PATH_SEARCH_CONTEXT32
+typedef ALIGN_86 struct _LDRP_PATH_SEARCH_CONTEXT32
 {
 	UNICODE_STRING32			DllSearchPath;
 	BOOLEAN						AllocatedOnLdrpHeap;
@@ -301,12 +450,27 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT32
 	UNICODE_STRING32			OriginalFullDllName;
 } LDRP_PATH_SEARCH_CONTEXT32, *PLDRP_PATH_SEARCH_CONTEXT32;
 
-typedef struct _LDR_DDAG_NODE32
+typedef ALIGN_86 struct _DDAG_DEPENDENCY32
 {
-	char data[0x30];
+	DWORD Next;
+	DWORD DDag;
+} DDAG_DEPENDENCY32, *PDDAG_DEPENDENCY32;
+
+typedef ALIGN_86 struct _LDR_DDAG_NODE32
+{
+	LIST_ENTRY32 modules;
+	DWORD ServiceTagList;
+	DWORD LoadCount;
+	DWORD LoadWhileUnloadingCount;
+	DWORD LowestLink;
+	DWORD Dependencies;
+	DWORD IncomingDependencies;
+	DWORD State;
+	DWORD CondenseLink;
+	DWORD PreorderNumber;
 } LDR_DDAG_NODE32, *PLDR_DDAG_NODE32;
 
-typedef struct _RTL_BALANCED_NODE32
+typedef ALIGN_86 struct _RTL_BALANCED_NODE32
 {
 	union
 	{
@@ -326,7 +490,13 @@ typedef struct _RTL_BALANCED_NODE32
 	};
 } RTL_BALANCED_NODE32, *PRTL_BALANCED_NODE32;
 
-typedef struct _LDR_DATA_TABLE_ENTRY32
+typedef ALIGN_86 struct _LARGE_INTEGER32
+{
+	DWORD LowPart;
+	DWORD HighPart;
+} LARGE_INTEGER32, *PLARGE_INTEGER32;
+
+typedef ALIGN_86 struct _LDR_DATA_TABLE_ENTRY32
 {
 	LIST_ENTRY32		InLoadOrderLinks;
 	LIST_ENTRY32		InMemoryOrderLinks;
@@ -351,10 +521,17 @@ typedef struct _LDR_DATA_TABLE_ENTRY32
 	RTL_BALANCED_NODE32	BaseAddressIndexNode;
 	RTL_BALANCED_NODE32	MappingInfoIndexNode;
 	DWORD				OriginalBase;
-	LARGE_INTEGER		LoadTime;
+	DWORD				Buffer;
+	LARGE_INTEGER32		LoadTime;
+	ULONG				BaseNameHashValue;
+	ULONG				LoadReason;
+	ULONG				ImplicitPathOptions;
+	ULONG				ReferenceCount;
+	ULONG				DependentLoadFlags;
+	UCHAR				SigningLevel;
 } LDR_DATA_TABLE_ENTRY32, *PLDR_DATA_TABLE_ENTRY32;
 
-typedef struct _PEB_LDR_DATA32
+typedef ALIGN_86 struct _PEB_LDR_DATA32
 {
 	ULONG			Length;
 	BYTE			Initialized;
@@ -367,7 +544,7 @@ typedef struct _PEB_LDR_DATA32
 	DWORD			ShutdownThreadId;
 } PEB_LDR_DATA32, *PPEB_LDR_DATA32;
 
-typedef struct _PEB32
+typedef ALIGN_86 struct _PEB32
 {
 	DWORD Reserved[3];
 	DWORD Ldr;
@@ -406,19 +583,43 @@ using f_LdrpLoadDll = NTSTATUS (__fastcall*)
 (
 	UNICODE_STRING				*	dll_path, 
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
-	ULONG32							Flags,
+	LDRP_LOAD_CONTEXT_FLAGS			Flags,
 	LDR_DATA_TABLE_ENTRY		**	ldr_out
 );
 
-using f_LdrpHandleTlsData = NTSTATUS(__fastcall*)
+using f_LdrUnloadDll = NTSTATUS(__stdcall*)
 (
-	BYTE * pImageBase
+	HINSTANCE hDll
 );
 
-using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall*)
+using f_LdrGetDllHandleEx = NTSTATUS (__fastcall*)
 (
-	void	*	hDll,
-	DWORD		SizeOfImage
+	ULONG				Flags,
+	PWSTR				OptDllPath,
+	PULONG				OptDllCharacteristics,
+	UNICODE_STRING	*	DllName,
+	PVOID			*	DllHandle
+);
+
+using f_LdrGetProcedureAddress = NTSTATUS (__stdcall*)
+(
+	PVOID				BaseAddress,
+	ANSI_STRING		*	Name,
+	ULONG				Ordinal,
+	PVOID			*	ProcedureAddress
+);
+
+using f_LdrLockLoaderLock = NTSTATUS (__stdcall*)
+(
+	ULONG			Flags,
+	ULONG		*	State,
+	ULONG_PTR	*	Cookie
+);
+
+using f_LdrUnlockLoaderLock = NTSTATUS (__stdcall*)
+(
+	ULONG Flags,
+	ULONG_PTR Cookie
 );
 
 using f_NtQueryInformationProcess = NTSTATUS (__stdcall*)
@@ -456,28 +657,202 @@ using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall*)
 	void	*	pArg3
 );
 
-using f_LdrpModuleBaseAddressIndex	= RTL_BALANCED_NODE*;
-using f_LdrpMappingInfoIndex		= RTL_BALANCED_NODE*;
+using f_LdrpPreprocessDllName = NTSTATUS (__fastcall*)
+(
+	UNICODE_STRING				* DllName,
+	LDRP_UNICODE_STRING_BUNDLE	* OutputDllName,
+	LDR_DATA_TABLE_ENTRY		* pOptParentEntry,
+	LDRP_LOAD_CONTEXT_FLAGS		* LoadContextFlags
+);
+
+using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall*)
+(
+	void	*	hDll,
+	DWORD		SizeOfImage
+);
+
+using f_LdrpHandleTlsData = NTSTATUS (__fastcall*)
+(
+	LDR_DATA_TABLE_ENTRY * pEntry
+);
+
+using f_RtlMoveMemory = VOID (__stdcall*)
+(
+	PVOID	UNALIGNED	Destination,
+	LPCVOID	UNALIGNED	Source,
+	SIZE_T				Length
+);
+
+using f_RtlAllocateHeap = PVOID (__stdcall*)
+(
+	PVOID	HeapHandle,
+	ULONG	Flags,
+	SIZE_T	Size
+);
+
+using f_RtlFreeHeap = BOOLEAN (__stdcall*)
+(
+	PVOID	HeapHandle,
+	ULONG	Flags,
+	PVOID	BaseAddress
+);
+
+using f_RtlAnsiStringToUnicodeString = NTSTATUS (__stdcall*)
+(
+	UNICODE_STRING	*	DestinationString,
+	ANSI_STRING		*	SourceString,
+	BOOLEAN				AllocateDestinationString
+);
+
+using f_RtlUnicodeStringToAnsiString = NTSTATUS (__stdcall*)
+(
+	ANSI_STRING		*	DestinationString,
+	UNICODE_STRING	*	SourceString,
+	BOOLEAN				AllocateDestinationString
+);
+
+using f_RtlInitUnicodeString = VOID (__stdcall*)
+(
+	UNICODE_STRING * DestinationString,
+	const wchar_t * SourceString
+);
+
+using f_RtlHashUnicodeString = NTSTATUS (__stdcall*)
+(
+	UNICODE_STRING	*	String,
+	BOOLEAN				CaseInSensitive,
+	ULONG				HashAlgorithm,
+	ULONG			*	HashValue
+);
+
+using f_RtlRbInsertNodeEx = VOID (__stdcall*)
+(
+	RTL_RB_TREE			*	pTree,
+	RTL_BALANCED_NODE	*	pOptParent,
+	BOOLEAN					Right,
+	RTL_BALANCED_NODE	*	pNode
+);
+
+using f_RtlRbRemoveNode = VOID (__stdcall*)
+(
+	RTL_RB_TREE			* pTree,
+	RTL_BALANCED_NODE	* pNode
+);
+
+using f_NtOpenFile = NTSTATUS (__stdcall*)
+(
+	HANDLE				*	hFileOut,
+	ACCESS_MASK				DesiredAccess,
+	OBJECT_ATTRIBUTES	*	pAtrributes,
+	IO_STATUS_BLOCK		*	pIoStatusBlock,
+	ULONG					ShareAccess,
+	ULONG					OpenOptions
+);
+
+using f_NtReadFile = NTSTATUS (__stdcall*)
+(
+	HANDLE					FileHandle,
+	HANDLE					hOptEvent,
+	PVOID					pOptApc,
+	PVOID					pOptApcContext,
+	IO_STATUS_BLOCK		*	IoStatusBlock,
+	PVOID					Buffer,
+	ULONG					Length,
+	LARGE_INTEGER		*	pOptByteOffset,
+	ULONG				*	pOptKey
+);
+
+using f_NtSetInformationFile = NTSTATUS (__stdcall*)
+(
+	HANDLE						FileHandle,
+	IO_STATUS_BLOCK			*	IoStatusBlock,
+	PVOID						FileInformation,
+	ULONG						Length,
+	FILE_INFORMATION_CLASS		FileInformationClass
+);
+
+using f_NtQueryInformationFile = NTSTATUS(__stdcall*)
+(
+	HANDLE						FileHandle,
+	IO_STATUS_BLOCK			*	pIoStatusBlock,
+	PVOID						FileInformation,
+	ULONG						Length,
+	FILE_INFORMATION_CLASS		FileInformationClass
+);
+
+using f_NtCreateSection = NTSTATUS (__stdcall*)
+(
+	PHANDLE			SectionHandle,
+	ACCESS_MASK		DesiredAccess,
+	PVOID			ObjectAttributes,
+	PLARGE_INTEGER	MaximumSize,
+	ULONG			SectionPageProtection,
+	ULONG			AllocationAttributes,
+	HANDLE			FileHandle
+);
+
+using f_NtMapViewOfSection = NTSTATUS (__stdcall*)
+(
+	HANDLE				SectionHandle,
+	HANDLE				ProcessHandle,
+	PVOID			*	BaseAddress,
+	ULONG_PTR			ZeroBits,
+	SIZE_T				CommitSize,
+	PLARGE_INTEGER		SectionOffset,
+	PSIZE_T				ViewSize,
+	SECTION_INHERIT		InheritDisposition,
+	ULONG				AllocationType,
+	ULONG				Win32Protect
+);
+
+using f_NtUnmapViewOfSection = NTSTATUS (__stdcall*)
+(
+	HANDLE	ProcessHandle,
+	PVOID	BaseAddress
+);
+
+using f_NtClose = NTSTATUS (__stdcall*)
+(
+	HANDLE Handle
+);
+
+using f_NtAllocateVirtualMemory = NTSTATUS (__stdcall*)
+(
+	HANDLE			ProcessHandle,
+	PVOID		*	BaseAddress,
+	ULONG_PTR		ZeroBits,
+	SIZE_T		*	RegionSize,
+	ULONG			AllocationType,
+	ULONG			Protect
+);
+
+using f_NtFreeVirtualMemory = NTSTATUS (__stdcall*)
+(
+	HANDLE		ProcessHandle,
+	PVOID	*	BaseAddress,
+	SIZE_T	*	RegionSize,
+	ULONG		FreeType
+);
+
+using f_NtProtectVirtualMemory = NTSTATUS (__stdcall*)
+(
+	HANDLE		ProcessHandle,
+	PVOID	*	BaseAddress,
+	SIZE_T	*	Size,
+	ULONG		NewAccess,
+	ULONG	*	OldAccess
+);
+
+using f_RtlGetSystemTimePrecise = LONGLONG (__stdcall*)
+(
+
+);
+
+using f_LdrpModuleBaseAddressIndex	= RTL_RB_TREE*;
+using f_LdrpMappingInfoIndex		= RTL_RB_TREE*;
+using f_LdrpHashTable				= LIST_ENTRY*;
+using f_LdrpHeap					= PVOID*;
 
 #pragma endregion
 
-#define NT_FUNC(Function) inline f_##Function Function = nullptr;
-#define LOAD_NT_FUNC(Function, Library, FunctionName) NT::Function = reinterpret_cast<f_##Function>(GetProcAddress(Library, FunctionName))
-
-namespace NT
-{
-	NT_FUNC(NtCreateThreadEx);
-	NT_FUNC(LdrLoadDll);
-	NT_FUNC(LdrpLoadDll);
-	NT_FUNC(RtlInsertInvertedFunctionTable);
-	NT_FUNC(NtQueryInformationProcess);
-	NT_FUNC(NtQuerySystemInformation);
-	NT_FUNC(NtQueryInformationThread);
-	NT_FUNC(LdrpHandleTlsData);
-	NT_FUNC(LdrpModuleBaseAddressIndex);
-	NT_FUNC(LdrpMappingInfoIndex);
-
-#ifdef _WIN64
-	NT_FUNC(RtlQueueApcWow64Thread);
-#endif
-}
+inline HINSTANCE g_hNTDLL;

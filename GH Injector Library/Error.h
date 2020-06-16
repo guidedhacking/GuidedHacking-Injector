@@ -38,71 +38,50 @@
 #define	INJ_ERR_RPM_FAIL					0x00000011	//ReadProcessMemory					: win32 error			: read operation failed
 #define INJ_ERR_GET_MODULE_HANDLE_FAIL		0x00000012	//GetModuleHandle					: win32 error			: address of the specified module couldn't be resolved
 #define INJ_ERR_CANT_FIND_MOD_PEB			0x00000013	//internal error					: -						: injected module isn't linked to the peb
-#define INJ_ERR_CANT_ACCESS_PEB_LDR			0x00000014	//ReadProcessMemory					: win32 error			: reading the peb entry of the injected module failed
+#define INJ_ERR_UNLINKING_FAILED			0x00000014	//internal error					: PEB linker error		: unlinking the injected module from the PEB failed (PEB linker error 0x60000001 - 0x600000XX)
 #define INJ_ERR_OUT_OF_MEMORY_EXT			0x00000015	//VirtualAllocEx					: win32 error			: memory allocation in the target process failed
 #define INJ_ERR_OUT_OF_MEMORY_INT			0x00000016	//VirtualAlloc						: win32 error			: internal memory allocation failed
 #define INJ_ERR_OUT_OF_MEMORY_NEW			0x00000017	//operator new						: -						: internal memory allocation on heap failed
 #define INJ_ERR_IMAGE_CANT_RELOC			0x00000018	//internal error					: -						: image has to be relocated but base reloc directory is emtpy
-#define INJ_ERR_LDRLOADDLL_MISSING			0x00000019	//internal error					: -						: can't resolve the address of LdrLoadDll
-#define INJ_ERR_REMOTEFUNC_MISSING			0x0000001A	//internal error					: -						: can't resolve the address of a remote function
+#define INJ_ERR_GET_SYMBOL_ADDRESS_FAILED	0x00000019	//internal error					: -						: can't resolve the address of a required symbol
+#define INJ_ERR_GET_PROC_ADDRESS_FAIL		0x0000001A	//GetProcAddress					: -						: resolving the address of a required function failed
 #define INJ_ERR_VERIFY_RESULT_FAIL			0x0000001B	//ReadProcessMemory					: win32 error			: reading the result data of the injection failed
-#define INJ_ERR_CANT_SET_PAGE_PROT			0x0000001C	//VirtualProtectEx					: win32 error			: updating the page protections failed
-#define INJ_ERR_MODULE_MISSING				0x0000001D	//GetModuleHandle					: win32 error			: resolving the address of a required module failed
-#define INJ_ERR_REMOTEMODULE_MISSING		0x0000001E	//GetModuleHandleEx(WOW64)			: -						: resolving the address of a required module in the target process failed
-#define INJ_ERR_SYMBOL_INIT_NOT_DONE		0x0000001F	//SYMBOL_PARSER::Initialize			: -						: initializations process of the symbol parser isn't finished
-#define INJ_ERR_SYMBOL_INIT_FAIL			0x00000020	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - 0x40000014)
-#define INJ_ERR_SYMBOL_GET_FAIL				0x00000021	//SYMBOL_PARSER::GetSymbolAddress	: symbol error			: couldn't get address of required symbol (symbol error 0x40000001 - 0x40000014)
-#define INJ_ERR_LOAD_CONFIG_EMPTY			0x00000022	//internal error					: -						: the load configuration directory of the module is emtpy
-#define INJ_ERR_CANT_GET_MODULE_PATH		0x00000023	//internal error					: -						: can't resolve the path of this instance of the injection library
-#define INJ_ERR_FAILED_TO_LOAD_DLL			0x00000024	//internal error					: -						: the injection failed for unknown reasons
-#define INJ_ERR_HIJACK_NO_HANDLES			0x00000025	//internal error					: -						: can't find a process handle to the target process
-#define INJ_ERR_HIJACK_NO_NATIVE_HANDLE		0x00000026	//internal error					: -						: can't find a hijackable handle to the target process
-#define INJ_ERR_HIJACK_INJ_FAILED			0x00000027	//internal error					: GH Inj error code		: injecting injection module into handle owner process failed
-#define INJ_ERR_HIJACK_OUT_OF_MEMORY_EXT	0x00000028	//VirtualAllocEx					: win32 error			: memory allocation in the hijack process failed
-#define INJ_ERR_HIJACK_WPM_FAIL				0x00000029	//WriteProcessMemory				: win32 error			: writing injection data to hijack process failed
-#define INJ_ERR_HIJACK_INJECTW_MISSING		0x0000002A	//internal error					: -						: can't locate remote injection function in hijack process
-#define INJ_ERR_HIJACK_REMOTE_INJ_FAIL		0x0000002B	//internal error					: GH Inj error code		: injection executed in the hijack process failed, additional error log was generated
+#define INJ_ERR_SYMBOL_INIT_NOT_DONE		0x0000001C	//SYMBOL_PARSER::Initialize			: -						: initializations process of the symbol parser isn't finished
+#define INJ_ERR_SYMBOL_INIT_FAIL			0x0000001D	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - 0x40000014)
+#define INJ_ERR_SYMBOL_GET_FAIL				0x0000001E	//SYMBOL_PARSER::GetSymbolAddress	: symbol error			: couldn't get address of required symbol (symbol error 0x40000001 - 0x40000014)
+#define INJ_ERR_CANT_GET_MODULE_PATH		0x0000001F	//internal error					: -						: can't resolve the path of this instance of the injection library
+#define INJ_ERR_FAILED_TO_LOAD_DLL			0x00000020	//internal error					: -						: the injection failed for unknown reasons
+#define INJ_ERR_HIJACK_NO_HANDLES			0x00000021	//internal error					: -						: can't find a process handle to the target process
+#define INJ_ERR_HIJACK_NO_NATIVE_HANDLE		0x00000022	//internal error					: -						: can't find a hijackable handle to the target process
+#define INJ_ERR_HIJACK_INJ_FAILED			0x00000023	//internal error					: GH Inj error code		: injecting injection module into handle owner process failed
+#define INJ_ERR_HIJACK_OUT_OF_MEMORY_EXT	0x00000024	//VirtualAllocEx					: win32 error			: memory allocation in the hijack process failed
+#define INJ_ERR_HIJACK_WPM_FAIL				0x00000025	//WriteProcessMemory				: win32 error			: writing injection data to hijack process failed
+#define INJ_ERR_HIJACK_INJECTW_MISSING		0x00000026	//internal error					: -						: can't locate remote injection function in hijack process
+#define INJ_ERR_HIJACK_REMOTE_INJ_FAIL		0x00000027	//internal error					: GH Inj error code		: injection executed in the hijack process failed, additional error log was generated
+#define INJ_ERR_LLEXW_FAILED				0x00000028	//LoadLibraryExW					: win32 error			: LoadLibraryExW failed loading the dll
+#define INJ_ERR_LDRLDLL_FAILED				0x00000029	//LdrLoadDll						: NTSTATUS				: LdrLoadDll failed loading the dll
+#define INJ_ERR_LDRPLDLL_FAILED				0x0000002A	//LdrpLoadDll						: NTSTATUS				: LdrpLoadDll failed loading the dll
 
-///////////////////
-///LoadLibraryExW
-											//Source				: advanced error type	: error description
-
-#define INJ_LLEXW_ERR_NO_DATA	0x00100001	//LoadLibraryExW_Shell	: -						: pData is NULL
-#define INJ_LLEXW_ERR_INV_DATA	0x00100002	//LoadLibraryExW_Shell	: -						: pData is invalid
-#define INJ_LLEXW_ERR_LL_FAIL	0x00100003	//LoadLibraryExW_Shell	: -						: pData->pLoadLibraryExW returned NULL
-
-///////////////////
-///LdrLoadDll
-											//Source			: advanced error type	: error description
-
-#define INJ_LLDLL_ERR_NO_DATA	0x00200001	//LdrLoadDll_Shell	: -						: pData is NULL
-#define INJ_LLDLL_ERR_INV_DATA	0x00200002	//LdrLoadDll_Shell	: -						: pData is invalid
-#define INJ_LLDLL_ERR_LL_FAIL	0x00200003	//LdrLoadDll_Shell	: NTSTATUS  			: pData->pLdrLoadDll failed
-
-///////////////////
-///LdrpLoadDll
-											//Source			: advanced error type	: error description
-
-#define INJ_LDRPL_ERR_NO_DATA	0x00300001	//LdrpLoadDll_Shell	: -						: pData is NULL
-#define INJ_LDRPL_ERR_INV_DATA	0x00300002	//LdrpLoadDll_Shell	: -						: pData is invalid
-#define INJ_LDRPL_ERR_LL_FAIL	0x00300003	//LdrpLoadDll_Shell	: NTSTATUS				: pData->pLdrpLoadDll failed
 
 ///////////////////
 ///ManualMap
-															//Source				: advanced error type	: error description
+															//Source							: advanced error type	: error description
 
-#define INJ_MM_ERR_NO_DATA						0x00400001	//ManualMapping_Shell	: -						: pData is NULL
-#define INJ_MM_LOADLIBRARYA_MISSING				0x00400002	//ManualMapping_Shell	: -						: can't resolve imports because pLoadLibraryA is NULL
-#define INJ_MM_GETMODULEHANDLEA_MISSING			0x00400003	//ManualMapping_Shell	: -						: can't resolve imports because pGetModuleHandleA is NULL
-#define INJ_MM_GETPROCADDRESS_MISSING			0x00400004	//ManualMapping_Shell	: -						: can't resolve imports because pGetProcAddress is NULL
-#define INJ_MM_CANT_LOAD_MODULE					0x00400005	//ManualMapping_Shell	: -						: GetModuleHandleA and LoadLibraryA failed
-#define INJ_MM_CANT_GET_IMPORT					0x00400006	//ManualMapping_Shell	: -						: GetProcAddress failed
-#define INJ_MM_CANT_LOAD_DELAY_MODULE			0x00400007	//ManualMapping_Shell	: -						: can't load required delayed module (GetModuleHandleA and LoadLibraryA failed)
-#define INJ_MM_CANT_GET_DELAY_IMPORT			0x00400008	//ManualMapping_Shell	: -						: can't load required delayed import (GetProcAddress failed)
-#define INJ_MM_KERNEL32_POINTER_MISSING			0x00400009	//ManualMapping_Shell	: -						: can't fake PE header since kernel32.dll reference is missing
-#define INJ_MM_FUNCTION_TABLE_MISSING			0x0040000A	//ManualMapping_Shell	: -						: function pointer to RtlInsertInvertedFunctionTable is missing
-#define INJ_MM_ENABLING_SEH_FAILED				0x0040000B	//ManualMapping_Shell	: -						: RtlInsertInvertedFunctionTable failed
-
+#define INJ_MM_ERR_NO_DATA						0x00400001	//internal error					: -						: pData is NULL
+#define INJ_MM_ERR_NT_OPEN_FILE					0x00400002	//NtOpenFile						: NTSTATUS				: NtOpenFile failed
+#define INJ_MM_ERR_HEAP_ALLOC					0x00400003	//NtAllocateHeap					: -						: memory allocation failed
+#define INJ_MM_ERR_NT_READ_FILE					0x00400004	//NtReadFile						: NTSTATUS				: reading the file failed
+#define INJ_MM_ERR_SET_FILE_POSITION			0x00400005	//NtSetInformationFile				: NTSTATUS				: failed to reset the file pointer to  the beginning of the file 
+#define INJ_MM_ERR_CANT_CREATE_SECTION			0x00400006	//NtCreateSection					: NTSTATUS				: failed to create a section
+#define INJ_MM_ERR_FAILED_TO_MAP_IMAGE			0x00400007	//NtMapViewOfSection				: NTSTATUS				: failed to map view of section
+#define INJ_MM_ERR_UPDATE_PAGE_PROTECTION		0x00400008	//NtProtectVirtualMemory			: NTSTATUS				: setting the page protection of the image failed
+#define INJ_MM_ERR_CANT_GET_FILE_SIZE			0x00400009	//NtQueryInformationFile			: NTSTATUS				: querying the file size failed
+#define INJ_MM_ERR_MEMORY_ALLOCATION_FAILED		0x0040000A	//NtAllocateVirtualMemory			: NTSTATUS				: couldn't allocate memory
+#define INJ_MM_ERR_IMAGE_CANT_BE_RELOCATED		0x0040000B	//internal error					: -						: the image has to be relocated but the reloc directory of the image is empty
+#define INJ_MM_ERR_IMPORT_FAIL					0x0040000C	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
+#define INJ_MM_ERR_DELAY_IMPORT_FAIL			0x0040000D	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
+#define INJ_MM_ERR_ENABLING_SEH_FAILED			0x0040000E	//RtlInsertInvertedFunctionTable	: NTSTATUS				: enabling exception handling by calling RtlInsertInvertedFunctionTable failed
+#define INJ_MM_ERR_INVALID_HEAP_HANDLE			0x0040000F	//internal error					: -						: the provided pointer to the LdrpHeap is invalid
 
 
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,6 +268,14 @@
 #define HOOK_SCAN_ERR_WAIT_FAILED					0x50000009	//WaitForSingleObject	:	win32 error
 #define HOOK_SCAN_ERR_WAIT_TIMEOUT					0x5000000A	//WaitForSingleObject	:	waiting timed out
 
+
+
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ERROR_DATA
 {
 	DWORD		AdvErrorCode;
@@ -298,7 +285,9 @@ struct ERROR_DATA
 };
 
 #define INIT_ERROR_DATA(data, error) \
-data.AdvErrorCode = error;\
-data.Line = __LINE__; \
-memcpy(data.szFileName, __FILENAMEW__,  ((size_t)lstrlenW(__FILENAMEW__)) * 2); \
+data.AdvErrorCode = error;															\
+data.Line = __LINE__;																\
+memcpy(data.szFileName, __FILENAMEW__,  ((size_t)lstrlenW(__FILENAMEW__)) * 2);		\
 memcpy(data.szFunctionName, __FUNCTIONW__, ((size_t)lstrlenW(__FUNCTIONW__)) * 2);
+
+#define LOG printf

@@ -10,6 +10,93 @@
 #undef Module32Next
 #endif
 
+using namespace WOW64;
+
+#define S_FUNC(f) f##_WOW64, #f
+
+template <typename T>
+DWORD LoadNtSymbolWOW64(T & Function, const char * szFunction)
+{
+	DWORD RVA = 0;
+	DWORD sym_ret = sym_ntdll_wow64.GetSymbolAddress(szFunction, RVA);
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		printf("Failed to load WOW64 function: %s\n", szFunction);
+		return 0;
+	}
+
+	Function = (T)(ReCa<UINT_PTR>(g_hNTDLL) + RVA);
+
+	return INJ_ERR_SUCCESS;
+}
+
+DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
+{
+	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
+	}
+
+	DWORD sym_ret = sym_ntdll_wow64_ret.get();
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		INIT_ERROR_DATA(error_data, sym_ret);
+
+		return INJ_ERR_SYMBOL_INIT_FAIL;
+	}
+
+	if (LoadNtSymbolWOW64(S_FUNC(LdrLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrUnloadDll)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(LdrGetDllHandleEx)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrGetProcedureAddress)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(LdrLockLoaderLock)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrUnlockLoaderLock)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(RtlMoveMemory)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlAllocateHeap)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlFreeHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(RtlAnsiStringToUnicodeString)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlUnicodeStringToAnsiString)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlInitUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlHashUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(RtlRbInsertNodeEx)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlRbRemoveNode)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(NtOpenFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtReadFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtSetInformationFile)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtQueryInformationFile)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtCreateSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtMapViewOfSection)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtUnmapViewOfSection)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(NtClose)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	
+	if (LoadNtSymbolWOW64(S_FUNC(NtAllocateVirtualMemory)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtFreeVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(NtProtectVirtualMemory)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(RtlGetSystemTimePrecise)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(RtlInsertInvertedFunctionTable)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpHandleTlsData)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpHashTable)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	return INJ_ERR_SUCCESS;
+}
+
 HINSTANCE GetModuleHandleEx_WOW64(HANDLE hTargetProc, const TCHAR * szModuleName)
 {
 #ifdef UNICODE
@@ -109,12 +196,12 @@ HINSTANCE GetModuleHandleExW_WOW64(HANDLE hTargetProc, const wchar_t * lpModuleN
 	return ME32.hModule;
 }
 
-bool GetProcAddressEx_WOW64(HANDLE hTargetProc, const TCHAR * szModuleName, const char * szProcName, void * &pOut)
+bool GetProcAddressEx_WOW64(HANDLE hTargetProc, const TCHAR * szModuleName, const char * szProcName, DWORD &pOut)
 {
 	return GetProcAddressEx_WOW64(hTargetProc, GetModuleHandleEx_WOW64(hTargetProc, szModuleName), szProcName, pOut);
 }
 
-bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * szProcName, void * &pOut)
+bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * szProcName, DWORD &pOut)
 {
 	BYTE * modBase = ReCa<BYTE*>(hModule);
 
@@ -162,7 +249,7 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 
 	BYTE * pBase = pExpDirBuffer - DirRVA;
 
-	auto Forward = [&](DWORD FuncRVA, void * &pForwarded) -> bool
+	auto Forward = [&](DWORD FuncRVA, DWORD &pForwarded) -> bool
 	{
 		char pFullExport[MAX_PATH]{ 0 };
 		size_t len_out = 0;
@@ -215,7 +302,7 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 			return Forward(FuncRVA, pOut);
 		}
 			
-		pOut = modBase + FuncRVA;
+		pOut = MDWD(modBase) + FuncRVA;
 		
 		return true;
 	}
@@ -262,7 +349,7 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 		return Forward(FuncRVA, pOut);
 	}
 
-	pOut = modBase + FuncRVA;
+	pOut = MDWD(modBase) + FuncRVA;
 
 	return true;
 }

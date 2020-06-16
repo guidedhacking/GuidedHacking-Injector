@@ -38,7 +38,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 
 	delete[] headers;
 
-	if (magic != 0x5A4D || signature != 0x4550 || machine != desired_machine) //"MZ" & "PE"
+	if (magic != IMAGE_DOS_SIGNATURE || signature != IMAGE_NT_SIGNATURE || machine != desired_machine) //"MZ" & "PE"
 	{
 		return FILE_ERR_INVALID_FILE;
 	}
@@ -97,14 +97,9 @@ bool IsNativeProcess(HANDLE hTargetProc)
 }
 
 ULONG GetSessionId(HANDLE hTargetProc, NTSTATUS & ntRetOut)
-{	
-	if (!NT::NtQueryInformationProcess)
-	{
-		return (ULONG)-1;
-	}
-
+{
 	PROCESS_SESSION_INFORMATION psi{ 0 };
-	ntRetOut = NT::NtQueryInformationProcess(hTargetProc, PROCESSINFOCLASS::ProcessSessionInformation, &psi, sizeof(psi), nullptr);
+	ntRetOut = NATIVE::NtQueryInformationProcess(hTargetProc, PROCESSINFOCLASS::ProcessSessionInformation, &psi, sizeof(psi), nullptr);
 	if (NT_FAIL(ntRetOut))
 	{
 		return (ULONG)-1;
@@ -132,16 +127,10 @@ bool IsElevatedProcess(HANDLE hTargetProc)
 
 void ErrorLog(ERROR_INFO * info)
 {
-	wchar_t pPath[MAX_PATH * 2]{ 0 };
-	if (!GetOwnModulePathW(pPath, sizeof(pPath) / sizeof(pPath[0])))
-	{
-		return;
-	}
-
 	wchar_t ErrorLogName[] = L"GH_Inj_Log.txt";
 
 	wchar_t FullPath[MAX_PATH]{ 0 };
-	StringCbCopyW(FullPath, sizeof(FullPath), pPath);
+	StringCbCopyW(FullPath, sizeof(FullPath), g_RootPathW.c_str());
 	StringCbCatW(FullPath, sizeof(FullPath), ErrorLogName);
 		
 	time_t time_raw	= time(nullptr);
@@ -184,6 +173,8 @@ void ErrorLog(ERROR_INFO * info)
 	std::wofstream error_log(FullPath, std::ios_base::out | std::ios_base::app);
 	if (!error_log.good())
 	{
+		LOG("Failed to open/create error log file:\n%ls\n", FullPath);
+
 		return;
 	}
 

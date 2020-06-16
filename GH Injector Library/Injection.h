@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Injection Internal.h"
 #include "Eject.h"
 #include "Handle Hijacking.h"
-#include "Remote Function WOW64.h"
 
 //Cloaking options:
 #define INJ_ERASE_HEADER				0x0001	//replaces the first 0x1000 bytes of the dll with 0's (not compatible with INJ_FAKE_HEADER)
@@ -18,18 +18,18 @@
 ///(2) launch method must be NtCreateThreadEx, ignored otherwise
 
 //Manual mapping options:
-#define INJ_MM_SHIFT_MODULE				0x00010000	//shifts the module by a random amount of bytes - the data preceding the dll is randomized aswell
-#define INJ_MM_CLEAN_DATA_DIR			0x00020000	//removes data from the dlls PE header
-#define INJ_MM_RESOLVE_IMPORTS			0x00040000	//resolves dll imports
-#define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00080000	//resolves delayed imports
-#define INJ_MM_EXECUTE_TLS				0x00100000	//executes TLS callbacks and initializes static TLS data
-#define INJ_MM_ENABLE_SEH				0x00200000	//enables exception handling
-#define INJ_MM_SET_PAGE_PROTECTIONS		0x00400000	//sets page protections based on section characteristics
-#define INJ_MM_INIT_SECURITY_COOKIE		0x00800000	//initializes security cookie for buffer overrun protection
-#define INJ_MM_RUN_DLL_MAIN				0x01000000	//executes DllMain
+#define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header
+#define INJ_MM_RESOLVE_IMPORTS			0x00020000	//resolves dll imports
+#define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00040000	//resolves delayed imports
+#define INJ_MM_EXECUTE_TLS				0x00080000	//executes TLS callbacks and initializes static TLS data
+#define INJ_MM_ENABLE_EXCEPTIONS		0x00100000	//enables exception handling
+#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics
+													//if set INJ_MM_CLEAN_DATA_DIR, INJ_ERASE_HEADER and INJ_FAKE_HEADER will be ignored
+#define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
+#define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
 
-#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_SEH | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
+#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
 
 //ansi version of the info structure:
 struct INJECTIONDATAA
@@ -71,36 +71,13 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData);
 ///		On success: INJ_ERR_SUCCESS.
 ///		On failure: One of the errorcodes defined in Error.h.
 
-DWORD _LoadLibraryExW	(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _LdrLoadDll		(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _LdrpLoadDll		(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _ManualMap		(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-//Injection methods called by InjectA/InjectW -> InjectDll
-
-#ifdef _WIN64
-DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE im, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-//Main injection function when injecting from x64 into a WOW64 process.
-//Arguments as defined in INJECTIONDATA and returnvalue as explained the InjectA/InjectW functions.
-
-DWORD _LoadLibrary_WOW64	(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _LdrLoadDll_WOW64		(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _LdrpLoadDll_WOW64	(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-DWORD _ManualMap_WOW64		(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data);
-//WOW64 injection methods called by InjectDLL_WOW64
-#endif
-
 #define MAXPATH_IN_TCHAR	MAX_PATH
 #define MAXPATH_IN_BYTE_A	MAX_PATH * sizeof(char)
 #define MAXPATH_IN_BYTE_W	MAX_PATH * sizeof(wchar_t)
 #define MAXPATH_IN_BYTE		MAX_PATH * sizeof(TCHAR)
 //Internal stuff
 
-#define ALIGN_UP(X, A) (X + (A - 1)) & (~(A - 1))
-#define ALIGN_IMAGE_BASE_X64(Base) ALIGN_UP(Base, 0x10)
-#define ALIGN_IMAGE_BASE_X86(Base) ALIGN_UP(Base, 0x08)
-#ifdef _WIN64 
-#define ALIGN_IMAGE_BASE(Base) ALIGN_IMAGE_BASE_X64(Base)
-#else
-#define ALIGN_IMAGE_BASE(Base) ALIGN_IMAGE_BASE_X86(Base)
-#endif
-//Alignment macro for module and code bases
+
+//Returns the version string of the current instance
+HRESULT __stdcall GetVersionA(char		* out, size_t cb_size);
+HRESULT __stdcall GetVersionW(wchar_t	* out, size_t cb_size);

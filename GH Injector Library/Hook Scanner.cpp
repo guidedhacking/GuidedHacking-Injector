@@ -2,7 +2,47 @@
 
 #include "Hook Scanner.h"
 
-bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, std::vector<HookInfo> & HookDataOut)
+static const char Modules[][MAX_PATH] =
+{
+	"kernel32.dll",
+	"KernelBase.dll",
+	"ntdll.dll"
+};
+
+static const char k32_functions[][MAX_PATH] =
+{
+	"LoadLibraryExW",
+	"BaseThreadInitThunk"
+};
+
+static const char kb_functions[][MAX_PATH] =
+{
+	"LoadLibraryExW",
+};
+
+static const char nt_functions[][MAX_PATH] =
+{
+	"LdrLoadDll",
+	"LdrGetDllHandleEx",
+	"LdrGetProcedureAddressForCaller",
+	"LdrLockLoaderLock",
+	"LdrUnlockLoaderLock",
+	"RtlMoveMemory",
+	"RtlAllocateHeap",
+	"RtlFreeHeap",
+	"RtlHashUnicodeString",
+	"RtlRbInsertNodeEx",
+	"NtOpenFile",
+	"NtReadFile",
+	"NtSetInformationFile",
+	"NtQueryInformationFile",
+	"NtCreateSection",
+	"NtMapViewOfSection",
+	"NtAllocateVirtualMemory",
+	"NtProtectVirtualMemory"
+};
+
+bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
@@ -36,44 +76,31 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 
 	bWow64 = false;
 #endif
-	
+
+	std::vector<HookInfo> HookDataOutV;
+
+	UINT ScanCount = 0;
+
 	if (bWow64)
 	{
 #ifdef _WIN64
-		std::string kernel32_path	("C:\\Windows\\SysWOW64\\kernel32.dll");
-		std::string kernelbase_path	("C:\\Windows\\SysWOW64\\KernelBase.dll");
-		std::string ntdll_path		("C:\\Windows\\SysWOW64\\ntdll.dll");
 
-		std::string kernel32_name	("kernel32.dll");
-		std::string kernelbase_name	("KernelBase.dll");
-		std::string ntdll_name		("ntdll.dll");
-
-		HINSTANCE h_remote_K32	= GetModuleHandleExA_WOW64(hTargetProc, kernel32_name.c_str());
-		HINSTANCE h_remote_KB	= GetModuleHandleExA_WOW64(hTargetProc, kernelbase_name.c_str());
-		HINSTANCE h_remote_NT	= GetModuleHandleExA_WOW64(hTargetProc, ntdll_name.c_str());
+		HINSTANCE h_remote_K32	= GetModuleHandleExA_WOW64(hTargetProc, Modules[0]);
+		HINSTANCE h_remote_KB	= GetModuleHandleExA_WOW64(hTargetProc, Modules[1]);
+		HINSTANCE h_remote_NT	= GetModuleHandleExA_WOW64(hTargetProc, Modules[2]);
 
 		PROCESS_INFORMATION pi{ 0 };
 		STARTUPINFOW si{ 0 };
 		si.cb			= sizeof(si);
 		si.dwFlags		= STARTF_USESHOWWINDOW;
 		si.wShowWindow	= SW_HIDE;
-		
-		wchar_t RootPath[MAX_PATH * 2]{ 0 };
-		if (!GetOwnModulePathW(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
-		{
-			ErrorCode = HOOK_SCAN_ERR_CANT_GET_OWN_MODULE_PATH;
-
-			CloseHandle(hTargetProc);
-
-			return false;
-		}
 
 		SECURITY_ATTRIBUTES sa{ 0 };
 		sa.nLength			= sizeof(SECURITY_ATTRIBUTES);
 		sa.bInheritHandle	= TRUE;
 
-		HANDLE hEvent = CreateEventEx(&sa, nullptr, NULL, EVENT_ALL_ACCESS);
-		if (!hEvent)
+		HANDLE hEventStart = CreateEventEx(&sa, nullptr, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+		if (!hEventStart)
 		{
 			LastWin32Error	= GetLastError();
 			ErrorCode		= HOOK_SCAN_ERR_CREATE_EVENT_FAILED;
@@ -83,30 +110,51 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			return false;
 		}
 
-		wchar_t hEvent_string[9]{ 0 };
-		_ultow_s(MDWD(hEvent), hEvent_string, 0x10);
-
-		StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
-
-		wchar_t cmdLine[MAX_PATH]{ 0 };
-		StringCbCatW(cmdLine, sizeof(cmdLine), L"\"");
-		StringCbCatW(cmdLine, sizeof(cmdLine), SM_EXE_FILENAME86);
-		StringCbCatW(cmdLine, sizeof(cmdLine), L"\" 1 ");
-		StringCbCatW(cmdLine, sizeof(cmdLine), hEvent_string);
-
-		if (!CreateProcessW(RootPath, cmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		HANDLE hEventEnd = CreateEventEx(&sa, nullptr, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+		if (!hEventEnd)
 		{
-			LastWin32Error	= GetLastError();
-			ErrorCode		= HOOK_SCAN_ERR_CREATE_PROCESS_FAILED;
+			CloseHandle(hEventStart);
 
-			CloseHandle(hEvent);
+			LastWin32Error = GetLastError();
+			ErrorCode = HOOK_SCAN_ERR_CREATE_EVENT_FAILED;
 
 			CloseHandle(hTargetProc);
 
 			return false;
 		}
 
-		DWORD dwWaitRet = WaitForSingleObject(hEvent, 500);
+		wchar_t hEventStart_string[9]{ 0 };
+		_ultow_s(MDWD(hEventStart), hEventStart_string, 0x10);
+
+		wchar_t hEventEnd_string[9]{ 0 };
+		_ultow_s(MDWD(hEventEnd), hEventEnd_string, 0x10);
+
+		wchar_t RootPath[MAX_PATH * 2]{ 0 };
+		StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
+		StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
+
+		wchar_t cmdLine[MAX_PATH]{ 0 };
+		StringCbCatW(cmdLine, sizeof(cmdLine), L"\"");
+		StringCbCatW(cmdLine, sizeof(cmdLine), SM_EXE_FILENAME86);
+		StringCbCatW(cmdLine, sizeof(cmdLine), L"\" 1 ");
+		StringCbCatW(cmdLine, sizeof(cmdLine), hEventStart_string);
+		StringCbCatW(cmdLine, sizeof(cmdLine), L" ");
+		StringCbCatW(cmdLine, sizeof(cmdLine), hEventEnd_string);
+
+		if (!CreateProcessW(RootPath, cmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		{
+			LastWin32Error	= GetLastError();
+			ErrorCode		= HOOK_SCAN_ERR_CREATE_PROCESS_FAILED;
+
+			CloseHandle(hEventStart);
+			CloseHandle(hEventEnd);
+
+			CloseHandle(hTargetProc);
+
+			return false;
+		}		
+
+		DWORD dwWaitRet = WaitForSingleObject(hEventStart, 1000);
 		if (dwWaitRet != WAIT_OBJECT_0)
 		{
 			if (dwWaitRet == WAIT_FAILED)
@@ -120,7 +168,8 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 				ErrorCode		= HOOK_SCAN_ERR_WAIT_TIMEOUT;
 			}
 
-			CloseHandle(hEvent);
+			CloseHandle(hEventStart);
+			CloseHandle(hEventEnd);
 
 			CloseHandle(pi.hThread);
 			CloseHandle(pi.hProcess);
@@ -132,37 +181,45 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 
 		if (h_remote_K32)
 		{
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryA",			h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryExA",		h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryExW",		h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "GetModuleHandleA",		h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "GetProcAddress",		h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "BaseThreadInitThunk",	h_remote_K32, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
+			for (auto i = 0; i != sizeof(k32_functions) / sizeof(k32_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[0], k32_functions[i], h_remote_K32, nullptr, 0, 0, NULL });
+			}
 		}
 
 		if (h_remote_KB)
 		{
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryA",			h_remote_KB, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryExA",			h_remote_KB, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryExW",			h_remote_KB, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "GetModuleHandleA",		h_remote_KB, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "GetProcAddressForCaller", h_remote_KB, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
+			for (auto i = 0; i != sizeof(kb_functions) / sizeof(kb_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[1], kb_functions[i], h_remote_KB, nullptr, 0, 0, NULL });
+			}
 		}
 
 		if (h_remote_NT)
 		{
-			HookDataOut.push_back({ ntdll_name, "LdrLoadDll",						h_remote_NT, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ ntdll_name, "LdrGetDllHandle",					h_remote_NT, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ ntdll_name, "LdrGetProcedureAddressForCaller",	h_remote_NT, ReCa<BYTE*>(pi.hProcess), nullptr, 0, 0, NULL });
+			for (auto i = 0; i != sizeof(nt_functions) / sizeof(nt_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[2], nt_functions[i], h_remote_NT, nullptr, 0, 0, NULL });
+			}
 		}
 
-		for (int i = 0; i != HookDataOut.size(); ++i)
+		for (auto & i : HookDataOutV)
 		{
-			ScanForHook_WOW64(HookDataOut.at(i), hTargetProc);
+			if (ScanForHook_WOW64(i, hTargetProc, pi.hProcess))
+			{
+				if (ScanCount < Count)
+				{
+					HookDataOut[ScanCount] = i;
+				}
+
+				++ScanCount;
+			}
 		}
 
-		SetEvent(hEvent);
-		CloseHandle(hEvent);
+		SetEvent(hEventEnd);
+
+		CloseHandle(hEventStart);
+		CloseHandle(hEventEnd);
 		
 		CloseHandle(pi.hThread);
 		CloseHandle(pi.hProcess);
@@ -170,56 +227,64 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 	}
 	else
 	{
-		std::string kernel32_name	("kernel32.dll");
-		std::string kernelbase_name	("KernelBase.dll");
-		std::string ntdll_name		("ntdll.dll");
+		HINSTANCE h_remote_K32	= GetModuleHandleA(Modules[0]);
+		HINSTANCE h_remote_KB	= GetModuleHandleA(Modules[1]);
+		HINSTANCE h_remote_NT	= GetModuleHandleA(Modules[2]);
 
-		HINSTANCE h_remote_K32	= GetModuleHandleExA(hTargetProc, kernel32_name.c_str());
-		HINSTANCE h_remote_KB	= GetModuleHandleExA(hTargetProc, kernelbase_name.c_str());
-		HINSTANCE h_remote_NT	= GetModuleHandleExA(hTargetProc, ntdll_name.c_str());
-
-		BYTE * p_mapped_K32 = ReCa<BYTE*>(LoadLibrary(TEXT("kernel32.dll")));
-		BYTE * p_mapped_KB	= ReCa<BYTE*>(LoadLibrary(TEXT("KernelBase.dll")));
-		BYTE * p_mapped_NT	= ReCa<BYTE*>(LoadLibrary(TEXT("ntdll.dll")));
-
-		if (h_remote_K32 && p_mapped_K32)
+		if (h_remote_K32)
 		{
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryA",			h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryExA",		h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "LoadLibraryExW",		h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "GetModuleHandleA",		h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "GetProcAddress",		h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernel32_name, "BaseThreadInitThunk",	h_remote_K32, p_mapped_K32, nullptr, 0, 0, NULL });
+			for (auto i = 0; i != sizeof(k32_functions) / sizeof(k32_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[0], k32_functions[i], h_remote_K32, nullptr, 0, 0, NULL });
+			}
 		}
 
-		if (h_remote_KB && p_mapped_KB)
+		if (h_remote_KB)
 		{
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryA",			h_remote_KB, p_mapped_KB, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryExA",			h_remote_KB, p_mapped_KB, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "LoadLibraryExW",			h_remote_KB, p_mapped_KB, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "GetModuleHandleA",		h_remote_KB, p_mapped_KB, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ kernelbase_name, "GetProcAddressForCaller", h_remote_KB, p_mapped_KB, nullptr, 0, 0, NULL });
-		}
-		
-		if (h_remote_NT && p_mapped_NT)
-		{
-			HookDataOut.push_back({ ntdll_name, "LdrLoadDll",						h_remote_NT, p_mapped_NT, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ ntdll_name, "LdrGetDllHandle",					h_remote_NT, p_mapped_NT, nullptr, 0, 0, NULL });
-			HookDataOut.push_back({ ntdll_name, "LdrGetProcedureAddressForCaller",	h_remote_NT, p_mapped_NT, nullptr, 0, 0, NULL });
+			for (auto i = 0; i != sizeof(kb_functions) / sizeof(kb_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[1], kb_functions[i], h_remote_KB, nullptr, 0, 0, NULL });
+			}
 		}
 
-		for (UINT i = 0; i != HookDataOut.size(); ++i)
+		if (h_remote_NT)
 		{
-			ScanForHook(HookDataOut.at(i), hTargetProc);
+			for (auto i = 0; i != sizeof(nt_functions) / sizeof(nt_functions[0]); ++i)
+			{
+				HookDataOutV.push_back({ Modules[2], nt_functions[i], h_remote_NT, nullptr, 0, 0, NULL });
+			}
+		}
+
+		for (auto & i : HookDataOutV)
+		{
+			if(ScanForHook(i, hTargetProc))
+			{
+				if (ScanCount < Count)
+				{
+					HookDataOut[ScanCount] = i;
+				}
+
+				++ScanCount;
+			}
 		}
 	}
 
 	CloseHandle(hTargetProc);
 
+	if (CountOut)
+	{
+		*CountOut = ScanCount;
+	}
+
+	if (ScanCount > Count)
+	{
+		return false;
+	}
+
 	return true;
 }
 
-bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, std::vector<HookInfo> & HookDataIn)
+bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
@@ -239,15 +304,25 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 		return false;
 	}
 
-	for (auto i : HookDataIn)
+	UINT SuccessCount = 0;
+	for (UINT i = 0; i != Count; ++i)
 	{
-		if (i.ChangeCount && (i.ErrorCode == HOOK_SCAN_ERR_SUCCESS))
+		if (HookDataIn[i].ChangeCount && (HookDataIn[i].ErrorCode == HOOK_SCAN_ERR_SUCCESS))
 		{
-			if (!WriteProcessMemory(hTargetProc, i.pFunc, i.OriginalBytes, sizeof(i.OriginalBytes), nullptr))
+			if (!WriteProcessMemory(hTargetProc, HookDataIn[i].pFunc, HookDataIn[i].OriginalBytes, sizeof(HookDataIn[i].OriginalBytes), nullptr))
 			{
-				i.ErrorCode = GetLastError();
+				HookDataIn[i].ErrorCode = GetLastError();
+			}
+			else
+			{
+				++SuccessCount;
 			}
 		}
+	}
+
+	if (CountOut)
+	{
+		*CountOut = SuccessCount;
 	}
 
 	CloseHandle(hTargetProc);
@@ -257,7 +332,7 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 
 bool ScanForHook(HookInfo & Info, HANDLE hTargetProc)
 {
-	Info.pFunc = ReCa<void*>(GetProcAddress(ReCa<HINSTANCE>(Info.pReference), Info.FunctionName.c_str()));
+	Info.pFunc = ReCa<void*>(GetProcAddress(Info.hModuleBase, Info.FunctionName));
 	if (!Info.pFunc)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_GETPROCADDRESS_FAILED;

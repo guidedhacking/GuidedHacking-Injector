@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Start Routine.h"
+#include "Import Handler.h"
 
 void EjectDll(HANDLE hTargetProc, HINSTANCE hModBase);
-//Unloads a Dll using FreeLibrary by creating a thread in the target process using NtCreateThreadEx.
+//Unloads a Dll using FreeLibrary by creating a thread in the target process using NtCreateThreadEx (native only).
 //
 //Arguments:
 //		hTargetProc (HANDLE):

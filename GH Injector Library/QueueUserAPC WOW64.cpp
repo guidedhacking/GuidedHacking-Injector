@@ -6,11 +6,6 @@
 
 DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, DWORD & Out, ERROR_DATA & error_data)
 {
-	if (!NT::RtlQueueApcWow64Thread)
-	{
-		return SR_QUAPC_ERR_RTLQAW64_MISSING;
-	}
-
 	BYTE Shellcode[] =
 	{
 		SR_REMOTE_DATA_BUFFER_86
@@ -100,7 +95,7 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 				continue;
 			}
 
-			if (NT_SUCCESS(NT::RtlQueueApcWow64Thread(hThread, pRemoteFunc, pMem, nullptr, nullptr)))
+			if (NT_SUCCESS(NATIVE::RtlQueueApcWow64Thread(hThread, pRemoteFunc, pMem, nullptr, nullptr)))
 			{
 				PostThreadMessageW(ThreadID, WM_NULL, 0, 0);
 				APC_Queued = true;

@@ -2,8 +2,6 @@
 
 #include "Process Info.h"
 
-#pragma comment(lib, "Psapi.lib")
-
 #define NEXT_SYSTEM_PROCESS_ENTRY(pCurrent) ReCa<SYSTEM_PROCESS_INFORMATION*>(ReCa<BYTE*>(pCurrent) + pCurrent->NextEntryOffset)
 
 PEB * ProcessInfo::GetPEB_Native()
@@ -99,15 +97,20 @@ ProcessInfo::ProcessInfo()
 	m_WaitFunctionReturnAddress[3] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtSignalAndWaitForSingleObject"	)) + NT_RET_OFFSET;
 	m_WaitFunctionReturnAddress[4] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtRemoveIoCompletionEx"			)) + NT_RET_OFFSET;
 
-	HINSTANCE hWIN32U = LoadLibrary(TEXT("win32u.dll"));
-	if (hWIN32U)
+	m_hWin32U = LoadLibrary(TEXT("win32u.dll"));
+	if (m_hWin32U)
 	{
-		m_WaitFunctionReturnAddress[5] = ReCa<UINT_PTR>(GetProcAddress(hWIN32U, "NtUserMsgWaitForMultipleObjectsEx")) + NT_RET_OFFSET;
+		m_WaitFunctionReturnAddress[5] = ReCa<UINT_PTR>(GetProcAddress(m_hWin32U, "NtUserMsgWaitForMultipleObjectsEx")) + NT_RET_OFFSET;
 	}
 }
 
 ProcessInfo::~ProcessInfo()
 {
+	if (m_hWin32U)
+	{
+		FreeLibrary(m_hWin32U);
+	}
+
 	if (m_pFirstProcess)
 	{
 		delete[] m_pFirstProcess;
@@ -642,28 +645,28 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 			return false;
 		}
 		
-		void * pBuffer = nullptr;
+		DWORD Address = 0;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtDelayExecution", pBuffer);
-		m_WaitFunctionReturnAddress_WOW64[0] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtDelayExecution", Address);
+		m_WaitFunctionReturnAddress_WOW64[0] = Address + NT_RET_OFFSET_86;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForSingleObject", pBuffer);
-		m_WaitFunctionReturnAddress_WOW64[1] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForSingleObject", Address);
+		m_WaitFunctionReturnAddress_WOW64[1] = Address + NT_RET_OFFSET_86;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForMultipleObjects", pBuffer);
-		m_WaitFunctionReturnAddress_WOW64[2] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForMultipleObjects", Address);
+		m_WaitFunctionReturnAddress_WOW64[2] = Address + NT_RET_OFFSET_86;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtSignalAndWaitForSingleObject", pBuffer);
-		m_WaitFunctionReturnAddress_WOW64[3] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtSignalAndWaitForSingleObject", Address);
+		m_WaitFunctionReturnAddress_WOW64[3] = Address + NT_RET_OFFSET_86;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtRemoveIoCompletionEx", pBuffer);
-		m_WaitFunctionReturnAddress_WOW64[4] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtRemoveIoCompletionEx", Address);
+		m_WaitFunctionReturnAddress_WOW64[4] = Address + NT_RET_OFFSET_86;
 
 		HINSTANCE hWIN32U = GetModuleHandleEx_WOW64(m_hCurrentProcess, TEXT("win32u.dll"));
 		if (hWIN32U)
 		{
-			GetProcAddressEx_WOW64(m_hCurrentProcess, hWIN32U, "NtUserMsgWaitForMultipleObjectsEx", pBuffer);
-			m_WaitFunctionReturnAddress_WOW64[5] = MDWD(pBuffer) + NT_RET_OFFSET_86;
+			GetProcAddressEx_WOW64(m_hCurrentProcess, hWIN32U, "NtUserMsgWaitForMultipleObjectsEx", Address);
+			m_WaitFunctionReturnAddress_WOW64[5] = Address + NT_RET_OFFSET_86;
 		}
 	}
 

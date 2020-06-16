@@ -4,12 +4,7 @@
 
 DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
 {
-	if (!NT::NtCreateThreadEx)
-	{
-		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-		return SR_NTCTE_ERR_NTCTE_MISSING;
-	}
+	LOG("Begin SR_NtCreateThreadEx\n");
 
 	void * pEntrypoint = nullptr;
 	if (CloakThread)
@@ -104,6 +99,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 #endif
 
+	LOG("Created codecave\n");
+
 	void * pMem = VirtualAllocEx(hTargetProc, nullptr, sizeof(Shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (!pMem)
 	{
@@ -118,6 +115,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
+	LOG("Codecave allocated at %p\n", pMem);
+
 	BOOL bRet = WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr);
 	if (!bRet)
 	{
@@ -127,8 +126,10 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 		return SR_NTCTE_ERR_WPM_FAIL;
 	}
+	
+	LOG("Creating thread with\npRoutine = %p\npArg = %p\n", pRemoteFunc, pMem);
 
-	NTSTATUS ntRet = NT::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
+	NTSTATUS ntRet = NATIVE::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
 	if (NT_FAIL(ntRet) || !hThread)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)ntRet);
@@ -137,6 +138,9 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 		return SR_NTCTE_ERR_NTCTE_FAIL;
 	}
+
+	auto TID = GetThreadId(hThread);
+	LOG("Thread created with TID = %06X (%06d)\n", TID, TID);
 	
 	if (CloakThread)
 	{
@@ -185,6 +189,10 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 			return SR_NTCTE_ERR_RESUME_FAIL;
 		}
 	}
+
+	LOG("Entering wait state\n");
+
+	Sleep(100);
 	
 	DWORD dwWaitRet = WaitForSingleObject(hThread, SR_REMOTE_TIMEOUT);
 	if (dwWaitRet != WAIT_OBJECT_0)
@@ -219,6 +227,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 	VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
+	LOG("Thread exit data retrieved\n");
+
 	if (dwExitCode == 0xFFFFFFFF)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
@@ -233,6 +243,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	}
 
 	Out	= data.Ret;
+
+	LOG("End SR_NtCreateThreadEx\n");
 			
 	return SR_ERR_SUCCESS;
 }

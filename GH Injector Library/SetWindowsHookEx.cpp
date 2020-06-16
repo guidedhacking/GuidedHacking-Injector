@@ -1,20 +1,15 @@
 #include "pch.h"
 
 #include "Start Routine.h"
-#pragma comment(lib, "wtsapi32.lib")
 
 DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId, DWORD & Out, ERROR_DATA & error_data)
 {
-	wchar_t RootPath[MAX_PATH * 2]{ 0 };
-	if (!GetOwnModulePathW(RootPath, sizeof(RootPath) / sizeof(RootPath[0])))
-	{
-		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		return SR_SWHEX_ERR_CANT_QUERY_INFO_PATH;
-	}
+	wchar_t RootPath[MAX_PATH]{ 0 };
+	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
 
-	wchar_t InfoPath[MAX_PATH * 2]{ 0 };
-	memcpy(InfoPath, RootPath, sizeof(InfoPath));
+	wchar_t InfoPath[MAX_PATH]{ 0 };
+	StringCbCopyW(InfoPath, sizeof(InfoPath), g_RootPathW.c_str());
 	StringCbCatW(InfoPath, sizeof(InfoPath), SM_INFO_FILENAME);
 
 	if (FileExists(InfoPath))

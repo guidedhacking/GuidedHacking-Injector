@@ -1,11 +1,12 @@
 #include "pch.h"
 
 #include "Start Routine.h"
-#pragma comment(lib, "wtsapi32.lib")
 
 DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_METHOD Method, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
 {
 	DWORD Ret = 0;
+
+	LOG("Entering StartRoutine\n");
 	
 	switch (Method)
 	{
@@ -56,6 +57,8 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			Ret = SR_ERR_INVALID_LAUNCH_METHOD;
 			break;
 	}
+
+	LOG("End StartRoutine\n");
 	
 	return Ret;
 }

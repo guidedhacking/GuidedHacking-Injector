@@ -6,13 +6,6 @@
 
 DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
 {
-	if (!NT::NtCreateThreadEx)
-	{
-		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-		return SR_NTCTE_ERR_NTCTE_MISSING;
-	}
-
 	void * pEntrypoint = nullptr;
 	if (CloakThread)
 	{
@@ -90,7 +83,7 @@ DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 		return SR_NTCTE_ERR_WPM_FAIL;
 	}
 
-	NTSTATUS ntRet = NT::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
+	NTSTATUS ntRet = NATIVE::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
 	if (NT_FAIL(ntRet) || !hThread)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)ntRet);

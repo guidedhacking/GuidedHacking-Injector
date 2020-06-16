@@ -114,15 +114,16 @@ struct HookInfo
 ///(1) ignored when manual mapping
 ///(2) ignored when launch method isn't LM_NtCreateThreadEx
 
-#define INJ_MM_SHIFT_MODULE				0x00010000	//shifts the module by a random amount of bytes - the data preceding the dll is randomized aswell
-#define INJ_MM_CLEAN_DATA_DIR			0x00020000	//removes data from the dlls PE header
-#define INJ_MM_RESOLVE_IMPORTS			0x00040000	//resolves dll imports
-#define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00080000	//resolves delayed imports
-#define INJ_MM_EXECUTE_TLS				0x00100000	//executes TLS callbacks and initializes static TLS data
-#define INJ_MM_ENABLE_SEH				0x00200000	//enables exception handling
-#define INJ_MM_SET_PAGE_PROTECTIONS		0x00400000	//sets page protections based on section characteristics
-#define INJ_MM_INIT_SECURITY_COOKIE		0x00800000	//initializes security cookie for buffer overrun protection
-#define INJ_MM_RUN_DLL_MAIN				0x01000000	//executes DllMain
+//Manual mapping options:
+#define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header
+#define INJ_MM_RESOLVE_IMPORTS			0x00020000	//resolves dll imports
+#define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00040000	//resolves delayed imports
+#define INJ_MM_EXECUTE_TLS				0x00080000	//executes TLS callbacks and initializes static TLS data
+#define INJ_MM_ENABLE_EXCEPTIONS		0x00100000	//enables exception handling
+#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics
+													//if set INJ_MM_CLEAN_DATA_DIR, INJ_ERASE_HEADER and INJ_FAKE_HEADER will be ignored
+#define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
+#define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
 
 #define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_SEH | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)

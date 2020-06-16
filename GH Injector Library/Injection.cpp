@@ -1,7 +1,6 @@
 #include "pch.h"
 
 #include "Injection.h"
-#pragma comment (lib, "Psapi.lib")
 
 DWORD InitErrorStruct(const wchar_t * szDllPath, INJECTIONDATAW * pData, int bNative, DWORD ErrorCode, ERROR_DATA error_data);
 
@@ -9,17 +8,15 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE im
 
 DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data);
 
-DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & error_data);
-
 DWORD InitErrorStruct(const wchar_t * szDllPath, INJECTIONDATAW * pData, int bNative, DWORD ErrorCode, ERROR_DATA error_data)
 {
 	if (!ErrorCode)
 	{
 		return INJ_ERR_SUCCESS;
 	}
-
+	
 	if (pData->GenerateErrorLog)
-	{	
+	{
 		ERROR_INFO info{ 0 };
 		info.szDllFileName				= szDllPath;
 		info.szTargetProcessExeFileName = pData->szTargetProcessExeFileName;
@@ -44,6 +41,8 @@ DWORD InitErrorStruct(const wchar_t * szDllPath, INJECTIONDATAW * pData, int bNa
 DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	LOG("InjectA called with pData = %p\n", pData);
 
 	ERROR_DATA error_data{ 0 };
 
@@ -87,6 +86,8 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	data.hHandleValue		= pData->hHandleValue;
 	data.GenerateErrorLog	= pData->GenerateErrorLog;
 
+	LOG("Forwarding call to InjectW\n");
+
 	DWORD Ret = InjectW(&data);
 	pData->hDllOut = data.hDllOut;
 
@@ -96,14 +97,25 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	LOG("InjectW called with pData = %p\n", pData);
 	
 	ERROR_DATA error_data{ 0 };
+	DWORD RetVal = INJ_ERR_SUCCESS;
 
 	if (!pData)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		return InitErrorStruct(nullptr, ReCa<INJECTIONDATAW*>(pData), -1, INJ_ERR_NO_DATA, error_data);
+		return InitErrorStruct(nullptr, pData, -1, INJ_ERR_NO_DATA, error_data);
+	}
+
+	RetVal = ResolveImports(error_data);
+	if (RetVal != INJ_ERR_SUCCESS)
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		return InitErrorStruct(nullptr, pData, -1, RetVal, error_data);
 	}
 		
 	if (!pData->szDllPath)
@@ -137,7 +149,7 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-			return INJ_ERR_STRINGC_XXX_FAIL;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
 		const wchar_t * pFileName = pData->szDllPath;
@@ -149,7 +161,7 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			return INJ_ERR_CANT_GET_TEMP_DIR;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_GET_TEMP_DIR, error_data);
 		}
 
 		hr = StringCchCatW(new_path, MAXPATH_IN_TCHAR, pFileName);
@@ -157,24 +169,25 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-			return INJ_ERR_STRINGC_XXX_FAIL;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
 		if (!CopyFileW(pData->szDllPath, new_path, FALSE))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			return INJ_ERR_CANT_COPY_FILE;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_COPY_FILE, error_data);
 		}
 
-		hr = StringCbLengthW(pData->szDllPath, sizeof(pData->szDllPath), &len_out);
-		if (FAILED(hr) || !len_out)
+		hr = StringCbCopyW(pData->szDllPath, sizeof(pData->szDllPath), new_path);
+		if (FAILED(hr))
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-			return INJ_ERR_STRINGC_XXX_FAIL;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
-		memcpy(pData->szDllPath, new_path, len_out);
+
+		LOG("Path of dll copy: %ls\n", pData->szDllPath);
 	}
 
 	if (pData->Flags & INJ_SCRAMBLE_DLL_NAME)
@@ -217,33 +230,23 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-			return INJ_ERR_STRINGC_XXX_FAIL;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
-		wchar_t * pFileName = const_cast<wchar_t*>(pData->szDllPath);
-		size_t len_out = 0;
-		hr = StringCchLengthW(pData->szDllPath, MAXPATH_IN_TCHAR, &len_out);
-		if (FAILED(hr) || !len_out)
-		{
-			INIT_ERROR_DATA(error_data, (DWORD)hr);
-
-			return INJ_ERR_STRINGC_XXX_FAIL;
-		}
-
-		pFileName += len_out;
-		while (*(--pFileName - 1) != '\\');
-
+		wchar_t * pFileName = wcsrchr(pData->szDllPath, '\\') + 1;
 		memcpy(pFileName, new_name, sizeof(new_name));
 
 		auto ren_ret = _wrename(OldFilePath, pData->szDllPath);
 		if (ren_ret)
 		{
-			INIT_ERROR_DATA(error_data, (DWORD)ren_ret);
+			INIT_ERROR_DATA(error_data, (DWORD)errno);
 
-			return INJ_ERR_CANT_RENAME_FILE;
+			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_RENAME_FILE, error_data);
 		}
+
+		LOG("Path of renamed dll: %ls\n", pData->szDllPath);
 	}
-	
+
 	HANDLE hTargetProc = nullptr;
 	if (pData->Flags & INJ_HIJACK_HANDLE)
 	{
@@ -310,9 +313,10 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 
 		return InitErrorStruct(szDllPath, pData, native_target, INJ_ERR_PLATFORM_MISMATCH, error_data);
 	}
+
+	LOG("File validated and prepared for injection:\n%ls\n", pData->szDllPath);
 	
 	HINSTANCE hOut	= NULL;
-	DWORD RetVal	= INJ_ERR_SUCCESS;
 
 #ifdef _WIN64
 	if (native_target)
@@ -327,6 +331,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	RetVal = InjectDLL(szDllPath, hTargetProc, pData->Mode, pData->Method, pData->Flags, hOut, error_data);
 #endif
 
+	LOG("Injection finished\n");
+
 	if (!(pData->Flags & INJ_HIJACK_HANDLE))
 	{
 		CloseHandle(hTargetProc);
@@ -335,55 +341,6 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	pData->hDllOut = hOut;
 
 	return InitErrorStruct(szDllPath, pData, native_target, RetVal, error_data);
-}
-
-DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE mode, LAUNCH_METHOD method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data)
-{
-	DWORD Ret = 0;
-
-	switch (mode)
-	{
-		case INJECTION_MODE::IM_LoadLibraryExW:
-			Ret = _LoadLibraryExW(szDllFile, hTargetProc, method, Flags, hOut, error_data);
-			break;
-
-		case INJECTION_MODE::IM_LdrLoadDll:
-			Ret = _LdrLoadDll(szDllFile, hTargetProc, method, Flags, hOut, error_data);
-			break;
-
-		case INJECTION_MODE::IM_LdrpLoadDll:
-			Ret = _LdrpLoadDll(szDllFile, hTargetProc, method, Flags, hOut, error_data);
-			break;
-
-		case INJECTION_MODE::IM_ManualMap:
-			Ret = _ManualMap(szDllFile, hTargetProc, method, Flags, hOut, error_data);
-			break;
-
-		default:
-			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-			Ret = INJ_ERR_INVALID_INJ_METHOD;
-			break;
-	}
-
-	if (Ret != INJ_ERR_SUCCESS)
-	{
-		return Ret;
-	}
-
-	if (!hOut)
-	{
-		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-		return INJ_ERR_REMOTE_CODE_FAILED;
-	}
-
-	if (mode != INJECTION_MODE::IM_ManualMap)
-	{
-		Ret = Cloaking(hTargetProc, Flags, hOut, error_data);
-	}
-	
-	return Ret;
 }
 
 DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
@@ -408,14 +365,16 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	hijack_data.Mode	= INJECTION_MODE::IM_LdrLoadDll;
 	hijack_data.Method	= LAUNCH_METHOD::LM_NtCreateThreadEx;
 	hijack_data.GenerateErrorLog = pData->GenerateErrorLog;
-	if (!GetOwnModulePathW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath) / sizeof(hijack_data.szDllPath[0])))
-	{
-		INIT_ERROR_DATA(error_data, GetLastError());
 
-		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_CANT_GET_MODULE_PATH, error_data);
+	HRESULT hr = StringCbCopyW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath), g_RootPathW.c_str());
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 	}
 
-	HRESULT hr = StringCbCatW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath), GH_INJ_MOD_NAMEW);	
+	hr = StringCbCatW(hijack_data.szDllPath, sizeof(hijack_data.szDllPath), GH_INJ_MOD_NAMEW);
 	if (FAILED(hr))
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
@@ -471,19 +430,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 		}
 
 		HINSTANCE hInjectionModuleEx = hijack_data.hDllOut;
-		void * pRemoteInjectW = nullptr;
-		if (!GetProcAddressEx(hHijackProc, hInjectionModuleEx, "InjectW", pRemoteInjectW))
-		{
-			LastErrCode = INJ_ERR_HIJACK_INJECTW_MISSING;
-			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-			EjectDll(hHijackProc, hInjectionModuleEx);
-
-			CloseHandle(hHijackProc);
-			
-			continue;
-		}		
-		
+		f_Routine pRemoteInjectW = ReCa<f_Routine>(ReCa<UINT_PTR>(InjectW) - ReCa<UINT_PTR>(g_hInjMod) + ReCa<UINT_PTR>(hInjectionModuleEx));
+				
 		void * pArg = VirtualAllocEx(hHijackProc, nullptr, sizeof(INJECTIONDATAW), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 		if (!pArg)
 		{
@@ -514,7 +462,7 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 		pData->hHandleValue = 0;
 
 		DWORD hijack_ret = INJ_ERR_SUCCESS;
-		DWORD remote_ret = StartRoutine(hHijackProc, static_cast<f_Routine>(pRemoteInjectW), pArg, LAUNCH_METHOD::LM_NtCreateThreadEx, false, hijack_ret, error_data);
+		DWORD remote_ret = StartRoutine(hHijackProc, pRemoteInjectW, pArg, LAUNCH_METHOD::LM_NtCreateThreadEx, false, hijack_ret, error_data);
 		
 		INJECTIONDATAW data_out{ 0 };
 		ReadProcessMemory(hHijackProc, pArg, &data_out, sizeof(INJECTIONDATAW), nullptr);
@@ -551,246 +499,36 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	return InitErrorStruct(szDllPath, pData, true, LastErrCode, error_data);
 }
 
-DWORD Cloaking(HANDLE hTargetProc, DWORD Flags, HINSTANCE hMod, ERROR_DATA & error_data)
+HRESULT __stdcall GetVersionA(char * out, size_t cb_size)
 {
-	if (!Flags)
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	if (!out)
 	{
-		return INJ_ERR_SUCCESS;
+		return E_INVALIDARG;
 	}
 
-	if (Flags & INJ_ERASE_HEADER)
+	if (sizeof(GH_INJ_VERSIONA) > cb_size)
 	{
-		BYTE Buffer[0x1000]{ 0 };
-		if (!WriteProcessMemory(hTargetProc, hMod, Buffer, 0x1000, nullptr))
-		{
-			INIT_ERROR_DATA(error_data, GetLastError());
-
-			return INJ_ERR_WPM_FAIL;
-		}
-	}
-	else if (Flags & INJ_FAKE_HEADER)
-	{
-		void * pK32 = ReCa<void *>(GetModuleHandle(TEXT("kernel32.dll")));
-		if (!pK32)
-		{
-			INIT_ERROR_DATA(error_data, GetLastError());
-
-			return INJ_ERR_GET_MODULE_HANDLE_FAIL;
-		}
-
-		if (!WriteProcessMemory(hTargetProc, hMod, pK32, 0x1000, nullptr))
-		{
-			INIT_ERROR_DATA(error_data, GetLastError());
-
-			return INJ_ERR_WPM_FAIL;
-		}
+		return TYPE_E_BUFFERTOOSMALL;
 	}
 
-	if (Flags & INJ_UNLINK_FROM_PEB)
+	return StringCbCopyA(out, cb_size, GH_INJ_VERSIONA);
+}
+
+HRESULT __stdcall GetVersionW(wchar_t * out, size_t cb_size)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	if (!out)
 	{
-		ProcessInfo PI;
-		PI.SetProcess(hTargetProc);
-
-		LDR_DATA_TABLE_ENTRY * pEntry = PI.GetLdrEntry(hMod);
-		if (!pEntry)
-		{
-			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
-
-			return INJ_ERR_CANT_FIND_MOD_PEB;
-		}
-
-		LDR_DATA_TABLE_ENTRY Entry{ 0 };
-		if (!ReadProcessMemory(hTargetProc, pEntry, &Entry, sizeof(Entry), nullptr))
-		{
-			INIT_ERROR_DATA(error_data, GetLastError());
-
-			return INJ_ERR_CANT_ACCESS_PEB_LDR;
-		}
-
-		auto Unlink = [=](LIST_ENTRY entry)
-		{
-			LIST_ENTRY list{ 0 };
-			if (ReadProcessMemory(hTargetProc, entry.Flink, &list, sizeof(LIST_ENTRY), nullptr))
-			{
-				list.Blink = entry.Blink;
-				WriteProcessMemory(hTargetProc, entry.Flink, &list, sizeof(LIST_ENTRY), nullptr);
-			}
-
-			if (ReadProcessMemory(hTargetProc, entry.Blink, &list, sizeof(LIST_ENTRY), nullptr))
-			{
-				list.Flink = entry.Flink;
-				WriteProcessMemory(hTargetProc, entry.Blink, &list, sizeof(LIST_ENTRY), nullptr);
-			}
-		};
-
-		Unlink(Entry.InInitializationOrderLinks);
-		Unlink(Entry.InLoadOrderLinks);
-		Unlink(Entry.InMemoryOrderLinks);
-		Unlink(Entry.HashLinks);
-
-		auto FindParentNodePtr = [hTargetProc](auto FindParentNodePtr, RTL_BALANCED_NODE * current, RTL_BALANCED_NODE * to_find)
-		{
-			if (!current)
-			{
-				return (RTL_BALANCED_NODE **)nullptr;
-			}
-
-			RTL_BALANCED_NODE node;
-			if (!ReadProcessMemory(hTargetProc, current, &node, sizeof(node), nullptr))
-			{
-				return (RTL_BALANCED_NODE **)nullptr;
-			}
-
-			if (node.Left == to_find)
-			{
-				return ADDRESS_OF(current, Left);
-			}
-			else if (node.Right == to_find)
-			{
-				return ADDRESS_OF(current, Right);
-			}
-
-			RTL_BALANCED_NODE ** ret = FindParentNodePtr(FindParentNodePtr, node.Left, to_find);
-
-			if (!ret)
-			{
-				ret = FindParentNodePtr(FindParentNodePtr, node.Right, to_find);
-			}
-
-			return ret;
-		};
-
-		auto RemoveNode = [=](RTL_BALANCED_NODE ** ppNode)
-		{
-			if (!ppNode)
-			{
-				return false;
-			}
-
-			RTL_BALANCED_NODE * pNode;
-			if (!ReadProcessMemory(hTargetProc, ppNode, &pNode, sizeof(pNode), nullptr))
-			{
-				return false;
-			}
-
-			RTL_BALANCED_NODE Node;
-			if (!ReadProcessMemory(hTargetProc, pNode, &Node, sizeof(Node), nullptr))
-			{
-				return false;
-			}
-
-			RTL_BALANCED_NODE * pNewValue = nullptr;
-
-			if (Node.Left)
-			{
-				if (Node.Right)
-				{
-					pNewValue = Node.Right;
-					Node.Right = nullptr;
-				}
-				else
-				{
-					pNewValue = Node.Left;
-					Node.Left = nullptr;
-				}
-
-			}
-			else if (Node.Right)
-			{
-				pNewValue = Node.Right;
-				Node.Right = nullptr;
-			}
-
-			if (!WriteProcessMemory(hTargetProc, ppNode, &pNewValue, sizeof(pNewValue), nullptr))
-			{
-				return false;
-			}
-
-			if (Node.Left)
-			{
-				auto pEmptyNode = FindParentNodePtr(FindParentNodePtr, pNode, nullptr);
-				if (!pEmptyNode)
-				{
-					return false;
-				}
-
-				if (!WriteProcessMemory(hTargetProc, pEmptyNode, &Node.Left, sizeof(Node.Left), nullptr))
-				{
-					return false;
-				}
-			}
-
-			return true;
-		};
-
-		if (!NT::LdrpModuleBaseAddressIndex || !NT::LdrpMappingInfoIndex)
-		{
-			HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
-
-			if (hNTDLL)
-			{
-				if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready && sym_ntdll_native_ret.get() == SYMBOL_ERR_SUCCESS)
-				{
-					DWORD rva = 0;
-					DWORD sym_ret = SYMBOL_ERR_SUCCESS;
-
-					sym_ret = sym_ntdll_native.GetSymbolAddress("LdrpModuleBaseAddressIndex", rva);
-					if (sym_ret == SYMBOL_ERR_SUCCESS)
-					{
-						NT::LdrpModuleBaseAddressIndex = ReCa<f_LdrpModuleBaseAddressIndex>(ReCa<BYTE *>(hNTDLL) + rva);
-					}
-
-					sym_ret = sym_ntdll_native.GetSymbolAddress("LdrpMappingInfoIndex", rva);
-					if (sym_ret == SYMBOL_ERR_SUCCESS)
-					{
-						NT::LdrpMappingInfoIndex = ReCa<f_LdrpMappingInfoIndex>(ReCa<BYTE *>(hNTDLL) + rva);
-					}
-				}
-			}
-		}
-
-		if (NT::LdrpModuleBaseAddressIndex)
-		{
-			auto * pBaseAddressIndexNode = FindParentNodePtr(FindParentNodePtr, NT::LdrpModuleBaseAddressIndex, ADDRESS_OF(pEntry, BaseAddressIndexNode));
-			if (pBaseAddressIndexNode)
-			{
-				if (RemoveNode(pBaseAddressIndexNode))
-				{
-					printf("Unlinked from LdrpModuleBaseAddressIndex\n");
-				}
-			}
-		}
-
-		if (NT::LdrpMappingInfoIndex)
-		{
-			auto * pMappingInfoIndexNode = FindParentNodePtr(FindParentNodePtr, NT::LdrpMappingInfoIndex, ADDRESS_OF(pEntry, MappingInfoIndexNode));
-
-			if (pMappingInfoIndexNode)
-			{
-				if (RemoveNode(pMappingInfoIndexNode))
-				{
-					printf("Unlinked from LdrpMappingInfoIndex\n");
-				}
-			}
-		}
-
-		WORD MaxLength_Full = Entry.FullDllName.MaxLength;
-		WORD MaxLength_Base = Entry.BaseDllName.MaxLength;
-		char * Buffer_Full = new char[MaxLength_Full];
-		char * Buffer_Base = new char[MaxLength_Base];
-		memset(Buffer_Full, 0, MaxLength_Full);
-		memset(Buffer_Base, 0, MaxLength_Base);
-		WriteProcessMemory(hTargetProc, Entry.FullDllName.szBuffer, Buffer_Full, MaxLength_Full, nullptr);
-		WriteProcessMemory(hTargetProc, Entry.BaseDllName.szBuffer, Buffer_Base, MaxLength_Base, nullptr);
-		delete[] Buffer_Full;
-		delete[] Buffer_Base;
-
-		char DdagNode[sizeof(LDR_DDAG_NODE)]{ 0 };
-		WriteProcessMemory(hTargetProc, Entry.DdagNode, DdagNode, sizeof(DdagNode), nullptr);
-
-		LDR_DATA_TABLE_ENTRY entry_new{ 0 };
-		WriteProcessMemory(hTargetProc, pEntry, &entry_new, sizeof(entry_new), nullptr);
+		return E_INVALIDARG;
 	}
 
-	return INJ_ERR_SUCCESS;
+	if (sizeof(GH_INJ_VERSIONA) > cb_size)
+	{
+		return TYPE_E_BUFFERTOOSMALL;
+	}
+
+	return StringCbCopyW(out, cb_size, GH_INJ_VERSIONW);
 }
