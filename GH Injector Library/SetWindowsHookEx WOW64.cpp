@@ -4,7 +4,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	wchar_t RootPath[MAX_PATH]{ 0 };
 	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
@@ -68,7 +68,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 	*ReCa<DWORD*>(Shellcode + 0x02 + sizeof(SR_REMOTE_DATA_WOW64)) = MDWD(pMem);
 
-	void * pRemoteFunc = ReCa<BYTE *>(pMem) + sizeof(SR_REMOTE_DATA_WOW64);
+	void * pRemoteFunc = ReCa<BYTE*>(pMem) + sizeof(SR_REMOTE_DATA_WOW64);
 
 	auto * sr_data = ReCa<SR_REMOTE_DATA_WOW64*>(Shellcode);
 	sr_data->pArg		= pArg;
@@ -165,7 +165,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 		}
 	}
 
-	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, SR_REMOTE_TIMEOUT);
+	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
@@ -196,7 +196,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	data.LastWin32Error = ERROR_SUCCESS;
 
 	auto Timer = GetTickCount64();
-	while (GetTickCount64() - Timer < SR_REMOTE_TIMEOUT)
+	while (GetTickCount64() - Timer < Timeout)
 	{
 		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
 		{

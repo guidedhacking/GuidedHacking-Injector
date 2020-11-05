@@ -2,7 +2,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 
 	wchar_t RootPath[MAX_PATH]{ 0 };
@@ -108,9 +108,9 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 
 #endif
 	
-	void * pRemoteFunc = ReCa<BYTE *>(pMem) + sizeof(SR_REMOTE_DATA);
+	void * pRemoteFunc = ReCa<BYTE*>(pMem) + sizeof(SR_REMOTE_DATA);
 
-	auto * sr_data = ReCa<SR_REMOTE_DATA *>(Shellcode);
+	auto * sr_data = ReCa<SR_REMOTE_DATA*>(Shellcode);
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
@@ -208,7 +208,9 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 		}
 	}
 
-	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, SR_REMOTE_TIMEOUT);
+	Sleep(SR_REMOTE_DELAY);
+
+	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
@@ -217,7 +219,6 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 
 		return SR_SWHEX_ERR_SWHEX_TIMEOUT;
 	}
-
 
 	DWORD ExitCode = 0;
 	GetExitCodeProcess(pi.hProcess, &ExitCode);
@@ -240,7 +241,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	data.LastWin32Error = ERROR_SUCCESS;
 
 	auto Timer = GetTickCount64();
-	while (GetTickCount64() - Timer < SR_REMOTE_TIMEOUT)
+	while (GetTickCount64() - Timer < Timeout)
 	{
 		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
 		{

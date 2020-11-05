@@ -85,7 +85,7 @@ enum class LAUNCH_METHOD
 	LM_QueueUserAPC
 };
 
-//macro to avoid compiler and shellcode related alignment issues
+//macro to avoid compiler and shellcode related alignment issues (unlikely but just to be sure)
 #define ALIGN_64 __declspec(align(8))
 #define ALIGN_86 __declspec(align(4))
 

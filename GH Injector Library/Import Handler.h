@@ -23,13 +23,9 @@ namespace NATIVE
 
 	NT_FUNC(LdrLoadDll);
 	NT_FUNC(LdrpLoadDll);
-	NT_FUNC(LdrUnloadDll);
 
 	NT_FUNC(LdrGetDllHandleEx);
 	NT_FUNC(LdrGetProcedureAddress);
-
-	NT_FUNC(LdrLockLoaderLock);
-	NT_FUNC(LdrUnlockLoaderLock);
 
 	NT_FUNC(NtCreateThreadEx);
 	NT_FUNC(RtlQueueApcWow64Thread);
@@ -43,24 +39,18 @@ namespace NATIVE
 	NT_FUNC(LdrpHandleTlsData);
 
 	NT_FUNC(RtlMoveMemory);
+	NT_FUNC(RtlZeroMemory);
 	NT_FUNC(RtlAllocateHeap);
 	NT_FUNC(RtlFreeHeap);
 
 	NT_FUNC(RtlAnsiStringToUnicodeString);
-	NT_FUNC(RtlUnicodeStringToAnsiString);
-	NT_FUNC(RtlInitUnicodeString);
-	NT_FUNC(RtlHashUnicodeString);
 
-	NT_FUNC(RtlRbInsertNodeEx);
 	NT_FUNC(RtlRbRemoveNode);
 
 	NT_FUNC(NtOpenFile);
 	NT_FUNC(NtReadFile);
 	NT_FUNC(NtSetInformationFile);
 	NT_FUNC(NtQueryInformationFile);
-	NT_FUNC(NtCreateSection);
-	NT_FUNC(NtMapViewOfSection);
-	NT_FUNC(NtUnmapViewOfSection);
 
 	NT_FUNC(NtClose);
 
@@ -68,11 +58,8 @@ namespace NATIVE
 	NT_FUNC(NtFreeVirtualMemory);
 	NT_FUNC(NtProtectVirtualMemory);
 
-	NT_FUNC(RtlGetSystemTimePrecise);
-
 	NT_FUNC(LdrpModuleBaseAddressIndex);
 	NT_FUNC(LdrpMappingInfoIndex);
-	NT_FUNC(LdrpHashTable);
 	NT_FUNC(LdrpHeap);
 }
 
@@ -87,13 +74,9 @@ namespace WOW64
 		
 	WOW64_FUNCTION_POINTER(LdrLoadDll);
 	WOW64_FUNCTION_POINTER(LdrpLoadDll);
-	WOW64_FUNCTION_POINTER(LdrUnloadDll);
 
 	WOW64_FUNCTION_POINTER(LdrGetDllHandleEx);
 	WOW64_FUNCTION_POINTER(LdrGetProcedureAddress);
-
-	WOW64_FUNCTION_POINTER(LdrLockLoaderLock);
-	WOW64_FUNCTION_POINTER(LdrUnlockLoaderLock);
 
 	WOW64_FUNCTION_POINTER(NtCreateThreadEx);
 	WOW64_FUNCTION_POINTER(RtlQueueApcWow64Thread);
@@ -107,24 +90,18 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(LdrpHandleTlsData);
 
 	WOW64_FUNCTION_POINTER(RtlMoveMemory);
+	WOW64_FUNCTION_POINTER(RtlZeroMemory);
 	WOW64_FUNCTION_POINTER(RtlAllocateHeap);
 	WOW64_FUNCTION_POINTER(RtlFreeHeap);
 
 	WOW64_FUNCTION_POINTER(RtlAnsiStringToUnicodeString);
-	WOW64_FUNCTION_POINTER(RtlUnicodeStringToAnsiString);
-	WOW64_FUNCTION_POINTER(RtlInitUnicodeString);
-	WOW64_FUNCTION_POINTER(RtlHashUnicodeString);
 
-	WOW64_FUNCTION_POINTER(RtlRbInsertNodeEx);
 	WOW64_FUNCTION_POINTER(RtlRbRemoveNode);
 
 	WOW64_FUNCTION_POINTER(NtOpenFile);
 	WOW64_FUNCTION_POINTER(NtReadFile);
 	WOW64_FUNCTION_POINTER(NtSetInformationFile);
 	WOW64_FUNCTION_POINTER(NtQueryInformationFile);
-	WOW64_FUNCTION_POINTER(NtCreateSection);
-	WOW64_FUNCTION_POINTER(NtMapViewOfSection);
-	WOW64_FUNCTION_POINTER(NtUnmapViewOfSection);
 
 	WOW64_FUNCTION_POINTER(NtClose);
 
@@ -132,11 +109,8 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(NtFreeVirtualMemory);
 	WOW64_FUNCTION_POINTER(NtProtectVirtualMemory);
 
-	WOW64_FUNCTION_POINTER(RtlGetSystemTimePrecise);
-
 	WOW64_FUNCTION_POINTER(LdrpModuleBaseAddressIndex);
 	WOW64_FUNCTION_POINTER(LdrpMappingInfoIndex);
-	WOW64_FUNCTION_POINTER(LdrpHashTable);
 	WOW64_FUNCTION_POINTER(LdrpHeap);
 }
 

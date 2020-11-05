@@ -2,7 +2,7 @@
 
 #include "Start Routine.h"
 
-DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_METHOD Method, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
+DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_METHOD Method, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	DWORD Ret = 0;
 
@@ -11,11 +11,11 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 	switch (Method)
 	{
 		case LAUNCH_METHOD::LM_NtCreateThreadEx:
-			Ret = SR_NtCreateThreadEx(hTargetProc, pRoutine, pArg, CloakThread, Out, error_data);
+			Ret = SR_NtCreateThreadEx(hTargetProc, pRoutine, pArg, CloakThread, Out, Timeout, error_data);
 			break;
 
 		case LAUNCH_METHOD::LM_HijackThread:
-			Ret = SR_HijackThread(hTargetProc, pRoutine, pArg, Out, error_data);
+			Ret = SR_HijackThread(hTargetProc, pRoutine, pArg, Out, Timeout, error_data);
 			break;
 
 		case LAUNCH_METHOD::LM_SetWindowsHookEx:
@@ -42,13 +42,13 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			{
 				TargetSession = (ULONG)-1;
 			}
-			Ret = SR_SetWindowsHookEx(hTargetProc, pRoutine, pArg, TargetSession, Out, error_data);
+			Ret = SR_SetWindowsHookEx(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
 
 			break;
 		}
 
 		case LAUNCH_METHOD::LM_QueueUserAPC:
-			Ret = SR_QueueUserAPC(hTargetProc, pRoutine, pArg, Out, error_data);
+			Ret = SR_QueueUserAPC(hTargetProc, pRoutine, pArg, Out, Timeout, error_data);
 			break;
 		
 		default:

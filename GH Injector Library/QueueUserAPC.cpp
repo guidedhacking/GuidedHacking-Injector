@@ -2,7 +2,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_QueueUserAPC(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_QueueUserAPC(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 #ifdef _WIN64
 
@@ -124,7 +124,7 @@ DWORD SR_QueueUserAPC(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 			continue;
 		}
 		
-		if (!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == THREAD_STATE::Running))
+		if ((!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == THREAD_STATE::Running)) && PI.GetThreadId() != GetCurrentThreadId())
 		{
 			DWORD ThreadID = PI.GetThreadId();
 			HANDLE hThread = OpenThread(THREAD_SET_CONTEXT, FALSE, ThreadID);
@@ -153,13 +153,15 @@ DWORD SR_QueueUserAPC(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		return SR_QUAPC_ERR_NO_THREADS;
 	}
 
+	Sleep(SR_REMOTE_DELAY);
+
 	SR_REMOTE_DATA data;
 	data.State			= SR_REMOTE_STATE::SR_RS_ExecutionPending;
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
 	auto Timer = GetTickCount64();
-	while (GetTickCount64() - Timer < SR_REMOTE_TIMEOUT)
+	while (GetTickCount64() - Timer < Timeout)
 	{
 		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
 		{

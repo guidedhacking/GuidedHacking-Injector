@@ -64,18 +64,21 @@ public:
 
 	PEB						* GetPEB();
 	LDR_DATA_TABLE_ENTRY	* GetLdrEntry(HINSTANCE hMod);
+	void					* GetEntrypoint();
 
 	DWORD GetPID();
+	DWORD GetSessionID();
 
 	bool IsNative();
-
-	void * GetEntrypoint();
+	bool IsProtected();
 
 	DWORD GetTID();
 	DWORD GetThreadId();
+
 	bool GetThreadState(THREAD_STATE & state, KWAIT_REASON & reason);
 	bool GetThreadStartAddress(void *& start_address);
 	bool GetThreadStartAddress_WOW64(void *& start_address);
+
 	bool IsThreadInAlertableState();
 	bool IsThreadWorkerThread();
 
@@ -86,6 +89,7 @@ public:
 
 	PEB32					* GetPEB_WOW64();
 	LDR_DATA_TABLE_ENTRY32	* GetLdrEntry_WOW64(HINSTANCE hMod);
+
 	bool IsThreadInAlertableState_WOW64();
 
 #endif

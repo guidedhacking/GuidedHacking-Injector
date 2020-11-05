@@ -4,7 +4,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	void * pEntrypoint = nullptr;
 	if (CloakThread)
@@ -137,7 +137,7 @@ DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 		}
 	}
 
-	DWORD dwWaitRet = WaitForSingleObject(hThread, SR_REMOTE_TIMEOUT);
+	DWORD dwWaitRet = WaitForSingleObject(hThread, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());

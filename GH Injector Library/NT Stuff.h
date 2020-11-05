@@ -20,6 +20,10 @@
 #undef RtlMoveMemory
 #endif
 
+#ifdef RtlZeroMemory
+#undef RtlZeroMemory
+#endif
+
 #define THREAD_CREATE_FLAGS_CREATE_SUSPENDED	0x00000001
 #define THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH  0x00000002
 #define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER	0x00000004
@@ -40,9 +44,10 @@ typedef LONG KPRIORITY;
 
 typedef enum class _PROCESSINFOCLASS
 {
-	ProcessBasicInformation		= 0,
-	ProcessSessionInformation	= 24,
-	ProcessWow64Information		= 26
+	ProcessBasicInformation			= 0,
+	ProcessSessionInformation		= 24,
+	ProcessWow64Information			= 26,
+	ProcessProtectionInformation	= 61
 } PROCESSINFOCLASS;
 
 typedef enum class _SYSTEM_INFORMATION_CLASS
@@ -72,12 +77,6 @@ typedef enum class _OBEJECT_TYPE_NUMBER
 {
 	Process = 0x07
 } OBJECT_TYPE_NUMBER;
-
-typedef enum class _SECTION_INHERIT
-{
-	ViewShare = 1,
-	ViewUnmap = 2
-} SECTION_INHERIT;
 
 enum class LDR_DDAG_STATE
 {
@@ -155,11 +154,6 @@ typedef struct _LDRP_DEPENDENCY
 	_LDRP_INCOMING_DEPENDENCY	*	IncomingDependenciesLink;
 	_LDR_DDAG_NODE				*	ParentNode;
 } LDRP_DEPENDENCY, *PLDRP_DEPENDENCY;
-
-typedef struct _LDRP_CSLIST
-{
-	PSINGLE_LIST_ENTRY Tail;
-} LDRP_CSLIST, * PLDRP_CSLIST;
 
 typedef struct _LDR_DDAG_NODE
 {
@@ -351,7 +345,7 @@ typedef struct _FILE_STANDARD_INFORMATION
 	ULONG         NumberOfLinks;
 	BOOLEAN       DeletePending;
 	BOOLEAN       Directory;
-} FILE_STANDARD_INFORMATION, * PFILE_STANDARD_INFORMATION;
+} FILE_STANDARD_INFORMATION, *PFILE_STANDARD_INFORMATION;
 
 typedef struct _FILE_POSITION_INFORMATION
 {
@@ -373,7 +367,7 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT
 	UNICODE_STRING				DllSearchPath;
 	BOOLEAN						AllocatedOnLdrpHeap;
 	LDRP_PATH_SEARCH_OPTIONS	SearchOptions;
-	LDRP_UNICODE_STRING_BUNDLE	OriginalFullDllName;
+	wchar_t *					OriginalFullDllName;
 } LDRP_PATH_SEARCH_CONTEXT, *PLDRP_PATH_SEARCH_CONTEXT;
 
 typedef union _LDRP_LOAD_CONTEXT_FLAGS
@@ -393,7 +387,7 @@ typedef union _LDRP_LOAD_CONTEXT_FLAGS
 		ULONG32 SearchOnlyFirstPathSegment	: 1;
 		ULONG32 RedirectedByAPISet			: 1;
 	};
-} LDRP_LOAD_CONTEXT_FLAGS, * PLDRP_LOAD_CONTEXT_FLAGS;
+} LDRP_LOAD_CONTEXT_FLAGS, *PLDRP_LOAD_CONTEXT_FLAGS;
 
 typedef struct _OBJECT_ATTRIBUTES 
 {
@@ -428,47 +422,12 @@ typedef struct _IO_STATUS_BLOCK
 
 #ifdef _WIN64
 
-typedef ALIGN_86 struct _ANSI_STRING32
-{
-	WORD	Length;
-	WORD	MaxLength;
-	DWORD	szBuffer;
-} ANSI_STRING32, *PANSI_STRING32;
-
 typedef ALIGN_86 struct _UNICODE_STRING32
 {
 	WORD	Length;
 	WORD	MaxLength;
 	DWORD	szBuffer;
 } UNICODE_STRING32, *PUNICODE_STRING32;
-
-typedef ALIGN_86 struct _LDRP_PATH_SEARCH_CONTEXT32
-{
-	UNICODE_STRING32			DllSearchPath;
-	BOOLEAN						AllocatedOnLdrpHeap;
-	LDRP_PATH_SEARCH_OPTIONS	SearchOptions;
-	UNICODE_STRING32			OriginalFullDllName;
-} LDRP_PATH_SEARCH_CONTEXT32, *PLDRP_PATH_SEARCH_CONTEXT32;
-
-typedef ALIGN_86 struct _DDAG_DEPENDENCY32
-{
-	DWORD Next;
-	DWORD DDag;
-} DDAG_DEPENDENCY32, *PDDAG_DEPENDENCY32;
-
-typedef ALIGN_86 struct _LDR_DDAG_NODE32
-{
-	LIST_ENTRY32 modules;
-	DWORD ServiceTagList;
-	DWORD LoadCount;
-	DWORD LoadWhileUnloadingCount;
-	DWORD LowestLink;
-	DWORD Dependencies;
-	DWORD IncomingDependencies;
-	DWORD State;
-	DWORD CondenseLink;
-	DWORD PreorderNumber;
-} LDR_DDAG_NODE32, *PLDR_DDAG_NODE32;
 
 typedef ALIGN_86 struct _RTL_BALANCED_NODE32
 {
@@ -587,12 +546,7 @@ using f_LdrpLoadDll = NTSTATUS (__fastcall*)
 	LDR_DATA_TABLE_ENTRY		**	ldr_out
 );
 
-using f_LdrUnloadDll = NTSTATUS(__stdcall*)
-(
-	HINSTANCE hDll
-);
-
-using f_LdrGetDllHandleEx = NTSTATUS (__fastcall*)
+using f_LdrGetDllHandleEx = NTSTATUS (__stdcall*)
 (
 	ULONG				Flags,
 	PWSTR				OptDllPath,
@@ -607,19 +561,6 @@ using f_LdrGetProcedureAddress = NTSTATUS (__stdcall*)
 	ANSI_STRING		*	Name,
 	ULONG				Ordinal,
 	PVOID			*	ProcedureAddress
-);
-
-using f_LdrLockLoaderLock = NTSTATUS (__stdcall*)
-(
-	ULONG			Flags,
-	ULONG		*	State,
-	ULONG_PTR	*	Cookie
-);
-
-using f_LdrUnlockLoaderLock = NTSTATUS (__stdcall*)
-(
-	ULONG Flags,
-	ULONG_PTR Cookie
 );
 
 using f_NtQueryInformationProcess = NTSTATUS (__stdcall*)
@@ -683,6 +624,12 @@ using f_RtlMoveMemory = VOID (__stdcall*)
 	SIZE_T				Length
 );
 
+using f_RtlZeroMemory = VOID(__stdcall*)
+(
+	PVOID	UNALIGNED	Destination,
+	SIZE_T				Length
+);
+
 using f_RtlAllocateHeap = PVOID (__stdcall*)
 (
 	PVOID	HeapHandle,
@@ -702,35 +649,6 @@ using f_RtlAnsiStringToUnicodeString = NTSTATUS (__stdcall*)
 	UNICODE_STRING	*	DestinationString,
 	ANSI_STRING		*	SourceString,
 	BOOLEAN				AllocateDestinationString
-);
-
-using f_RtlUnicodeStringToAnsiString = NTSTATUS (__stdcall*)
-(
-	ANSI_STRING		*	DestinationString,
-	UNICODE_STRING	*	SourceString,
-	BOOLEAN				AllocateDestinationString
-);
-
-using f_RtlInitUnicodeString = VOID (__stdcall*)
-(
-	UNICODE_STRING * DestinationString,
-	const wchar_t * SourceString
-);
-
-using f_RtlHashUnicodeString = NTSTATUS (__stdcall*)
-(
-	UNICODE_STRING	*	String,
-	BOOLEAN				CaseInSensitive,
-	ULONG				HashAlgorithm,
-	ULONG			*	HashValue
-);
-
-using f_RtlRbInsertNodeEx = VOID (__stdcall*)
-(
-	RTL_RB_TREE			*	pTree,
-	RTL_BALANCED_NODE	*	pOptParent,
-	BOOLEAN					Right,
-	RTL_BALANCED_NODE	*	pNode
 );
 
 using f_RtlRbRemoveNode = VOID (__stdcall*)
@@ -780,37 +698,6 @@ using f_NtQueryInformationFile = NTSTATUS(__stdcall*)
 	FILE_INFORMATION_CLASS		FileInformationClass
 );
 
-using f_NtCreateSection = NTSTATUS (__stdcall*)
-(
-	PHANDLE			SectionHandle,
-	ACCESS_MASK		DesiredAccess,
-	PVOID			ObjectAttributes,
-	PLARGE_INTEGER	MaximumSize,
-	ULONG			SectionPageProtection,
-	ULONG			AllocationAttributes,
-	HANDLE			FileHandle
-);
-
-using f_NtMapViewOfSection = NTSTATUS (__stdcall*)
-(
-	HANDLE				SectionHandle,
-	HANDLE				ProcessHandle,
-	PVOID			*	BaseAddress,
-	ULONG_PTR			ZeroBits,
-	SIZE_T				CommitSize,
-	PLARGE_INTEGER		SectionOffset,
-	PSIZE_T				ViewSize,
-	SECTION_INHERIT		InheritDisposition,
-	ULONG				AllocationType,
-	ULONG				Win32Protect
-);
-
-using f_NtUnmapViewOfSection = NTSTATUS (__stdcall*)
-(
-	HANDLE	ProcessHandle,
-	PVOID	BaseAddress
-);
-
 using f_NtClose = NTSTATUS (__stdcall*)
 (
 	HANDLE Handle
@@ -843,16 +730,14 @@ using f_NtProtectVirtualMemory = NTSTATUS (__stdcall*)
 	ULONG	*	OldAccess
 );
 
-using f_RtlGetSystemTimePrecise = LONGLONG (__stdcall*)
-(
-
-);
-
 using f_LdrpModuleBaseAddressIndex	= RTL_RB_TREE*;
 using f_LdrpMappingInfoIndex		= RTL_RB_TREE*;
-using f_LdrpHashTable				= LIST_ENTRY*;
 using f_LdrpHeap					= PVOID*;
 
 #pragma endregion
 
 inline HINSTANCE g_hNTDLL;
+
+#ifdef  _WIN64
+inline HINSTANCE g_hNTDLL_WOW64;
+#endif

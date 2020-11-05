@@ -4,21 +4,19 @@
 
 #include "Injection Internal.h"
 #include "Manual Mapping.h"
+#include "WOW64 Shells.h"
 
 using namespace WOW64;
 
-BYTE InjectionShell_WOW64[] =
+DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
-	0x55, 0x8B, 0xEC, 0x56, 0x8B, 0x75, 0x08, 0x85, 0xF6, 0x75, 0x0A, 0xB8, 0x01, 0x00, 0x20, 0x00, 0x5E, 0x5D, 0xC2, 0x04, 0x00, 0x8B, 0x4E, 0x04, 0x85, 0xC9, 0x75, 0x0A, 0xB8, 0x02, 0x00, 0x20, 0x00, 0x5E, 0x5D, 0xC2,
-	0x04, 0x00, 0x8D, 0x46, 0x14, 0x56, 0x89, 0x46, 0x10, 0x8D, 0x46, 0x0C, 0x50, 0x6A, 0x00, 0x6A, 0x00, 0xFF, 0xD1, 0x33, 0xC9, 0x89, 0x46, 0x08, 0x85, 0xC0, 0xBA, 0x03, 0x00, 0x20, 0x00, 0x5E, 0x0F, 0x48, 0xCA, 0x8B,
-	0xC1, 0x5D, 0xC2, 0x04, 0x00
-};
+	LOG("InjectDLL_WOW64 called\n");
 
-DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data)
-{
 	if (Mode == INJECTION_MODE::IM_ManualMap)
 	{
-		return MMAP_WOW64::ManualMap_WOW64(szDllFile, hTargetProc, Method, Flags, hOut, error_data);
+		LOG("Forwarding call to ManualMap_WOW64\n");
+
+		return MMAP_WOW64::ManualMap_WOW64(szDllFile, hTargetProc, Method, Flags, hOut, Timeout, error_data);
 	}
 
 	INJECTION_DATA_INTERNAL_WOW64 data{ 0 };
@@ -50,8 +48,9 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		}
 	}
 
-	data.ModuleFileName.Length		= (WORD)(len - sizeof(wchar_t));
-	data.ModuleFileName.MaxLength	= (WORD)(sizeof(data.Path));
+	data.ModuleFileName.Length		= (WORD)len;
+	data.ModuleFileName.MaxLength	= (WORD)sizeof(data.Path);
+
 	hr = StringCbCopyW(data.Path, sizeof(data.Path), szDllFile);
 	if (FAILED(hr))
 	{
@@ -63,9 +62,11 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 	ULONG_PTR ShellSize		= sizeof(InjectionShell_WOW64);
 	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL_WOW64) + ShellSize + 0x10;
 
-	BYTE * pAllocBase = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+	BYTE * pAllocBase = ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 	BYTE * pArg		= pAllocBase;
-	BYTE * pShell	= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_INTERNAL_WOW64)), 0x10));
+	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_INTERNAL_WOW64)), 0x10));
+
+	LOG("Memory allocated\npArg   = %p\npShell = %p\nAllocationSize = %08X\n", pArg, pShell, (DWORD)AllocationSize);
 
 	if (!pArg)
 	{
@@ -92,8 +93,14 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		return INJ_ERR_WPM_FAIL;
 	}
 
+	printf("LoadLibraryExW: %08X\n", data.f.LoadLibraryExW);
+	printf("LdrLoadDll    : %08X\n", data.f.LdrLoadDll);
+	printf("LdrpLoadDll   : %08X\n", data.f.LdrpLoadDll);
+
+	LOG("Data written\n");
+
 	DWORD remote_ret = 0;
-	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, error_data);
+	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
@@ -104,6 +111,8 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 		return dwRet;
 	}
+
+	LOG("Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL_WOW64), nullptr))
 	{
@@ -138,6 +147,8 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 	hOut = ReCa<HINSTANCE>(MPTR(data.hRet));
 
+	LOG("End InjectDLL_WOW64\n");
+
 	return INJ_ERR_SUCCESS;
 }
 
@@ -149,12 +160,16 @@ INJECTION_FUNCTION_TABLE_WOW64::INJECTION_FUNCTION_TABLE_WOW64()
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(GetLastError);
 
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrLockLoaderLock);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrUnlockLoaderLock);
-
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlRbRemoveNode);
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlMoveMemory);
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlZeroMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlFreeHeap);
 
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlRbRemoveNode);
+
+	WOW64_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
+
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
 }
 

@@ -3,35 +3,69 @@
 #ifdef _WIN64
 
 #include "Manual Mapping.h"
+#include "WOW64 Shells.h"
+
+#pragma optimize("", off)
 
 using namespace WOW64;
 using namespace MMAP_WOW64;
 
-BYTE ManualMapping_Shell_WOW64[] =
+DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
-	0
-};
+	LOG("Begin ManualMap_WOW64\n");
 
-DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, ERROR_DATA & error_data)
-{
-	MANUAL_MAPPING_DATA_WOW64			data;
+	MANUAL_MAPPING_DATA_WOW64 data{ 0 };
 	data.Flags = Flags;
 
-	data.DllPath.MaxLength = sizeof(data.szPathBuffer);
-	data.DllPath.Length		= (WORD)(lstrlenW(szDllFile) * sizeof(wchar_t));
-	memcpy(data.szPathBuffer, szDllFile, data.DllPath.Length);
+	size_t len = 0;
+	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.szPathBuffer), &len);
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-	const wchar_t * pDllName = wcsrchr(szDllFile, '\\') + 1;
-	data.DllName.MaxLength	= sizeof(data.szNameBuffer);
-	data.DllName.Length		= (WORD)(lstrlenW(pDllName) * sizeof(wchar_t));
-	memcpy(data.szNameBuffer, pDllName, data.DllName.Length);
+		return INJ_ERR_STRINGC_XXX_FAIL;
+	}
+	
+	data.DllPath.Length		= (WORD)len;
+	data.DllPath.MaxLength	= (WORD)sizeof(data.szPathBuffer);
+
+	hr = StringCbCopyW(data.szPathBuffer, sizeof(data.szPathBuffer), szDllFile);
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return INJ_ERR_STRINGC_XXX_FAIL;
+	}
+
+	const wchar_t * pDllName = wcsrchr(szDllFile, '\\') + 1; 
+	
+	hr = StringCbLengthW(pDllName, sizeof(data.szNameBuffer), &len);
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return INJ_ERR_STRINGC_XXX_FAIL;
+	}
+	
+	data.DllName.Length		= (WORD)len;
+	data.DllName.MaxLength	= (WORD)sizeof(data.szNameBuffer);
+
+	hr = StringCbCopyW(data.szNameBuffer, sizeof(data.szNameBuffer), pDllName);
+	if (FAILED(hr))
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return INJ_ERR_STRINGC_XXX_FAIL;
+	}
 
 	ULONG_PTR ShellSize = sizeof(ManualMapping_Shell_WOW64);
 	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA_WOW64) + ShellSize + 0x10;
-	BYTE * pAllocBase		= ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+	BYTE * pAllocBase	= ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 
 	BYTE * pArg		= pAllocBase;
-	BYTE * pShell	= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), 0x10));
+	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), 0x10));
+
+	LOG("pArg   = %p\npShell = %p\n", pArg, pShell);
 
 	if (!pArg)
 	{
@@ -58,8 +92,10 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 		return INJ_ERR_WPM_FAIL;
 	}
 
+	LOG("Data written\n");
+
 	DWORD remote_ret = 0;
-	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, error_data);
+	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
@@ -70,6 +106,8 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 		return dwRet;
 	}
+
+	LOG("Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pAllocBase, &data, sizeof(MANUAL_MAPPING_DATA_WOW64), nullptr))
 	{
@@ -104,6 +142,8 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 	hOut = ReCa<HINSTANCE>(MPTR(data.hRet));
 
+	LOG("End ManualMap_WOW64\n");
+
 	return 0;
 }
 
@@ -111,40 +151,25 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 {
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtOpenFile);
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtReadFile);
+	WOW64_FUNC_CONSTRUCTOR_INIT(NtClose);
+
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtSetInformationFile);
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtQueryInformationFile);
-
-	WOW64_FUNC_CONSTRUCTOR_INIT(NtCreateSection);
-	WOW64_FUNC_CONSTRUCTOR_INIT(NtMapViewOfSection);
-	WOW64_FUNC_CONSTRUCTOR_INIT(NtUnmapViewOfSection);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtAllocateVirtualMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtFreeVirtualMemory);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlMoveMemory);
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlZeroMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAllocateHeap);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlFreeHeap);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrGetDllHandleEx);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpLoadDll);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrUnloadDll);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrGetProcedureAddress);
 
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrLockLoaderLock);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrUnlockLoaderLock);
-
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAnsiStringToUnicodeString);
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlUnicodeStringToAnsiString);
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlInitUnicodeString);
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlHashUnicodeString);
-
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlRbInsertNodeEx);
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlRbRemoveNode);
-
-	WOW64_FUNC_CONSTRUCTOR_INIT(RtlGetSystemTimePrecise);
-
-	WOW64_FUNC_CONSTRUCTOR_INIT(NtClose);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpPreprocessDllName);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlInsertInvertedFunctionTable);
@@ -152,8 +177,9 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHashTable);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
 }
+
+#pragma optimize("", on)
 
 #endif

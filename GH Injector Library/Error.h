@@ -61,6 +61,10 @@
 #define INJ_ERR_LLEXW_FAILED				0x00000028	//LoadLibraryExW					: win32 error			: LoadLibraryExW failed loading the dll
 #define INJ_ERR_LDRLDLL_FAILED				0x00000029	//LdrLoadDll						: NTSTATUS				: LdrLoadDll failed loading the dll
 #define INJ_ERR_LDRPLDLL_FAILED				0x0000002A	//LdrpLoadDll						: NTSTATUS				: LdrpLoadDll failed loading the dll
+#define INJ_ERR_CANT_GET_PEB				0x0000002B	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
+#define INJ_ERR_INVALID_PEB_DATA			0x0000002C	//internal error					: -						: peb data required to erase/fake header or unlike the module from the peb wasn't findable
+#define INJ_ERR_UPDATE_PROTECTION_FAILED	0x0000002D	//NtProtectVirtualMemory			: NTSTATUS				: updating the page protection of the pe header failed
+#define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002E	//internal error					: -						: can't resolve address of the wow64 ntdll
 
 
 ///////////////////
@@ -72,16 +76,17 @@
 #define INJ_MM_ERR_HEAP_ALLOC					0x00400003	//NtAllocateHeap					: -						: memory allocation failed
 #define INJ_MM_ERR_NT_READ_FILE					0x00400004	//NtReadFile						: NTSTATUS				: reading the file failed
 #define INJ_MM_ERR_SET_FILE_POSITION			0x00400005	//NtSetInformationFile				: NTSTATUS				: failed to reset the file pointer to  the beginning of the file 
-#define INJ_MM_ERR_CANT_CREATE_SECTION			0x00400006	//NtCreateSection					: NTSTATUS				: failed to create a section
-#define INJ_MM_ERR_FAILED_TO_MAP_IMAGE			0x00400007	//NtMapViewOfSection				: NTSTATUS				: failed to map view of section
-#define INJ_MM_ERR_UPDATE_PAGE_PROTECTION		0x00400008	//NtProtectVirtualMemory			: NTSTATUS				: setting the page protection of the image failed
-#define INJ_MM_ERR_CANT_GET_FILE_SIZE			0x00400009	//NtQueryInformationFile			: NTSTATUS				: querying the file size failed
-#define INJ_MM_ERR_MEMORY_ALLOCATION_FAILED		0x0040000A	//NtAllocateVirtualMemory			: NTSTATUS				: couldn't allocate memory
-#define INJ_MM_ERR_IMAGE_CANT_BE_RELOCATED		0x0040000B	//internal error					: -						: the image has to be relocated but the reloc directory of the image is empty
-#define INJ_MM_ERR_IMPORT_FAIL					0x0040000C	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
-#define INJ_MM_ERR_DELAY_IMPORT_FAIL			0x0040000D	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
-#define INJ_MM_ERR_ENABLING_SEH_FAILED			0x0040000E	//RtlInsertInvertedFunctionTable	: NTSTATUS				: enabling exception handling by calling RtlInsertInvertedFunctionTable failed
-#define INJ_MM_ERR_INVALID_HEAP_HANDLE			0x0040000F	//internal error					: -						: the provided pointer to the LdrpHeap is invalid
+#define INJ_MM_ERR_UPDATE_PAGE_PROTECTION		0x00400006	//NtProtectVirtualMemory			: NTSTATUS				: setting the page protection of a section failed
+#define INJ_MM_ERR_CANT_GET_FILE_SIZE			0x00400007	//NtQueryInformationFile			: NTSTATUS				: querying the file size failed
+#define INJ_MM_ERR_MEMORY_ALLOCATION_FAILED		0x00400008	//NtAllocateVirtualMemory			: NTSTATUS				: couldn't allocate memory
+#define INJ_MM_ERR_IMAGE_CANT_BE_RELOCATED		0x00400009	//internal error					: -						: the image has to be relocated but the reloc directory of the image is empty
+#define INJ_MM_ERR_IMPORT_FAIL					0x0040000A	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
+#define INJ_MM_ERR_DELAY_IMPORT_FAIL			0x0040000B	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
+#define INJ_MM_ERR_ENABLING_SEH_FAILED			0x0040000C	//RtlInsertInvertedFunctionTable	: NTSTATUS				: enabling exception handling by calling RtlInsertInvertedFunctionTable failed
+#define INJ_MM_ERR_INVALID_HEAP_HANDLE			0x0040000D	//internal error					: -						: the provided pointer to the LdrpHeap is invalid
+#define INJ_MM_ERR_CANT_GET_PEB					0x0040000E	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
+#define INJ_MM_ERR_INVALID_PEB_DATA				0x0040000F	//internal error					: -						: peb data required to fake header wasn't findable
+
 
 
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

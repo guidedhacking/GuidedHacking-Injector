@@ -59,28 +59,30 @@ enum class LAUNCH_METHOD
 //ansi version of the info structure:
 struct INJECTIONDATAA
 {
-	char			szDllPath[MAX_PATH * 2];					//fullpath to the dll to inject
-	DWORD			ProcessID;									//process identifier of the target process
-	INJECTION_MODE	Mode;										//injection mode
-	LAUNCH_METHOD	Method;										//method to execute the remote shellcode
-	DWORD			Flags;										//combination of the flags defined above
-	DWORD			hHandleValue;								//optional value to identify a handle in a process
-	HINSTANCE		hDllOut;									//returned image base of the injection
-	bool			GenerateErrorLog;							//if true error data is generated and stored in GH_Inj_Log.txt
+	char			szDllPath[MAX_PATH * 2];	//fullpath to the dll to inject
+	DWORD			ProcessID;					//process identifier of the target process
+	INJECTION_MODE	Mode;						//injection mode
+	LAUNCH_METHOD	Method;						//method to execute the remote shellcode
+	DWORD			Flags;						//combination of the flags defined above
+	DWORD			Timeout;					//timeout for DllMain return in milliseconds
+	DWORD			hHandleValue;				//optional value to identify a handle in a process
+	HINSTANCE		hDllOut;					//returned image base of the injection
+	bool			GenerateErrorLog;			//if true error data is generated and stored in GH_Inj_Log.txt
 };
 
 //unicode version of the info structure (documentation above)
 struct INJECTIONDATAW
 {
-	wchar_t				szDllPath[MAX_PATH * 2];
-	wchar_t				szTargetProcessExeFileName[MAX_PATH];	//exe name of the target process, this value gets set automatically and should be initialized with 0s
-	DWORD				ProcessID;
-	INJECTION_MODE		Mode;
-	LAUNCH_METHOD		Method;
-	DWORD				Flags;
-	DWORD				hHandleValue;
-	HINSTANCE			hDllOut;
-	bool				GenerateErrorLog;
+	wchar_t			szDllPath[MAX_PATH * 2];
+	wchar_t			szTargetProcessExeFileName[MAX_PATH];	//exe name of the target process, this value gets set automatically and should be initialized with 0s
+	DWORD			ProcessID;
+	INJECTION_MODE	Mode;
+	LAUNCH_METHOD	Method;
+	DWORD			Flags;
+	DWORD			Flags;
+	DWORD			hHandleValue;
+	HINSTANCE		hDllOut;
+	bool			GenerateErrorLog;
 };
 
 //amount of bytes to be scanned by ValidateInjectionFunctions and restored by RestoreInjectionFunctions
@@ -89,21 +91,20 @@ struct INJECTIONDATAW
 //ValidateInjectionFunctions fills an std::vector with this info, result can simply be passed to RestoreInjectionFunctions
 struct HookInfo
 {
-	std::string	ModulePath;
-	std::string FunctionName;
+	const char * ModuleName;
+	const char * FunctionName;
 
-	HINSTANCE			hModuleBase;
-	BYTE			*	pReference;
-	void			*	pFunc;
-	UINT				ChangeCount;
-	BYTE				OriginalBytes[HOOK_SCAN_BYTE_COUNT];
+	HINSTANCE		hModuleBase;
+	void		*	pFunc;
+	UINT			ChangeCount;
+	BYTE			OriginalBytes[HOOK_SCAN_BYTE_COUNT];
 
 	DWORD ErrorCode;
 };
 
 //Cloaking options:
-#define INJ_ERASE_HEADER				0x0001	//replaces the first 0x1000 bytes of the dll with 0's (not compatible with INJ_FAKE_HEADER)
-#define INJ_FAKE_HEADER					0x0002	//replaces the dlls header with the header of the local kernel32.dll (not compatible with INJ_ERASE_HEADER)
+#define INJ_ERASE_HEADER				0x0001	//replaces the first 0x1000 bytes of the dll with 0's (takes priority over INJ_FAKE_HEADER if both are specified)
+#define INJ_FAKE_HEADER					0x0002	//replaces the dlls header with the header of the ntdll.dll (superseded by INJ_ERASE_HEADER if both are specified)
 #define INJ_UNLINK_FROM_PEB				0x0004	//unlinks the module from the process enviroment block (1)
 #define INJ_THREAD_CREATE_CLOAKED		0x0008	//passes certain flags to NtCreateThreadEx to make the thread creation more stealthy (2)
 #define INJ_SCRAMBLE_DLL_NAME			0x0010	//randomizes the dll name on disk before injecting it
@@ -112,16 +113,15 @@ struct HookInfo
 
 //Notes:
 ///(1) ignored when manual mapping
-///(2) ignored when launch method isn't LM_NtCreateThreadEx
+///(2) launch method must be NtCreateThreadEx, ignored otherwise
 
 //Manual mapping options:
-#define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header
+#define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
 #define INJ_MM_RESOLVE_IMPORTS			0x00020000	//resolves dll imports
 #define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00040000	//resolves delayed imports
 #define INJ_MM_EXECUTE_TLS				0x00080000	//executes TLS callbacks and initializes static TLS data
 #define INJ_MM_ENABLE_EXCEPTIONS		0x00100000	//enables exception handling
-#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics
-													//if set INJ_MM_CLEAN_DATA_DIR, INJ_ERASE_HEADER and INJ_FAKE_HEADER will be ignored
+#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics, if set INJ_MM_CLEAN_DATA_DIR will be ignored
 #define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
 #define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
@@ -131,5 +131,5 @@ struct HookInfo
 using f_InjectA = DWORD (__stdcall*)(INJECTIONDATAA * pData);
 using f_InjectW = DWORD (__stdcall*)(INJECTIONDATAW * pData);
 
-using f_ValidateInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, std::vector<HookInfo> & HookDataOut);
-using f_RestoreInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, std::vector<HookInfo> & HookDataIn);
+using f_ValidateInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
+using f_RestoreInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn,	UINT Count, UINT * CountOut);

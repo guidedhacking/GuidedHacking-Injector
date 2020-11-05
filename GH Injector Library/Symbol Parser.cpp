@@ -139,7 +139,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 	}
 
 	File.seekg(0, std::ios::beg);
-	File.read(ReCa<char *>(pRawData), FileSize);
+	File.read(ReCa<char*>(pRawData), FileSize);
 	File.close();
 
 	IMAGE_DOS_HEADER	* pDos	= ReCa<IMAGE_DOS_HEADER*>(pRawData);
@@ -154,11 +154,11 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 	if (pFile->Machine == IMAGE_FILE_MACHINE_AMD64)
 	{
-		pOpt64 = ReCa<IMAGE_OPTIONAL_HEADER64 *>(&pNT->OptionalHeader);
+		pOpt64 = ReCa<IMAGE_OPTIONAL_HEADER64*>(&pNT->OptionalHeader);
 	}
 	else if (pFile->Machine == IMAGE_FILE_MACHINE_I386)
 	{
-		pOpt32 = ReCa<IMAGE_OPTIONAL_HEADER32 *>(&pNT->OptionalHeader);
+		pOpt32 = ReCa<IMAGE_OPTIONAL_HEADER32*>(&pNT->OptionalHeader);
 		x86 = true;
 	}
 	else
@@ -198,7 +198,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		pDataDir = &pOpt64->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
 	}
 
-	IMAGE_DEBUG_DIRECTORY * pDebugDir = ReCa<IMAGE_DEBUG_DIRECTORY *>(pLocalImageBase + pDataDir->VirtualAddress);
+	IMAGE_DEBUG_DIRECTORY * pDebugDir = ReCa<IMAGE_DEBUG_DIRECTORY*>(pLocalImageBase + pDataDir->VirtualAddress);
 
 	if (!pDataDir->Size || IMAGE_DEBUG_TYPE_CODEVIEW != pDebugDir->Type)
 	{
@@ -209,7 +209,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		return SYMBOL_ERR_NO_PDB_DEBUG_DATA;
 	}
 
-	PdbInfo * pdb_info = ReCa<PdbInfo *>(pLocalImageBase + pDebugDir->AddressOfRawData);
+	PdbInfo * pdb_info = ReCa<PdbInfo*>(pLocalImageBase + pDebugDir->AddressOfRawData);
 	if (pdb_info->Signature != 0x53445352)
 	{
 		VirtualFree(pLocalImageBase, 0, MEM_RELEASE);

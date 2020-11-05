@@ -78,6 +78,9 @@
     <ClInclude Include="Injection Internal.h">
       <Filter>Headerdateien\Injection Methods</Filter>
     </ClInclude>
+    <ClInclude Include="WOW64 Shells.h">
+      <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Handle Hijacking.cpp">

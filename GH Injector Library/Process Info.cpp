@@ -58,7 +58,7 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
 
 		if (CurrentEntry.DllBase == hMod)
 		{
-			return ReCa<LDR_DATA_TABLE_ENTRY *>(pCurrentEntry);
+			return ReCa<LDR_DATA_TABLE_ENTRY*>(pCurrentEntry);
 		}
 		else if (pCurrentEntry == pLastEntry)
 		{
@@ -277,18 +277,6 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry(HINSTANCE hMod)
 	return GetLdrEntry_Native(hMod);
 }
 
-DWORD ProcessInfo::GetPID()
-{
-	return GetProcessId(m_hCurrentProcess);
-}
-
-bool ProcessInfo::IsNative()
-{
-	BOOL bOut = FALSE;
-	IsWow64Process(m_hCurrentProcess, &bOut);
-	return (bOut == FALSE);
-}
-
 void * ProcessInfo::GetEntrypoint()
 {
 	if (!m_pFirstProcess)
@@ -314,9 +302,9 @@ void * ProcessInfo::GetEntrypoint()
 		return nullptr;
 	}
 
-	LIST_ENTRY * pCurrentEntry	= ldrdata.InLoadOrderModuleListHead.Flink;
-	LIST_ENTRY * pLastEntry		= ldrdata.InLoadOrderModuleListHead.Blink;
-	
+	LIST_ENTRY * pCurrentEntry = ldrdata.InLoadOrderModuleListHead.Flink;
+	LIST_ENTRY * pLastEntry = ldrdata.InLoadOrderModuleListHead.Blink;
+
 	wchar_t NameBuffer[MAX_PATH]{ 0 };
 	while (true)
 	{
@@ -341,6 +329,40 @@ void * ProcessInfo::GetEntrypoint()
 	}
 
 	return nullptr;
+}
+
+DWORD ProcessInfo::GetPID()
+{
+	return GetProcessId(m_hCurrentProcess);
+}
+
+DWORD ProcessInfo::GetSessionID()
+{
+	if (m_pFirstProcess)
+	{
+		return m_pCurrentProcess->SessionId;
+	}
+
+	return 0;
+}
+
+bool ProcessInfo::IsNative()
+{
+	BOOL bOut = FALSE;
+	IsWow64Process(m_hCurrentProcess, &bOut);
+	return (bOut == FALSE);
+}
+
+bool ProcessInfo::IsProtected()
+{
+	BYTE info = 0;
+
+	if (NT_FAIL(m_pNtQueryInformationProcess(m_hCurrentProcess, PROCESSINFOCLASS::ProcessProtectionInformation, &info, sizeof(info), nullptr)))
+	{
+		return true;
+	}
+
+	return (info != 0);
 }
 
 DWORD ProcessInfo::GetTID()
@@ -445,6 +467,11 @@ bool ProcessInfo::IsThreadInAlertableState()
 
 #ifdef _WIN64
 
+	if (!ctx.Rip || !ctx.Rsp)
+	{
+		return false;
+	}
+
 	if (ctx.Rip == m_WaitFunctionReturnAddress[0])
 	{
 		return (ctx.Rcx == TRUE);
@@ -461,31 +488,31 @@ bool ProcessInfo::IsThreadInAlertableState()
 	{
 		return (ctx.Rsi == TRUE);
 	} 
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[4] && ctx.Rsp)
+	else if (ctx.Rip == m_WaitFunctionReturnAddress[4])
 	{
-		UINT_PTR buffer = 0;
-		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x30), &buffer, sizeof(buffer), nullptr))
+		BOOLEAN Alertable = FALSE;
+		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x30), &Alertable, sizeof(Alertable), nullptr))
 		{
-			return (buffer == TRUE);
+			return (Alertable == TRUE);
 		}
 	}
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[5] && ctx.Rsp)
+	else if (ctx.Rip == m_WaitFunctionReturnAddress[5])
 	{
-		UINT_PTR buffer = 0;
-		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x28), &buffer, sizeof(buffer), nullptr))
+		DWORD Flags = FALSE;
+		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x28), &Flags, sizeof(Flags), nullptr))
 		{
-			return ((buffer & MWMO_ALERTABLE) != 0);
+			return ((Flags & MWMO_ALERTABLE) != 0);
 		}
 	} 
 
 #else
 
-	if (!ctx.Esp)
+	if (!ctx.Eip || !ctx.Esp)
 	{
 		return false;
 	}
 
-	DWORD stack_buffer[6] = { 0 };
+	DWORD stack_buffer[7] = { 0 };
 	if (!ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Esp), stack_buffer, sizeof(stack_buffer), nullptr))
 	{
 		return false;
@@ -509,7 +536,7 @@ bool ProcessInfo::IsThreadInAlertableState()
 	}
 	else if (ctx.Eip == m_WaitFunctionReturnAddress[4])
 	{
-		return (stack_buffer[4] == TRUE);
+		return ((stack_buffer[6] & 0xFF) == TRUE);
 	}
 	else if (ctx.Eip == m_WaitFunctionReturnAddress[5])
 	{
@@ -543,7 +570,7 @@ bool ProcessInfo::IsThreadWorkerThread()
 	CloseHandle(hThread);
 
 	USHORT TebInfo = NULL;
-	if (ReadProcessMemory(m_hCurrentProcess, ReCa<BYTE *>(tbi.TebBaseAddress) + TEB_SAMETEBFLAGS, &TebInfo, sizeof(TebInfo), nullptr))
+	if (ReadProcessMemory(m_hCurrentProcess, ReCa<BYTE*>(tbi.TebBaseAddress) + TEB_SAMETEBFLAGS, &TebInfo, sizeof(TebInfo), nullptr))
 	{
 		return ((TebInfo & 0x2000) != 0);
 	}
@@ -579,7 +606,7 @@ PEB32 * ProcessInfo::GetPEB_WOW64()
 		return nullptr;
 	}
 
-	return ReCa<PEB32 *>(pPEB);
+	return ReCa<PEB32*>(pPEB);
 }
 
 LDR_DATA_TABLE_ENTRY32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
@@ -679,7 +706,7 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 	WOW64_CONTEXT ctx{ 0 };
 	ctx.ContextFlags = WOW64_CONTEXT_ALL;
 
-	if (!Wow64GetThreadContext(hThread, &ctx) || !ctx.Esp)
+	if (!Wow64GetThreadContext(hThread, &ctx) || !ctx.Eip || !ctx.Esp)
 	{
 		CloseHandle(hThread);
 
@@ -688,7 +715,7 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 	
 	CloseHandle(hThread);
 	
-	DWORD stack_buffer[6] = { 0 };
+	DWORD stack_buffer[7] = { 0 };
 	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(ctx.Esp), stack_buffer, sizeof(stack_buffer), nullptr))
 	{
 		return false;
@@ -712,7 +739,7 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 	}
 	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[4])
 	{
-		return (stack_buffer[4] == TRUE);
+		return ((stack_buffer[6] & 0xFF) == TRUE);
 	}
 	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[5])
 	{

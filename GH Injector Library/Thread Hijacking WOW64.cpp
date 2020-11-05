@@ -4,7 +4,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	ProcessInfo PI;
 	if (!PI.SetProcess(hTargetProc))
@@ -168,7 +168,7 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	data.LastWin32Error = ERROR_SUCCESS;
 
 	auto Timer = GetTickCount64();
-	while (GetTickCount64() - Timer < SR_REMOTE_TIMEOUT)
+	while (GetTickCount64() - Timer < Timeout)
 	{
 		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
 		{

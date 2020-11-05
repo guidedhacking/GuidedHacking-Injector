@@ -44,45 +44,33 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	if (!NATIVE::pLoadLibraryExW || !NATIVE::pGetLastError) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(LdrLoadDll)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(LdrUnloadDll)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(LdrGetDllHandleEx)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(LdrGetProcedureAddress)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-
-	if (LoadExportedFunction(S_FUNC(LdrLockLoaderLock)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(LdrUnlockLoaderLock)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(NtQueryInformationProcess)))	return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtQuerySystemInformation)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtQueryInformationThread)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(RtlMoveMemory)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
+	if (LoadExportedFunction(S_FUNC(RtlZeroMemory)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(RtlAllocateHeap)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(RtlFreeHeap)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(RtlAnsiStringToUnicodeString))) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(RtlUnicodeStringToAnsiString))) return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(RtlInitUnicodeString)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(RtlHashUnicodeString)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
-	if (LoadExportedFunction(S_FUNC(RtlRbInsertNodeEx)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(RtlRbRemoveNode)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	
 	if (LoadExportedFunction(S_FUNC(NtOpenFile)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtReadFile)))					return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtSetInformationFile)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtQueryInformationFile)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(NtCreateSection)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(NtMapViewOfSection)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-	if (LoadExportedFunction(S_FUNC(NtUnmapViewOfSection)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(NtClose)))						return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(NtAllocateVirtualMemory)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtFreeVirtualMemory)))			return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(NtProtectVirtualMemory)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
-
-	if (LoadExportedFunction(S_FUNC(RtlGetSystemTimePrecise)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 
 	if (LoadExportedFunction(S_FUNC(NtCreateThreadEx)))				return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	if (LoadExportedFunction(S_FUNC(RtlQueueApcWow64Thread)))		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
@@ -110,7 +98,6 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 
 	if (LoadNtSymbolNative(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolNative(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrpHashTable)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolNative(S_FUNC(LdrpHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	
 #ifdef _WIN64

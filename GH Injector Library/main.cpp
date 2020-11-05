@@ -8,6 +8,9 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 	
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
+		FILE * pFile = nullptr;
+		freopen_s(&pFile, "CONOUT$", "w", stdout);
+
 		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSIONW, hDll);
 
 		DisableThreadLibraryCalls(hDll);
@@ -31,17 +34,36 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 			return FALSE;
 		}
 
+		size_t buffer_size = MAX_PATH;
+		char * szWindowsDir = new char[buffer_size];
+
+		if (_dupenv_s(&szWindowsDir, &buffer_size, "WINDIR"))
+		{
+			LOG("Couldn't resolve %%WINDIR%%\n");
+
+			delete[] szWindowsDir;
+
+			return FALSE;
+		}
+
 		g_RootPathA = szRootPathA;
 		g_RootPathW = szRootPathW;
 
 		LOG("Rootpath is %s\n", szRootPathA);
 
 #ifdef _WIN64
-		sym_ntdll_wow64_ret		= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64,	std::string("C:\\Windows\\SysWOW64\\ntdll.dll"), g_RootPathA, nullptr, false);
-		sym_ntdll_native_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, std::string("C:\\Windows\\System32\\ntdll.dll"), g_RootPathA, nullptr, false);
-#else
-		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, "C:\\Windows\\System32\\ntdll.dll", g_RootPathA, nullptr, false);
+		std::string szNtDllWOW64 = szWindowsDir;
+		szNtDllWOW64 += "\\SysWOW64\\ntdll.dll";
+
+		sym_ntdll_wow64_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false);
 #endif
+
+		std::string szNtDllNative = szWindowsDir;
+		szNtDllNative += "\\System32\\ntdll.dll";
+
+		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathA, nullptr, false);
+
+		delete[] szWindowsDir;
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{

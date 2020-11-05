@@ -2,7 +2,7 @@
 
 #include "Start Routine.h"
 
-DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, bool CloakThread, DWORD & Out, ERROR_DATA & error_data)
+DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	LOG("Begin SR_NtCreateThreadEx\n");
 
@@ -19,7 +19,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 		pEntrypoint = pi.GetEntrypoint();
 	}
-	DWORD Flags		= THREAD_CREATE_FLAGS_CREATE_SUSPENDED | THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH | THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER;
+
+	DWORD Flags		= THREAD_CREATE_FLAGS_CREATE_SUSPENDED | THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER;
 	HANDLE hThread	= nullptr;
 
 #ifdef _WIN64
@@ -140,6 +141,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	}
 
 	auto TID = GetThreadId(hThread);
+
 	LOG("Thread created with TID = %06X (%06d)\n", TID, TID);
 	
 	if (CloakThread)
@@ -192,12 +194,12 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 	LOG("Entering wait state\n");
 
-	Sleep(100);
+	Sleep(SR_REMOTE_DELAY);
 	
-	DWORD dwWaitRet = WaitForSingleObject(hThread, SR_REMOTE_TIMEOUT);
+	DWORD dwWaitRet = WaitForSingleObject(hThread, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
-		INIT_ERROR_DATA(error_data, GetLastError());
+		INIT_ERROR_DATA(error_data, dwWaitRet);
 
 		TerminateThread(hThread, 0);
 		CloseHandle(hThread);
