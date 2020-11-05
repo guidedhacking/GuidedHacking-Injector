@@ -79,11 +79,17 @@ struct INJECTIONDATAW
 	INJECTION_MODE	Mode;
 	LAUNCH_METHOD	Method;
 	DWORD			Flags;
-	DWORD			Flags;
+	DWORD			Timeout;
 	DWORD			hHandleValue;
 	HINSTANCE		hDllOut;
 	bool			GenerateErrorLog;
 };
+
+#ifdef _UNICODE
+#define INJECTIONDATA INJECTIONDATAW
+#else
+#define INJECTIONDATA INJECTIONDATAA
+#endif
 
 //amount of bytes to be scanned by ValidateInjectionFunctions and restored by RestoreInjectionFunctions
 #define HOOK_SCAN_BYTE_COUNT 0x10
@@ -126,10 +132,13 @@ struct HookInfo
 #define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
 
-#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_SEH | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
+#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
 
-using f_InjectA = DWORD (__stdcall*)(INJECTIONDATAA * pData);
-using f_InjectW = DWORD (__stdcall*)(INJECTIONDATAW * pData);
+using f_InjectA = DWORD(__stdcall*)(INJECTIONDATAA * pData);
+using f_InjectW = DWORD(__stdcall*)(INJECTIONDATAW * pData);
 
-using f_ValidateInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
-using f_RestoreInjectionFunctions	= bool (__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn,	UINT Count, UINT * CountOut);
+using f_ValidateInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
+using f_RestoreInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut);
+
+using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
+using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
