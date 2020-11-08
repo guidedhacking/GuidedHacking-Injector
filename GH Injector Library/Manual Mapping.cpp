@@ -67,7 +67,6 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	BYTE * pArg		= pAllocBase;
 	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA), 0x10));
 
-	LOG("Shellstart = %p\nShellend   = %p\n", ManualMapping_Shell, ManualMapping_Shell_End);
 	LOG("Shellsize = %IX bytes\n", ShellSize);
 	LOG("pArg   = %p\npShell = %p\nAllocationSize = %08X\n", pArg, pShell, (DWORD)AllocationSize);
 

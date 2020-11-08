@@ -52,7 +52,6 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	BYTE * pArg		= pAllocBase;
 	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_INTERNAL), 0x10));
 
-	LOG("Shellstart = %p\nShellend   = %p\n", InjectionShell, InjectionShell_End);
 	LOG("Shellsize = %IX bytes\n", ShellSize);
 	LOG("Memory allocated\npArg   = %p\npShell = %p\nAllocationSize = %08X\n", pArg, pShell, (DWORD)AllocationSize);
 
