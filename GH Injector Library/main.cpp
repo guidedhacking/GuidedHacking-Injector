@@ -8,8 +8,13 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 	
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
+
+#ifdef DEBUG_INFO
+		AllocConsole();
+
 		FILE * pFile = nullptr;
 		freopen_s(&pFile, "CONOUT$", "w", stdout);
+#endif
 
 		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSIONW, hDll);
 

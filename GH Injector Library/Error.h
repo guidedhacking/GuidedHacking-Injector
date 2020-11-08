@@ -295,4 +295,10 @@ data.Line = __LINE__;																\
 memcpy(data.szFileName, __FILENAMEW__,  ((size_t)lstrlenW(__FILENAMEW__)) * 2);		\
 memcpy(data.szFunctionName, __FUNCTIONW__, ((size_t)lstrlenW(__FUNCTIONW__)) * 2);
 
+//#define DEBUG_INFO
+
+#ifdef DEBUG_INFO
 #define LOG printf
+#else
+#define LOG
+#endif

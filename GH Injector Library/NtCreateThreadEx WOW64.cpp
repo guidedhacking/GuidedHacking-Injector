@@ -140,7 +140,7 @@ DWORD SR_NtCreateThreadEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	DWORD dwWaitRet = WaitForSingleObject(hThread, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
-		INIT_ERROR_DATA(error_data, GetLastError());
+		INIT_ERROR_DATA(error_data, dwWaitRet);
 
 		TerminateThread(hThread, 0);
 		CloseHandle(hThread);

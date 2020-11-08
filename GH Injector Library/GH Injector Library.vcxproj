@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{AC732425-E265-40FF-842F-C59CECE9A96C}</ProjectGuid>
     <RootNamespace>GHInjectorLibrary</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -116,7 +116,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <CallingConvention>FastCall</CallingConvention>
       <TreatWarningAsError>false</TreatWarningAsError>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ControlFlowGuard>false</ControlFlowGuard>
       <SupportJustMyCode>false</SupportJustMyCode>

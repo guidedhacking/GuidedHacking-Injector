@@ -83,6 +83,7 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	data.Mode				= pData->Mode;
 	data.Method				= pData->Method;
 	data.Flags				= pData->Flags;
+	data.Timeout			= pData->Timeout;
 	data.hHandleValue		= pData->hHandleValue;
 	data.GenerateErrorLog	= pData->GenerateErrorLog;
 
