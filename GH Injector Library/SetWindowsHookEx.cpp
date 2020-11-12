@@ -258,6 +258,8 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 
 	if (data.State != SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
 		return SR_SWHEX_ERR_REMOTE_TIMEOUT;
 	}
 

@@ -213,6 +213,8 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 	if (data.State != (DWORD)SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
 		return SR_SWHEX_ERR_REMOTE_TIMEOUT;
 	}
 
