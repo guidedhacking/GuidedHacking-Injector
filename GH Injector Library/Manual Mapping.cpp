@@ -96,6 +96,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	}
 
 	LOG("Data written\n");
+	LOG("NtSetInformationFile: %p\n", data.f.NtSetInformationFile);
 
 	DWORD remote_ret = 0;
 	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
@@ -198,7 +199,7 @@ __forceinline bool InitAnsiString(MANUAL_MAPPING_FUNCTION_TABLE * f, ANSI_STRING
 
 	String->Length		= Length;
 	String->MaxLength	= Length + 1 * sizeof(char);
-	f->RtlMoveMemory(String->szBuffer, szString, Length);
+	f->memmove(String->szBuffer, szString, Length);
 	
 	return true;
 }
@@ -241,8 +242,8 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	}
 
 	//nt path prefix "\??\"
-	f->RtlMoveMemory(DllNtPath.szBuffer + 0, pData->NtPathPrefix, sizeof(wchar_t[4]));
-	f->RtlMoveMemory(DllNtPath.szBuffer + 4, pData->szPathBuffer, DllNtPath.Length);
+	f->memmove(DllNtPath.szBuffer + 0, pData->NtPathPrefix, sizeof(wchar_t[4]));
+	f->memmove(DllNtPath.szBuffer + 4, pData->szPathBuffer, DllNtPath.Length);
 	DllNtPath.Length += sizeof(wchar_t[4]);
 
 	UNICODE_STRING DllName = pData->DllName;
@@ -294,7 +295,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	LARGE_INTEGER ImageSize{ pNtHeaders->OptionalHeader.SizeOfImage };
 
 	DeleteObject(f, Headers);
-	
+
 	auto * fsi = NewObject<FILE_STANDARD_INFO>(f);
 	ntRet = f->NtQueryInformationFile(hDllFile, &io_status, fsi, sizeof(FILE_STANDARD_INFO), FILE_INFORMATION_CLASS::FileStandardInformation);
 	if (NT_FAIL(ntRet))
@@ -335,7 +336,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 		f->NtFreeVirtualMemory(hProc, ReCa<void**>(&pRawData), &RawSize, MEM_RELEASE);
 		f->NtClose(hDllFile);
 
-		return INJ_MM_ERR_NT_READ_FILE;
+		return INJ_MM_ERR_SET_FILE_POSITION;
 	}
 
 	ntRet = f->NtReadFile(hDllFile, nullptr, nullptr, nullptr, &io_status, pRawData, fsi->AllocationSize.LowPart, nullptr, nullptr);
@@ -373,14 +374,14 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	}
 
 	//copy header and sections
-	f->RtlMoveMemory(pBase, pRawData, pOptionalHeader->SizeOfHeaders);
+	f->memmove(pBase, pRawData, pOptionalHeader->SizeOfHeaders);
 
 	auto * pCurrentSectionHeader = IMAGE_FIRST_SECTION(pNtHeaders);
 	for (UINT i = 0; i != pFileHeader->NumberOfSections; ++i, ++pCurrentSectionHeader)
 	{
 		if (pCurrentSectionHeader->SizeOfRawData)
 		{
-			f->RtlMoveMemory(pBase + pCurrentSectionHeader->VirtualAddress, pRawData + pCurrentSectionHeader->PointerToRawData, pCurrentSectionHeader->SizeOfRawData);
+			f->memmove(pBase + pCurrentSectionHeader->VirtualAddress, pRawData + pCurrentSectionHeader->PointerToRawData, pCurrentSectionHeader->SizeOfRawData);
 		}
 	}
 
@@ -1003,7 +1004,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 
 			auto * ntdll_ldr = ReCa<LDR_DATA_TABLE_ENTRY*>(pPEB->Ldr->InLoadOrderModuleListHead.Flink->Flink);			
 
-			f->RtlMoveMemory(pBase, ntdll_ldr->DllBase, pOptionalHeader->SizeOfHeaders);
+			f->memmove(pBase, ntdll_ldr->DllBase, pOptionalHeader->SizeOfHeaders);
 		}
 
 		if (Flags & INJ_MM_SET_PAGE_PROTECTIONS)
@@ -1046,7 +1047,7 @@ MANUAL_MAPPING_FUNCTION_TABLE::MANUAL_MAPPING_FUNCTION_TABLE()
 	NT_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
 	NT_FUNC_CONSTRUCTOR_INIT(NtFreeVirtualMemory);
 
-	NT_FUNC_CONSTRUCTOR_INIT(RtlMoveMemory);
+	NT_FUNC_CONSTRUCTOR_INIT(memmove);
 	NT_FUNC_CONSTRUCTOR_INIT(RtlZeroMemory);
 	NT_FUNC_CONSTRUCTOR_INIT(RtlAllocateHeap);
 	NT_FUNC_CONSTRUCTOR_INIT(RtlFreeHeap);

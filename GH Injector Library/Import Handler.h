@@ -38,7 +38,7 @@ namespace NATIVE
 	NT_FUNC(RtlInsertInvertedFunctionTable);
 	NT_FUNC(LdrpHandleTlsData);
 
-	NT_FUNC(RtlMoveMemory);
+	NT_FUNC(memmove);
 	NT_FUNC(RtlZeroMemory);
 	NT_FUNC(RtlAllocateHeap);
 	NT_FUNC(RtlFreeHeap);
@@ -89,7 +89,7 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(RtlInsertInvertedFunctionTable);
 	WOW64_FUNCTION_POINTER(LdrpHandleTlsData);
 
-	WOW64_FUNCTION_POINTER(RtlMoveMemory);
+	WOW64_FUNCTION_POINTER(memmove);
 	WOW64_FUNCTION_POINTER(RtlZeroMemory);
 	WOW64_FUNCTION_POINTER(RtlAllocateHeap);
 	WOW64_FUNCTION_POINTER(RtlFreeHeap);

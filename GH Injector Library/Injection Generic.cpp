@@ -256,7 +256,7 @@ DWORD InjectionShell(INJECTION_DATA_INTERNAL * pData)
 				return INJ_ERR_INVALID_PEB_DATA;
 			}
 
-			f->RtlMoveMemory(base, ntdll_ldr->DllBase, header_size);
+			f->memmove(base, ntdll_ldr->DllBase, header_size);
 		}
 
 		pData->LastError = (DWORD)f->NtProtectVirtualMemory(hProc, &base, &header_size, old_access, &old_access);
@@ -326,7 +326,7 @@ INJECTION_FUNCTION_TABLE::INJECTION_FUNCTION_TABLE()
 
 	WIN32_FUNC_CONSTRUCTOR_INIT(GetLastError);
 
-	NT_FUNC_CONSTRUCTOR_INIT(RtlMoveMemory);
+	NT_FUNC_CONSTRUCTOR_INIT(memmove);
 	NT_FUNC_CONSTRUCTOR_INIT(RtlZeroMemory);
 	NT_FUNC_CONSTRUCTOR_INIT(RtlFreeHeap);
 

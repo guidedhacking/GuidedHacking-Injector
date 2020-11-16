@@ -133,7 +133,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	if (LoadNtSymbolWOW64(S_FUNC(LdrGetDllHandleEx)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrGetProcedureAddress)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
-	if (LoadNtSymbolWOW64(S_FUNC(RtlMoveMemory)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(WOW64::memmove_WOW64, "memmove"))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(RtlZeroMemory)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(RtlAllocateHeap)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(RtlFreeHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;

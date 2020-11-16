@@ -27,7 +27,7 @@ static const char nt_functions[][MAX_PATH] =
 	"LdrGetProcedureAddressForCaller",
 	"LdrLockLoaderLock",
 	"LdrUnlockLoaderLock",
-	"RtlMoveMemory",
+	"memmove",
 	"RtlAllocateHeap",
 	"RtlFreeHeap",
 	"RtlHashUnicodeString",

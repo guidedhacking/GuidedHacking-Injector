@@ -16,8 +16,8 @@
 	#define NT_SUCCESS(status) (status >= 0)
 #endif
 
-#ifdef RtlMoveMemory
-#undef RtlMoveMemory
+#ifdef memmove
+#undef memmove
 #endif
 
 #ifdef RtlZeroMemory
@@ -617,7 +617,7 @@ using f_LdrpHandleTlsData = NTSTATUS (__fastcall*)
 	LDR_DATA_TABLE_ENTRY * pEntry
 );
 
-using f_RtlMoveMemory = VOID (__stdcall*)
+using f_memmove = VOID (__stdcall*)
 (
 	PVOID	UNALIGNED	Destination,
 	LPCVOID	UNALIGNED	Source,
