@@ -124,7 +124,7 @@ bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 	return (guid_eq == 0);
 }
 
-DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload)
+DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection)
 {
 	if (m_Initialized)
 	{
@@ -325,8 +325,17 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		url += '/';
 		url += pdb_info->PdbFileName;
 
+		if (WaitForConnection)
+		{
+			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
+			{
+				Sleep(25);
+			}
+		}
+
 		if (FAILED(URLDownloadToFileA(nullptr, url.c_str(), m_szPdbPath.c_str(), NULL, nullptr)))
 		{
+			MessageBoxA(0, "Feels bad man", 0, 0);
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
 			delete[] pRawData;

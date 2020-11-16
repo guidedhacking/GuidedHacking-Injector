@@ -27,6 +27,9 @@
 #include <urlmon.h>
 #include <future>
 
+//internet shit
+#include <WinInet.h>
+
 //warning shit
 #pragma warning(disable: 4201) //unnamed union
 #pragma warning(disable: 4324) //structure member alignment resulting in additional bytes being added as padding

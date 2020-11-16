@@ -532,3 +532,34 @@ HRESULT __stdcall GetVersionW(wchar_t * out, size_t cb_size)
 
 	return StringCbCopyW(out, cb_size, GH_INJ_VERSIONW);
 }
+
+DWORD __stdcall GetSymbolState()
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+	{
+		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
+	}
+
+	DWORD sym_ret = sym_ntdll_native_ret.get();
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		return sym_ret;
+	}
+
+#ifdef _WIN64
+	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+	{
+		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
+	}
+
+	sym_ret = sym_ntdll_wow64_ret.get();
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		return sym_ret;
+	}
+#endif
+
+	return SYMBOL_ERR_SUCCESS;
+}

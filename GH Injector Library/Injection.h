@@ -82,3 +82,7 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData);
 //Returns the version string of the current instance
 HRESULT __stdcall GetVersionA(char		* out, size_t cb_size);
 HRESULT __stdcall GetVersionW(wchar_t	* out, size_t cb_size);
+
+//Returns the state of the symbol download threads
+//If finished SYMBOL_ERR_SUCCESS (0) is returned 
+DWORD __stdcall GetSymbolState();

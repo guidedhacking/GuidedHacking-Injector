@@ -112,7 +112,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 		return INJ_ERR_WOW64_NTDLL_MISSING;
 	}
 
-	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 

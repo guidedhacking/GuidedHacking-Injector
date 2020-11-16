@@ -24,7 +24,7 @@ public:
 	SYMBOL_PARSER();
 	~SYMBOL_PARSER();
 
-	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload);
+	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection = false);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 };
 

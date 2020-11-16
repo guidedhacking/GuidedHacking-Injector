@@ -142,3 +142,5 @@ using f_RestoreInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DW
 
 using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
 using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
+
+using f_GetSymbolState = DWORD(__stdcall *)();

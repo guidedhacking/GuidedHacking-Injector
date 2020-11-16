@@ -31,7 +31,7 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	WIN32_FUNC_INIT(GetLastError, hK32);
 	if (!NATIVE::pLoadLibraryExW || !NATIVE::pGetLastError) return INJ_ERR_GET_PROC_ADDRESS_FAIL;	
 	
-	if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+	if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 

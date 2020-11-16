@@ -60,13 +60,13 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		std::string szNtDllWOW64 = szWindowsDir;
 		szNtDllWOW64 += "\\SysWOW64\\ntdll.dll";
 
-		sym_ntdll_wow64_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false);
+		sym_ntdll_wow64_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false, true);
 #endif
 
 		std::string szNtDllNative = szWindowsDir;
 		szNtDllNative += "\\System32\\ntdll.dll";
 
-		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathA, nullptr, false);
+		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathA, nullptr, false, true);
 
 		delete[] szWindowsDir;
 	}
