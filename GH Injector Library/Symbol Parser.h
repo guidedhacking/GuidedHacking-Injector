@@ -17,7 +17,7 @@ class SYMBOL_PARSER
 
 	bool m_Initialized;
 
-	bool VerifyExistingPdb(GUID guid);
+	bool VerifyExistingPdb(const GUID & guid);
 
 public:
 

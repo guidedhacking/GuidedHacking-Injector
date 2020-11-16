@@ -26,7 +26,7 @@ SYMBOL_PARSER::~SYMBOL_PARSER()
 	}
 }
 
-bool SYMBOL_PARSER::VerifyExistingPdb(GUID guid)
+bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 {
 	std::ifstream f(m_szPdbPath.c_str(), std::ios::binary | std::ios::ate);
 	if (f.bad())
@@ -63,16 +63,31 @@ bool SYMBOL_PARSER::VerifyExistingPdb(GUID guid)
 
 	auto * pPDBHeader = ReCa<PDBHeader7*>(pdb_raw);
 
-	int min_file_size = (int)pPDBHeader->root_stream_page_number_list_number * pPDBHeader->page_size + pPDBHeader->root_stream_size;
-	if (size_on_disk < (size_t)min_file_size)
+	if (memcmp(pPDBHeader->signature, "Microsoft C/C++ MSF 7.00\r\n\x1A""DS\0\0\0", sizeof(PDBHeader7::signature)))
 	{
 		delete[] pdb_raw;
 
 		return false;
 	}
 
-	int * pRootPageNumber = ReCa<int*>(pdb_raw + (size_t)pPDBHeader->root_stream_page_number_list_number * pPDBHeader->page_size);
-	auto * pRootStream = ReCa<RootStream7*>(pdb_raw + (size_t)(*pRootPageNumber) * pPDBHeader->page_size);
+	if (size_on_disk < (size_t)pPDBHeader->page_size * pPDBHeader->file_page_count)
+	{
+		delete[] pdb_raw;
+
+		return false;
+	}
+
+	int		* pRootPageNumber	= ReCa<int*>(pdb_raw + (size_t)pPDBHeader->root_stream_page_number_list_number * pPDBHeader->page_size);
+	auto	* pRootStream		= ReCa<RootStream7*>(pdb_raw + (size_t)(*pRootPageNumber) * pPDBHeader->page_size);
+
+	int size = 0;
+	for (int i = 0; i < pRootStream->num_streams; ++i)
+	{
+		if (pRootStream->stream_sizes[i] == 0xFFFFFFFF)
+			continue;
+
+		size += pRootStream->stream_sizes[i];
+	}
 	
 	std::map<int, std::vector<int>> streams;
 	int current_page_number = 0;
@@ -100,9 +115,9 @@ bool SYMBOL_PARSER::VerifyExistingPdb(GUID guid)
 	auto pdb_info_stream = streams.at(1);
 	auto pdb_info_page_index = pdb_info_stream.at(0);
 
-	auto * stram_data = ReCa<GUID_StreamData*>(pdb_raw + (size_t)(pdb_info_page_index) * pPDBHeader->page_size);
+	auto * stream_data = ReCa<GUID_StreamData*>(pdb_raw + (size_t)(pdb_info_page_index) * pPDBHeader->page_size);
 
-	int guid_eq = memcmp(&stram_data->guid, &guid, sizeof(GUID));
+	int guid_eq = memcmp(&stream_data->guid, &guid, sizeof(GUID));
 
 	delete[] pdb_raw;
 	
