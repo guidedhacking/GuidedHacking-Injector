@@ -32,13 +32,14 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	auto * pDos = ReCa<IMAGE_DOS_HEADER*>(headers);
 	auto * pNT	= ReCa<IMAGE_NT_HEADERS*>(headers + pDos->e_lfanew); //no need for correct nt headers type
 
-	WORD magic		= pDos->e_magic;
-	DWORD signature = pNT->Signature;
-	WORD machine	= pNT->FileHeader.Machine;
+	WORD	magic		= pDos->e_magic;
+	DWORD	signature	= pNT->Signature;
+	WORD	machine		= pNT->FileHeader.Machine;
+	WORD	character	= pNT->FileHeader.Characteristics;
 
 	delete[] headers;
 
-	if (magic != IMAGE_DOS_SIGNATURE || signature != IMAGE_NT_SIGNATURE || machine != desired_machine) //"MZ" & "PE"
+	if (magic != IMAGE_DOS_SIGNATURE || signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
 	{
 		return FILE_ERR_INVALID_FILE;
 	}

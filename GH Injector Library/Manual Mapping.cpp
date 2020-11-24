@@ -222,7 +222,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	IMAGE_OPTIONAL_HEADER	* pOptionalHeader	= nullptr;
 	IMAGE_FILE_HEADER		* pFileHeader		= nullptr;
 
-	MANUAL_MAPPING_FUNCTION_TABLE * f = &pData->f;
+	auto * f = &pData->f;
 	f->pLdrpHeap = *f->LdrpHeap;
 	
 	if (!f->pLdrpHeap)
@@ -399,7 +399,9 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 
 	if (LocationDelta)
 	{
-		if (!pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size)
+		auto * pRelocDir = ReCa<IMAGE_DATA_DIRECTORY*>(&pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC]);
+
+		if (!pRelocDir->Size)
 		{
 			ImgSize = 0;
 			f->NtFreeVirtualMemory(hProc, ReCa<void**>(&pBase), &ImgSize, MEM_RELEASE);
@@ -408,7 +410,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 			return INJ_MM_ERR_IMAGE_CANT_BE_RELOCATED;
 		}
 
-		IMAGE_BASE_RELOCATION * pRelocData = ReCa<IMAGE_BASE_RELOCATION*>(pBase + pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
+		auto * pRelocData = ReCa<IMAGE_BASE_RELOCATION*>(pBase + pRelocDir->VirtualAddress);
 
 		while (pRelocData->VirtualAddress)
 		{
@@ -424,7 +426,12 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 				}
 			}
 
-			pRelocData = ReCa<IMAGE_BASE_RELOCATION*>(ReCa<BYTE*>(pRelocData) + pRelocData->SizeOfBlock);
+			pRelocData = ReCa<IMAGE_BASE_RELOCATION*>(ReCa<BYTE*>(pRelocData) + pRelocData->SizeOfBlock); 
+			
+			if (pRelocData >= reinterpret_cast<IMAGE_BASE_RELOCATION*>(pBase + pRelocDir->VirtualAddress + pRelocDir->Size))
+			{
+				break;
+			}
 		}
 
 		pOptionalHeader->ImageBase += ReCa<ULONG_PTR>(LocationDelta);
@@ -592,10 +599,10 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 				break;
 			}
 
-			LDRP_UNICODE_STRING_BUNDLE * pModPathW = NewObject<LDRP_UNICODE_STRING_BUNDLE>(f, 1);
+			auto * pModPathW = NewObject<LDRP_UNICODE_STRING_BUNDLE>(f, 1);
 
 			pModPathW->String.MaxLength = sizeof(pModPathW->StaticBuffer);
-			pModPathW->String.szBuffer = pModPathW->StaticBuffer;
+			pModPathW->String.szBuffer	= pModPathW->StaticBuffer;
 
 			ntRet = f->LdrpPreprocessDllName(&ModNameW, pModPathW, nullptr, &flags);
 
@@ -641,8 +648,8 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 				*pModule = hDll;
 			}
 
-			IMAGE_THUNK_DATA * pIAT = ReCa<IMAGE_THUNK_DATA*>(pBase + pDelayImportDescr->ImportAddressTableRVA);
-			IMAGE_THUNK_DATA * pNameTable = ReCa<IMAGE_THUNK_DATA*>(pBase + pDelayImportDescr->ImportNameTableRVA);
+			IMAGE_THUNK_DATA * pIAT			= ReCa<IMAGE_THUNK_DATA*>(pBase + pDelayImportDescr->ImportAddressTableRVA);
+			IMAGE_THUNK_DATA * pNameTable	= ReCa<IMAGE_THUNK_DATA*>(pBase + pDelayImportDescr->ImportNameTableRVA);
 
 			for (; pIAT->u1.Function; ++pIAT, ++pNameTable)
 			{
@@ -806,7 +813,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 			Callback(pBase, DLL_PROCESS_ATTACH, nullptr);
 		}
 	}
-
+	
 	if (Flags & INJ_MM_RUN_DLL_MAIN && pOptionalHeader->AddressOfEntryPoint)
 	{
 		f_DLL_ENTRY_POINT DllMain = ReCa<f_DLL_ENTRY_POINT>(pBase + pOptionalHeader->AddressOfEntryPoint);
@@ -858,7 +865,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 		}
 
 		Size = pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT].Size;
-		if (Size)
+		if (Size && !(Flags & INJ_MM_RESOLVE_DELAY_IMPORTS))
 		{
 			auto * pDelayImportDescr = ReCa<IMAGE_DELAYLOAD_DESCRIPTOR*>(pBase + pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT].VirtualAddress);
 

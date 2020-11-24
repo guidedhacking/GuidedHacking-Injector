@@ -164,7 +164,6 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 	IMAGE_OPTIONAL_HEADER64 * pOpt64 = nullptr;
 	IMAGE_OPTIONAL_HEADER32 * pOpt32 = nullptr;
 
-
 	bool x86 = false;
 
 	if (pFile->Machine == IMAGE_FILE_MACHINE_AMD64)
