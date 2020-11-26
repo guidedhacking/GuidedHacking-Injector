@@ -12,6 +12,11 @@ DWORD ManualMapping_Shell_End();
 
 DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
+#if !defined(_WIN64) && defined (DUMP_SHELLCODE)
+	auto length = ReCa<BYTE*>(ManualMapping_Shell_End) - ReCa<BYTE*>(ManualMapping_Shell);
+	DumpShellcode(ReCa<BYTE*>(ManualMapping_Shell), length, L"ManualMapping_Shell_WOW64");
+#endif
+
 	LOG("Begin ManualMap\n");
 		
 	MANUAL_MAPPING_DATA data{ 0 };

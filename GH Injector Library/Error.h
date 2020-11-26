@@ -302,3 +302,5 @@ memcpy(data.szFunctionName, __FUNCTIONW__, ((size_t)lstrlenW(__FUNCTIONW__)) * 2
 #else
 #define LOG
 #endif
+
+//#define DUMP_SHELLCODE

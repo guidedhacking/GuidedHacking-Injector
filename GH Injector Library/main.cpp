@@ -2,12 +2,24 @@
 
 #include "Tools.h"
 
+#if !defined(_WIN64) && defined (DUMP_SHELLCODE)
+#include "Manual Mapping.h"
+#include "Injection Internal.h"
+#endif
+
 BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 {
 	UNREFERENCED_PARAMETER(pReserved);
 	
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
+
+#if !defined(_WIN64) && defined (DUMP_SHELLCODE)
+		HINSTANCE	dummy_instance{ 0 };
+		ERROR_DATA	dummy_data{ 0 };
+		InjectDLL(nullptr, nullptr, INJECTION_MODE::IM_LoadLibraryExW, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
+		MMAP_NATIVE::ManualMap(nullptr, nullptr, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
+#endif
 
 #ifdef DEBUG_INFO
 		AllocConsole();

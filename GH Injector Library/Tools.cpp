@@ -243,3 +243,62 @@ std::wstring LaunchMethodToString(LAUNCH_METHOD method)
 
 	return std::wstring(L"bruh moment");
 }
+
+void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
+{
+	wchar_t Shellcodename[] = L"Shellcodes.txt";
+
+	wchar_t FullPath[MAX_PATH]{ 0 };
+	StringCbCopyW(FullPath, sizeof(FullPath), g_RootPathW.c_str());
+	StringCbCatW(FullPath, sizeof(FullPath), Shellcodename);
+
+	std::wofstream shellcodes(FullPath, std::ios_base::out | std::ios_base::app);
+	if (!shellcodes.good())
+	{
+		LOG("Failed to open/create shellcodename.txt file:\n%ls\n", FullPath);
+
+		return;
+	}
+
+	shellcodes << L"inline unsigned char " << szShellname << L"[] =\n";
+	shellcodes << L"{";
+
+	int row_length = 500;
+	int char_count = 6 * length - 2 + (length / row_length + 1) * 2 + 1; 
+	wchar_t * array_out = new wchar_t[char_count]();
+
+	if (!array_out)
+	{
+		LOG("Failed to allocate buffer for shellcode data\n");
+	
+		shellcodes.close();
+	}
+
+	int idx = 0;
+
+	for (auto i = 0; i < length; ++i)
+	{
+		if (!(i % row_length))
+		{
+			array_out[idx++] = '\n';
+			array_out[idx++] = '\t';
+		}
+
+		swprintf_s(&array_out[idx], char_count - idx, L"0x%02X", start[i]);
+
+		idx += 4;
+
+		if (i == length - 1)
+		{
+			break;
+		}
+
+		array_out[idx++] = ',';
+		array_out[idx++] = ' ';
+	}
+
+	shellcodes << array_out;
+	shellcodes << L"\n};\n\n";
+
+	shellcodes.close();
+}

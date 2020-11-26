@@ -112,8 +112,7 @@ bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 		streams.insert({ i, numbers });
 	}
 
-	auto pdb_info_stream = streams.at(1);
-	auto pdb_info_page_index = pdb_info_stream.at(0);
+	auto pdb_info_page_index = streams.at(1).at(0);
 
 	auto * stream_data = ReCa<GUID_StreamData*>(pdb_raw + (size_t)(pdb_info_page_index) * pPDBHeader->page_size);
 

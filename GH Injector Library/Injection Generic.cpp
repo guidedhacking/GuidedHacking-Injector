@@ -12,6 +12,11 @@ DWORD InjectionShell_End();
 
 DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
+#if !defined(_WIN64) && defined (DUMP_SHELLCODE)
+	auto length = ReCa<BYTE*>(InjectionShell_End) - ReCa<BYTE*>(InjectionShell);
+	DumpShellcode(ReCa<BYTE*>(InjectionShell), length, L"InjectionShell_WOW64");
+#endif
+
 	LOG("InjectDll called\n");
 
 	if (Mode == INJECTION_MODE::IM_ManualMap)

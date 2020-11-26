@@ -135,3 +135,9 @@ void ErrorLog(ERROR_INFO * info);
 ///			A pointer to an ERROR_INFO structure which contains information about what went wrong.
 //
 //Returnvalue (void)
+
+#if !defined(_WIN64) && defined(DUMP_SHELLCODE)
+
+void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname);
+
+#endif
