@@ -5,6 +5,7 @@
 SYMBOL_PARSER::SYMBOL_PARSER()
 {
 	m_Initialized	= false;
+	m_Ready			= false;
 	m_SymbolTable	= 0;
 	m_Filesize		= 0;
 	m_hPdbFile		= nullptr;
@@ -15,14 +16,22 @@ SYMBOL_PARSER::~SYMBOL_PARSER()
 {
 	if (m_Initialized)
 	{
-		SymUnloadModule64(m_hProcess, m_SymbolTable);
+		if (m_SymbolTable)
+		{
+			SymUnloadModule64(m_hProcess, m_SymbolTable);
+		}
 
 		SymCleanup(m_hProcess);
+	}
 
+	if (m_hProcess)
+	{
 		CloseHandle(m_hProcess);
-		CloseHandle(m_hPdbFile);
+	}
 
-		m_Initialized = false;
+	if (m_hPdbFile)
+	{
+		CloseHandle(m_hPdbFile);
 	}
 }
 
@@ -125,7 +134,7 @@ bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 
 DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection)
 {
-	if (m_Initialized)
+	if (m_Ready)
 	{
 		return SYMBOL_ERR_ALREADY_INITIALIZED;
 	}
@@ -328,26 +337,27 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
 				Sleep(10);
-
-				if (WaitForSingleObject(DownloadManager::hInterrupEvent, 0) == WAIT_OBJECT_0)
-				{
-					VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
-
-					delete[] pRawData;
-
-					return SYMBOL_ERR_DOWNLOAD_FAILED;
-				}
 			}
 		}
 
-		DownloadManager dm;
-		if (FAILED(URLDownloadToFileA(nullptr, url.c_str(), m_szPdbPath.c_str(), NULL, &dm)))
+		char szCacheFile[MAX_PATH]{ 0 };
+
+		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, nullptr)))
 		{
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
 			delete[] pRawData;
 
 			return SYMBOL_ERR_DOWNLOAD_FAILED;
+		}
+
+		if (!CopyFileA(szCacheFile, m_szPdbPath.c_str(), FALSE))
+		{
+			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
+
+			delete[] pRawData;
+
+			return SYMBOL_ERR_COPYFILE_FAILED;
 		}
 	}
 
@@ -365,8 +375,8 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		Filesize = file_attr_data.nFileSizeLow;
 	}
 
-	HANDLE hPdbFile = CreateFileA(m_szPdbPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, NULL, nullptr);
-	if (hPdbFile == INVALID_HANDLE_VALUE)
+	m_hPdbFile = CreateFileA(m_szPdbPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, NULL, nullptr);
+	if (m_hPdbFile == INVALID_HANDLE_VALUE)
 	{
 		return SYMBOL_ERR_CANT_OPEN_PDB_FILE;
 	}
@@ -374,7 +384,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 	m_hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, GetCurrentProcessId());
 	if (!m_hProcess)
 	{
-		CloseHandle(hPdbFile);
+		CloseHandle(m_hPdbFile);
 
 		return SYMBOL_ERR_CANT_OPEN_PROCESS;
 	}
@@ -382,7 +392,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 	if (!SymInitialize(m_hProcess, m_szPdbPath.c_str(), FALSE))
 	{
 		CloseHandle(m_hProcess);
-		CloseHandle(hPdbFile);
+		CloseHandle(m_hPdbFile);
 
 		return SYMBOL_ERR_SYM_INIT_FAIL;
 	}
@@ -395,7 +405,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		SymCleanup(m_hProcess);
 
 		CloseHandle(m_hProcess);
-		CloseHandle(hPdbFile);
+		CloseHandle(m_hPdbFile);
 
 		return SYMBOL_ERR_SYM_LOAD_TABLE;
 	}
@@ -405,14 +415,14 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		*pdb_path_out = m_szPdbPath;
 	}
 
-	m_Initialized = true;
+	m_Ready = true;
 
 	return SYMBOL_ERR_SUCCESS;
 }
 
 DWORD SYMBOL_PARSER::GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut)
 {
-	if (!m_Initialized)
+	if (!m_Ready)
 	{
 		return SYMBOL_ERR_NOT_INITIALIZED;
 	}
@@ -432,4 +442,34 @@ DWORD SYMBOL_PARSER::GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut)
 	RvaOut = (DWORD)(si.Address - si.ModBase);
 
 	return SYMBOL_ERR_SUCCESS;
+}
+
+void SYMBOL_PARSER::InterruptCleanup()
+{
+	if (m_Initialized)
+	{
+		if (m_SymbolTable)
+		{
+			SymUnloadModule64(m_hProcess, m_SymbolTable);
+		}
+
+		SymCleanup(m_hProcess);
+	}
+
+	if (m_hProcess)
+	{
+		CloseHandle(m_hProcess);
+	}
+
+	if (m_hPdbFile)
+	{
+		CloseHandle(m_hPdbFile);
+	}
+	
+	m_Initialized	= false;
+	m_Ready			= false;
+	m_SymbolTable	= 0;
+	m_Filesize		= 0;
+	m_hPdbFile		= nullptr;
+	m_hProcess		= nullptr;
 }

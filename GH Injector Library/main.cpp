@@ -28,7 +28,7 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		freopen_s(&pFile, "CONOUT$", "w", stdout);
 #endif
 
-		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSIONW, hDll);
+		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSION, hDll);
 
 		DisableThreadLibraryCalls(hDll);
 
@@ -84,8 +84,13 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
-		//async threads are already terminated but process still gets stuck, wtf? This shit doesn't work
-		SetEvent(DownloadManager::hInterrupEvent);
+		sym_ntdll_native.InterruptCleanup();
+
+#ifdef _WIN64
+		sym_ntdll_wow64.InterruptCleanup();
+#endif
+
+		LOG("GH Injector V%ls detached\n", GH_INJ_VERSION);
 	}
 	
 	return TRUE;

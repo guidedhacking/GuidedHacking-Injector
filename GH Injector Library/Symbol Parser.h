@@ -3,8 +3,6 @@
 #include "pch.h"
 
 #include "Error.h"
-#include "Download Manager.h"
-
 class SYMBOL_PARSER
 {
 	HANDLE m_hProcess;
@@ -17,6 +15,7 @@ class SYMBOL_PARSER
 	std::string m_szModulePath;
 
 	bool m_Initialized;
+	bool m_Ready;
 
 	bool VerifyExistingPdb(const GUID & guid);
 
@@ -27,6 +26,8 @@ public:
 
 	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection = false);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
+
+	void InterruptCleanup();
 };
 
 struct PdbInfo

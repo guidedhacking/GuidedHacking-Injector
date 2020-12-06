@@ -226,28 +226,29 @@
 //Symbol errors:
 #define SYMBOL_ERR_SUCCESS						0x00000000
 
-															//Source				:	error description
-#define SYMBOL_ERR_CANT_OPEN_MODULE				0x40000001	//std::ifstream::good	:	can't open the specified module
-#define SYMBOL_ERR_FILE_SIZE_IS_NULL			0x40000002	//std::ifstream::tellg	:	file size of the specified module is 0
-#define SYMBOL_ERR_CANT_ALLOC_MEMORY_NEW		0x40000003	//operator new			:	can't allocate memory
-#define SYMBOL_ERR_INVALID_FILE_ARCHITECTURE	0x40000004	//internal error		:	the architecture of the specified file doesn't match AMD64 or I386
-#define SYMBOL_ERR_CANT_ALLOC_MEMORY			0x40000005	//VirtualAlloc			:	can't allocate memory
-#define SYMBOL_ERR_NO_PDB_DEBUG_DATA			0x40000006	//internal error		:	debuge directory is emtpy or wrong type
-#define SYMBOL_ERR_PATH_DOESNT_EXIST			0x40000007	//CreateDirectoryA		:	path doesn't exit and can't be created
-#define SYMBOL_ERR_CANT_CREATE_DIRECTORY		0x40000008	//CreateDirectoryA		:	path doesn't exit and can't be created (x86/x64 subdirectory)
-#define SYMBOL_ERR_CANT_CONVERT_PDB_GUID		0x40000008	//StringFromGUID2		:	conversion of the GUID to string failed
-#define SYMBOL_ERR_GUID_TO_ANSI_FAILED			0x40000009	//wcstombs_s			:	conversion of GUID to ANSI string failed
-#define SYMBOL_ERR_DOWNLOAD_FAILED				0x4000000A	//URLDownloadToFileA	:	downloading the pdb file failed
-#define SYMBOL_ERR_CANT_ACCESS_PDB_FILE			0x4000000B	//GetFileAttributesExA	:	can't access the pdb file
-#define SYMBOL_ERR_CANT_OPEN_PDB_FILE			0x4000000C	//CreateFileA			:	can't open the pdb file
-#define SYMBOL_ERR_CANT_OPEN_PROCESS			0x4000000D	//OpenProcess			:	can't open handle to current process
-#define SYMBOL_ERR_SYM_INIT_FAIL				0x4000000E	//SymInitialize			:	couldn't initialize pdb symbol stuff
-#define SYMBOL_ERR_SYM_LOAD_TABLE				0x4000000F	//SymLoadModule64		:	couldn't load symbol table
-#define SYMBOL_ERR_ALREADY_INITIALIZED			0x40000010	//internal error		:	this instance of the SYMBOL_PARSER has already been initialized
-#define SYMBOL_ERR_NOT_INITIALIZED				0x40000011	//internal error		:	this isntance of the SYMBOL_PARSER hasn't benen initialized
-#define SYMBOL_ERR_IVNALID_SYMBOL_NAME			0x40000012	//internal error		:	szSymbolName is NULL
-#define SYMBOL_ERR_SYMBOL_SEARCH_FAILED			0x40000013	//SymFromName			:	couldn't find szSymbolName in the specified pdb
-#define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess			:	can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
+															//Source					:	error description
+#define SYMBOL_ERR_CANT_OPEN_MODULE				0x40000001	//std::ifstream::good		:	can't open the specified module
+#define SYMBOL_ERR_FILE_SIZE_IS_NULL			0x40000002	//std::ifstream::tellg		:	file size of the specified module is 0
+#define SYMBOL_ERR_CANT_ALLOC_MEMORY_NEW		0x40000003	//operator new				:	can't allocate memory
+#define SYMBOL_ERR_INVALID_FILE_ARCHITECTURE	0x40000004	//internal error			:	the architecture of the specified file doesn't match AMD64 or I386
+#define SYMBOL_ERR_CANT_ALLOC_MEMORY			0x40000005	//VirtualAlloc				:	can't allocate memory
+#define SYMBOL_ERR_NO_PDB_DEBUG_DATA			0x40000006	//internal error			:	debuge directory is emtpy or wrong type
+#define SYMBOL_ERR_PATH_DOESNT_EXIST			0x40000007	//CreateDirectoryA			:	path doesn't exit and can't be created
+#define SYMBOL_ERR_CANT_CREATE_DIRECTORY		0x40000008	//CreateDirectoryA			:	path doesn't exit and can't be created (x86/x64 subdirectory)
+#define SYMBOL_ERR_CANT_CONVERT_PDB_GUID		0x40000008	//StringFromGUID2			:	conversion of the GUID to string failed
+#define SYMBOL_ERR_GUID_TO_ANSI_FAILED			0x40000009	//wcstombs_s				:	conversion of GUID to ANSI string failed
+#define SYMBOL_ERR_DOWNLOAD_FAILED				0x4000000A	//URLDownloadToCacheFileA	:	downloading the pdb file failed
+#define SYMBOL_ERR_CANT_ACCESS_PDB_FILE			0x4000000B	//GetFileAttributesExA		:	can't access the pdb file
+#define SYMBOL_ERR_CANT_OPEN_PDB_FILE			0x4000000C	//CreateFileA				:	can't open the pdb file
+#define SYMBOL_ERR_CANT_OPEN_PROCESS			0x4000000D	//OpenProcess				:	can't open handle to current process
+#define SYMBOL_ERR_SYM_INIT_FAIL				0x4000000E	//SymInitialize				:	couldn't initialize pdb symbol stuff
+#define SYMBOL_ERR_SYM_LOAD_TABLE				0x4000000F	//SymLoadModule64			:	couldn't load symbol table
+#define SYMBOL_ERR_ALREADY_INITIALIZED			0x40000010	//internal error			:	this instance of the SYMBOL_PARSER has already been initialized
+#define SYMBOL_ERR_NOT_INITIALIZED				0x40000011	//internal error			:	this isntance of the SYMBOL_PARSER hasn't benen initialized
+#define SYMBOL_ERR_IVNALID_SYMBOL_NAME			0x40000012	//internal error			:	szSymbolName is NULL
+#define SYMBOL_ERR_SYMBOL_SEARCH_FAILED			0x40000013	//SymFromName				:	couldn't find szSymbolName in the specified pdb
+#define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess				:	can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
+#define SYMBOL_ERR_COPYFILE_FAILED				0x40000015	//CopyFileA					:	copying the file from the cache directory failed
 
 
 
