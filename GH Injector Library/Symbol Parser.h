@@ -3,6 +3,7 @@
 #include "pch.h"
 
 #include "Error.h"
+#include "Download Manager.h"
 
 class SYMBOL_PARSER
 {

@@ -136,10 +136,10 @@
       <TreatWarningAsError>true</TreatWarningAsError>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <CallingConvention>StdCall</CallingConvention>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ControlFlowGuard>false</ControlFlowGuard>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -157,12 +157,14 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ControlFlowGuard>false</ControlFlowGuard>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Download Manager.h" />
     <ClInclude Include="Eject.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="Handle Hijacking.h" />
@@ -180,6 +182,7 @@
     <ClInclude Include="WOW64 Shells.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Download Manager.cpp" />
     <ClCompile Include="Eject.cpp" />
     <ClCompile Include="Handle Hijacking.cpp" />
     <ClCompile Include="Hook Scanner WOW64.cpp" />

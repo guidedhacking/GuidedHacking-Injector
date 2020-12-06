@@ -5,8 +5,6 @@
 #include "Manual Mapping.h"
 #include "WOW64 Shells.h"
 
-#pragma optimize("", off)
-
 using namespace WOW64;
 using namespace MMAP_WOW64;
 
@@ -179,7 +177,5 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
 }
-
-#pragma optimize("", on)
 
 #endif

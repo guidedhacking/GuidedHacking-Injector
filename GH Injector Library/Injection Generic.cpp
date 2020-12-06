@@ -3,12 +3,10 @@
 #include "Injection Internal.h"
 #include "Manual Mapping.h"
 
-#pragma optimize("", off)
-
 using namespace NATIVE;
 
-DWORD InjectionShell(INJECTION_DATA_INTERNAL * pData);
-DWORD InjectionShell_End();
+DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_INTERNAL * pData);
+DWORD __declspec(code_seg(".inj_sec$2")) InjectionShell_End();
 
 DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
@@ -140,7 +138,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	return INJ_ERR_SUCCESS;
 }
 
-DWORD InjectionShell(INJECTION_DATA_INTERNAL * pData)
+DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_INTERNAL * pData)
 {
 	if (!pData)
 	{
@@ -318,7 +316,7 @@ DWORD InjectionShell(INJECTION_DATA_INTERNAL * pData)
 	return INJ_ERR_SUCCESS;
 }
 
-DWORD InjectionShell_End()
+DWORD __declspec(code_seg(".inj_sec$2")) InjectionShell_End()
 {
 	return 0;
 }
@@ -343,5 +341,3 @@ INJECTION_FUNCTION_TABLE::INJECTION_FUNCTION_TABLE()
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
 }
-
-#pragma optimize("", on)

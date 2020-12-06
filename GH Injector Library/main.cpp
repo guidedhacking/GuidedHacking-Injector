@@ -84,7 +84,8 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
-		LOG("Process detaching\n");
+		//async threads are already terminated but process still gets stuck, wtf? This shit doesn't work
+		SetEvent(DownloadManager::hInterrupEvent);
 	}
 	
 	return TRUE;

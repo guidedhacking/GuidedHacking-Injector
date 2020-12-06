@@ -327,13 +327,22 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		{
 			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
-				Sleep(25);
+				Sleep(10);
+
+				if (WaitForSingleObject(DownloadManager::hInterrupEvent, 0) == WAIT_OBJECT_0)
+				{
+					VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
+
+					delete[] pRawData;
+
+					return SYMBOL_ERR_DOWNLOAD_FAILED;
+				}
 			}
 		}
 
-		if (FAILED(URLDownloadToFileA(nullptr, url.c_str(), m_szPdbPath.c_str(), NULL, nullptr)))
+		DownloadManager dm;
+		if (FAILED(URLDownloadToFileA(nullptr, url.c_str(), m_szPdbPath.c_str(), NULL, &dm)))
 		{
-			MessageBoxA(0, "Feels bad man", 0, 0);
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
 			delete[] pRawData;

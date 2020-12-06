@@ -1,14 +1,11 @@
 #include "pch.h"
 
 #include "Manual Mapping.h"
-
-#pragma optimize("", off)
-
 using namespace NATIVE;
 using namespace MMAP_NATIVE;
 
-DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData);
-DWORD ManualMapping_Shell_End();
+DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_MAPPING_DATA * pData);
+DWORD __declspec(code_seg(".mmap_sec$2")) ManualMapping_Shell_End();
 
 DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
@@ -209,7 +206,7 @@ __forceinline bool InitAnsiString(MANUAL_MAPPING_FUNCTION_TABLE * f, ANSI_STRING
 	return true;
 }
 
-DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
+DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 {
 	if (!pData)
 	{
@@ -263,7 +260,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	
 	HANDLE hDllFile = nullptr;
 
-	ntRet = f->NtOpenFile(&hDllFile, FILE_GENERIC_READ, oa, &io_status, FILE_SHARE_READ, 0x20);
+	ntRet = f->NtOpenFile(&hDllFile, FILE_GENERIC_READ, oa, &io_status, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
 	
 	DeleteObject(f, oa);
 	DeleteObject(f, DllNtPath.szBuffer);
@@ -802,7 +799,6 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	if ((Flags & INJ_MM_EXECUTE_TLS) && pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].Size)
 	{
 		auto * pTLS = ReCa<IMAGE_TLS_DIRECTORY*>(pBase + pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
-
 		//LdrpHandleTlsData either crashes or returns STATUS_SUCCESS -> no point in error checking
 		//It also only accesses the DllBase member of the ldr entry thus a dummy entry is sufficient
 
@@ -1041,7 +1037,7 @@ DWORD ManualMapping_Shell(MANUAL_MAPPING_DATA * pData)
 	return INJ_ERR_SUCCESS;
 }
 
-DWORD ManualMapping_Shell_End()
+DWORD __declspec(code_seg(".mmap_sec$2")) ManualMapping_Shell_End()
 { 
 	return 1; 
 }
@@ -1080,5 +1076,3 @@ MANUAL_MAPPING_FUNCTION_TABLE::MANUAL_MAPPING_FUNCTION_TABLE()
 
 	pLdrpHeap = nullptr;
 }
-
-#pragma optimize("", on)

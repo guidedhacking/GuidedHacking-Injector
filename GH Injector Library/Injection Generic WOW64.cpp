@@ -93,10 +93,6 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	printf("LoadLibraryExW: %08X\n", data.f.LoadLibraryExW);
-	printf("LdrLoadDll    : %08X\n", data.f.LdrLoadDll);
-	printf("LdrpLoadDll   : %08X\n", data.f.LdrpLoadDll);
-
 	LOG("Data written\n");
 
 	DWORD remote_ret = 0;
