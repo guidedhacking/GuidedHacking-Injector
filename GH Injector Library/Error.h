@@ -249,6 +249,7 @@
 #define SYMBOL_ERR_SYMBOL_SEARCH_FAILED			0x40000013	//SymFromName				:	couldn't find szSymbolName in the specified pdb
 #define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess				:	can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
 #define SYMBOL_ERR_COPYFILE_FAILED				0x40000015	//CopyFileA					:	copying the file from the cache directory failed
+#define SYMBOL_ERR_INTERRUPT					0x40000016	//internal error			:	download has been interrupted
 
 
 

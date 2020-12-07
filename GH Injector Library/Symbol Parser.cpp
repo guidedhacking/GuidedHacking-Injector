@@ -7,13 +7,20 @@ SYMBOL_PARSER::SYMBOL_PARSER()
 	m_Initialized	= false;
 	m_Ready			= false;
 	m_SymbolTable	= 0;
-	m_Filesize		= 0;
 	m_hPdbFile		= nullptr;
 	m_hProcess		= nullptr;
+
+	m_bInterruptEvent	= false;
+	m_hInterruptEvent	= CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 SYMBOL_PARSER::~SYMBOL_PARSER()
 {
+	if (m_hInterruptEvent)
+	{
+		CloseHandle(m_hInterruptEvent);
+	}
+
 	if (m_Initialized)
 	{
 		if (m_SymbolTable)
@@ -336,13 +343,24 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		{
 			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
-				Sleep(10);
+				Sleep(50);
+
+				if (m_bInterruptEvent)
+				{
+					VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
+
+					delete[] pRawData;
+
+					return SYMBOL_ERR_INTERRUPT;
+				}
 			}
 		}
 
 		char szCacheFile[MAX_PATH]{ 0 };
+		DownloadManager dlmgr;
+		dlmgr.SetInterruptEvent(m_hInterruptEvent);
 
-		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, nullptr)))
+		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, &dlmgr)))
 		{
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
@@ -444,8 +462,14 @@ DWORD SYMBOL_PARSER::GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut)
 	return SYMBOL_ERR_SUCCESS;
 }
 
-void SYMBOL_PARSER::InterruptCleanup()
+void SYMBOL_PARSER::Interrupt()
 {
+	if (m_hInterruptEvent)
+	{
+		SetEvent(m_hInterruptEvent);
+		CloseHandle(m_hInterruptEvent);
+	}
+
 	if (m_Initialized)
 	{
 		if (m_SymbolTable)
@@ -469,7 +493,9 @@ void SYMBOL_PARSER::InterruptCleanup()
 	m_Initialized	= false;
 	m_Ready			= false;
 	m_SymbolTable	= 0;
-	m_Filesize		= 0;
 	m_hPdbFile		= nullptr;
 	m_hProcess		= nullptr;
+
+	m_bInterruptEvent = false;
+	m_hInterruptEvent = nullptr;
 }

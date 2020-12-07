@@ -81,6 +81,9 @@
     <ClInclude Include="WOW64 Shells.h">
       <Filter>Quelldateien\wow64\Injection Methods</Filter>
     </ClInclude>
+    <ClInclude Include="Download Manager.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Handle Hijacking.cpp">
@@ -160,6 +163,9 @@
     </ClCompile>
     <ClCompile Include="Injection Generic WOW64.cpp">
       <Filter>Quelldateien\wow64\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Download Manager.cpp">
+      <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

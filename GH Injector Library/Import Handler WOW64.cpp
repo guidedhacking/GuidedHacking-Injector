@@ -94,7 +94,7 @@ DWORD LoadNtSymbolWOW64(T & Function, const char * szFunction)
 	DWORD sym_ret = sym_ntdll_wow64.GetSymbolAddress(szFunction, RVA);
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
-		printf("Failed to load WOW64 function: %s\n", szFunction);
+		LOG("Failed to load WOW64 function: %s\n", szFunction);
 		return 0;
 	}
 

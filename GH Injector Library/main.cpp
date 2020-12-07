@@ -30,8 +30,6 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 
 		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSION, hDll);
 
-		DisableThreadLibraryCalls(hDll);
-
 		g_hInjMod = hDll;
 
 		char	szRootPathA[MAX_PATH]{ 0 };
@@ -68,26 +66,42 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 
 		LOG("Rootpath is %s\n", szRootPathA);
 
-#ifdef _WIN64
-		std::string szNtDllWOW64 = szWindowsDir;
-		szNtDllWOW64 += "\\SysWOW64\\ntdll.dll";
-
-		sym_ntdll_wow64_ret	= std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false, true);
-#endif
-
 		std::string szNtDllNative = szWindowsDir;
 		szNtDllNative += "\\System32\\ntdll.dll";
 
 		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathA, nullptr, false, true);
 
+#ifdef _WIN64
+		std::string szNtDllWOW64 = szWindowsDir;
+		szNtDllWOW64 += "\\SysWOW64\\ntdll.dll";
+
+		sym_ntdll_wow64_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false, true);
+#endif
+
 		delete[] szWindowsDir;
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
-		sym_ntdll_native.InterruptCleanup();
+		LOG("GH Injector V%ls detaching\n", GH_INJ_VERSION);
+
+		if (sym_ntdll_native_ret.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+		{
+			sym_ntdll_native.Interrupt();
+			if (sym_ntdll_native_ret.wait_for(std::chrono::microseconds(25)) != std::future_status::timeout)
+			{
+				LOG("Native ntdll pdb download thread didn't exit properly.\n");
+			}
+		}
 
 #ifdef _WIN64
-		sym_ntdll_wow64.InterruptCleanup();
+		if (sym_ntdll_wow64_ret.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+		{
+			sym_ntdll_wow64.Interrupt();
+			if (sym_ntdll_wow64_ret.wait_for(std::chrono::microseconds(25)) != std::future_status::timeout)
+			{
+				LOG("Wow64 ntdll pdb download thread didn't exit properly.\n");
+			}
+		}
 #endif
 
 		LOG("GH Injector V%ls detached\n", GH_INJ_VERSION);

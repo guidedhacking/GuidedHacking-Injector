@@ -3,19 +3,23 @@
 #include "pch.h"
 
 #include "Error.h"
+#include "Download Manager.h"
+
 class SYMBOL_PARSER
 {
 	HANDLE m_hProcess;
 
 	HANDLE		m_hPdbFile;
 	std::string	m_szPdbPath;
-	DWORD		m_Filesize;
 	DWORD64		m_SymbolTable;
 
 	std::string m_szModulePath;
 
 	bool m_Initialized;
 	bool m_Ready;
+
+	HANDLE	m_hInterruptEvent;
+	bool	m_bInterruptEvent;
 
 	bool VerifyExistingPdb(const GUID & guid);
 
@@ -27,7 +31,7 @@ public:
 	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection = false);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 
-	void InterruptCleanup();
+	void Interrupt();
 };
 
 struct PdbInfo
@@ -68,7 +72,9 @@ struct GUID_StreamData
 #ifdef  _WIN64
 inline SYMBOL_PARSER				sym_ntdll_wow64;
 inline std::shared_future<DWORD>	sym_ntdll_wow64_ret;
+inline DWORD						sym_ntdll_wow64_thread_id;
 #endif
 
 inline SYMBOL_PARSER				sym_ntdll_native;
 inline std::shared_future<DWORD>	sym_ntdll_native_ret;
+inline DWORD						sym_ntdll_native_thread_id;
