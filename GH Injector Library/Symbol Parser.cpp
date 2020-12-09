@@ -146,6 +146,8 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		return SYMBOL_ERR_ALREADY_INITIALIZED;
 	}
 
+	m_bInterruptEvent = false;
+
 	std::ifstream File(szModulePath, std::ios::binary | std::ios::ate);
 	if (!File.good())
 	{
@@ -343,7 +345,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		{
 			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
-				Sleep(50);
+				Sleep(25);
 
 				if (m_bInterruptEvent)
 				{
@@ -415,6 +417,8 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		return SYMBOL_ERR_SYM_INIT_FAIL;
 	}
 
+	m_Initialized = true;
+
 	SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_AUTO_PUBLICS);
 
 	m_SymbolTable = SymLoadModuleEx(m_hProcess, nullptr, m_szPdbPath.c_str(), nullptr, 0x10000000, Filesize, nullptr, NULL);
@@ -464,6 +468,8 @@ DWORD SYMBOL_PARSER::GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut)
 
 void SYMBOL_PARSER::Interrupt()
 {
+	m_bInterruptEvent = true;
+
 	if (m_hInterruptEvent)
 	{
 		SetEvent(m_hInterruptEvent);
@@ -496,6 +502,5 @@ void SYMBOL_PARSER::Interrupt()
 	m_hPdbFile		= nullptr;
 	m_hProcess		= nullptr;
 
-	m_bInterruptEvent = false;
 	m_hInterruptEvent = nullptr;
 }

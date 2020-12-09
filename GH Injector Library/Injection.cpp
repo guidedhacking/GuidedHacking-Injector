@@ -395,7 +395,7 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	
 	DWORD LastErrCode	= INJ_ERR_SUCCESS;
 	HANDLE hHijackProc	= nullptr;
-	for (auto i : handles)
+	for (const auto & i : handles)
 	{
 		hHijackProc = OpenProcess(access_mask | PROCESS_CREATE_THREAD, FALSE, i.OwnerPID);
 		if (!hHijackProc)

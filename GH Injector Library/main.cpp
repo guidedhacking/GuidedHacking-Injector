@@ -84,20 +84,22 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 	{
 		LOG("GH Injector V%ls detaching\n", GH_INJ_VERSION);
 
-		if (sym_ntdll_native_ret.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+		if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 		{
+			LOG("Attempting to interrupt native ntdll.pdb donwload thread\n");
 			sym_ntdll_native.Interrupt();
-			if (sym_ntdll_native_ret.wait_for(std::chrono::microseconds(25)) != std::future_status::timeout)
+			if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
 			{
 				LOG("Native ntdll pdb download thread didn't exit properly.\n");
 			}
 		}
 
 #ifdef _WIN64
-		if (sym_ntdll_wow64_ret.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+		if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 		{
+			LOG("Attempting to interrupt wow64 ntdll.pdb donwload thread\n");
 			sym_ntdll_wow64.Interrupt();
-			if (sym_ntdll_wow64_ret.wait_for(std::chrono::microseconds(25)) != std::future_status::timeout)
+			if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
 			{
 				LOG("Wow64 ntdll pdb download thread didn't exit properly.\n");
 			}
