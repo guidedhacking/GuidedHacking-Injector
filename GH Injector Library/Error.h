@@ -294,6 +294,8 @@ struct ERROR_DATA
 #define INIT_ERROR_DATA(data, error) \
 data.AdvErrorCode = error;															\
 data.Line = __LINE__;																\
+memset(data.szFileName, 0, sizeof(data.szFileName));								\
+memset(data.szFunctionName, 0, sizeof(data.szFunctionName));						\
 memcpy(data.szFileName, __FILENAMEW__,  ((size_t)lstrlenW(__FILENAMEW__)) * 2);		\
 memcpy(data.szFunctionName, __FUNCTIONW__, ((size_t)lstrlenW(__FUNCTIONW__)) * 2);
 
