@@ -18,8 +18,10 @@ class SYMBOL_PARSER
 	bool m_Initialized;
 	bool m_Ready;
 
+	DownloadManager m_DlMgr;
 	HANDLE	m_hInterruptEvent;
 	bool	m_bInterruptEvent;
+	float	m_fProgress;
 
 	bool VerifyExistingPdb(const GUID & guid);
 
@@ -32,6 +34,7 @@ public:
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 
 	void Interrupt();
+	float GetDownloadProgress();
 };
 
 struct PdbInfo

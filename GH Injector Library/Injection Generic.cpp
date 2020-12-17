@@ -181,6 +181,9 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 			LDRP_PATH_SEARCH_CONTEXT ctx{ 0 };
 			ctx.OriginalFullDllName = pData->ModuleFileName.szBuffer;
 
+			LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
+
+
 			LDR_DATA_TABLE_ENTRY * entry = nullptr;
 
 			pData->LastError = (DWORD)f->LdrpLoadDll(&pData->ModuleFileName, &ctx, { 0 }, &entry);
@@ -206,8 +209,7 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 	if (!(pData->Flags & (INJ_UNLINK_FROM_PEB | INJ_FAKE_HEADER | INJ_ERASE_HEADER)))
 	{
 		return INJ_ERR_SUCCESS;
-	}
-	
+	}	
 
 	PEB * pPEB = nullptr;
 	LDR_DATA_TABLE_ENTRY * pEntry = nullptr;

@@ -144,3 +144,5 @@ using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
 using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
 
 using f_GetSymbolState = DWORD(__stdcall *)();
+
+using f_GetDownloadProgress = float(__stdcall *)(bool bWoW64);

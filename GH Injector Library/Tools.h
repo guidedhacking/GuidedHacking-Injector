@@ -4,7 +4,6 @@
 
 //Filenames and errorlog setup
 
-
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
 #define GH_INJ_VERSIONW L"3.4"
@@ -141,3 +140,13 @@ void ErrorLog(ERROR_INFO * info);
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname);
 
 #endif
+
+float __stdcall GetDownloadProgress(bool bWow64);
+//This function returns the current state of the PDB download.
+//
+//Arguments:
+//		bWow64 (bool):
+///			If true the progress of the WoW64 PDB download will be returned, otherwise the progress of the native pdb download.
+//
+//Returnvalue (float):
+///		A value 0 <= ret <= 1. 1 indicates that the download is finished.

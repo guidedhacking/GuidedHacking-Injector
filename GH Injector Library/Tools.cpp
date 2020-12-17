@@ -244,6 +244,8 @@ std::wstring LaunchMethodToString(LAUNCH_METHOD method)
 	return std::wstring(L"bruh moment");
 }
 
+#if !defined(_WIN64) && defined(DUMP_SHELLCODE)
+
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 {
 	wchar_t Shellcodename[] = L"Shellcodes.txt";
@@ -301,4 +303,26 @@ void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 	shellcodes << L"\n};\n\n";
 
 	shellcodes.close();
+}
+
+#endif
+
+float __stdcall GetDownloadProgress(bool bWow64)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+#ifdef _WIN64
+	if (bWow64)
+	{
+		return sym_ntdll_wow64.GetDownloadProgress();
+	}
+	else
+	{
+		return sym_ntdll_native.GetDownloadProgress();
+	}	
+#else
+	UNREFERENCED_PARAMETER(bWow64);
+
+	return sym_ntdll_native.GetDownloadProgress();
+#endif
 }

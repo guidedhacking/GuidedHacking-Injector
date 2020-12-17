@@ -12,6 +12,7 @@ SYMBOL_PARSER::SYMBOL_PARSER()
 
 	m_bInterruptEvent	= false;
 	m_hInterruptEvent	= CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	m_fProgress			= 0.0f;
 }
 
 SYMBOL_PARSER::~SYMBOL_PARSER()
@@ -359,10 +360,10 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		}
 
 		char szCacheFile[MAX_PATH]{ 0 };
-		DownloadManager dlmgr;
-		dlmgr.SetInterruptEvent(m_hInterruptEvent);
 
-		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, &dlmgr)))
+		m_DlMgr.SetInterruptEvent(m_hInterruptEvent);
+
+		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, &m_DlMgr)))
 		{
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
@@ -380,6 +381,8 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 			return SYMBOL_ERR_COPYFILE_FAILED;
 		}
 	}
+
+	m_fProgress = 1.0f;
 
 	VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
@@ -503,4 +506,14 @@ void SYMBOL_PARSER::Interrupt()
 	m_hProcess		= nullptr;
 
 	m_hInterruptEvent = nullptr;
+}
+
+float SYMBOL_PARSER::GetDownloadProgress()
+{
+	if (m_fProgress == 1.0f)
+	{
+		return m_fProgress;
+	}
+
+	return m_DlMgr.GetDownloadProgress();
 }

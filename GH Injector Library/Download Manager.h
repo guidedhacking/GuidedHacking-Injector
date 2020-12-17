@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include <windows.h>
+#include "pch.h"
 
 class DownloadManager : public IBindStatusCallback
 {
-    HANDLE m_hInterruptEvent;
+    HANDLE  m_hInterruptEvent;
+    float   m_fProgress;
 
 public:
 
@@ -39,4 +40,6 @@ public:
     HRESULT __stdcall OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText);
 
     BOOL SetInterruptEvent(HANDLE hInterrupt);
+
+    float GetDownloadProgress();
 };

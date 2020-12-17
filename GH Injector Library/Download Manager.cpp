@@ -4,7 +4,8 @@
 
 DownloadManager::DownloadManager()
 {
-    m_hInterruptEvent = nullptr;
+    m_hInterruptEvent   = nullptr;
+    m_fProgress         = 0.0f;
 }
 
 DownloadManager::~DownloadManager()
@@ -91,14 +92,17 @@ HRESULT __stdcall DownloadManager::OnObjectAvailable(const IID & riid, IUnknown 
 
 HRESULT __stdcall DownloadManager::OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText)
 {
-    UNREFERENCED_PARAMETER(ulProgress);
-    UNREFERENCED_PARAMETER(ulProgressMax);
     UNREFERENCED_PARAMETER(ulStatusCode);
     UNREFERENCED_PARAMETER(szStatusText);
 
     if (m_hInterruptEvent && WaitForSingleObject(m_hInterruptEvent, 0) == WAIT_OBJECT_0)
     {
         return E_ABORT;
+    }
+
+    if (ulProgressMax)
+    {
+        m_fProgress = (float)ulProgress / ulProgressMax;
     }
 
     return S_OK;
@@ -112,4 +116,9 @@ BOOL DownloadManager::SetInterruptEvent(HANDLE hInterrupt)
     }
 
     return DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS);
+}
+
+float DownloadManager::GetDownloadProgress()
+{
+    return m_fProgress;
 }
