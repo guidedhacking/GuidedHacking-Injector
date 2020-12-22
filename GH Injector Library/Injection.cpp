@@ -232,8 +232,27 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
-		wchar_t * pFileName = wcsrchr(pData->szDllPath, '\\') + 1;
-		memcpy(pFileName, new_name, sizeof(new_name));
+		wchar_t * pFileName = wcsrchr(pData->szDllPath, '\\');
+		if (!pFileName)
+		{
+			INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+			return INJ_ERR_INVALID_PATH_SEPERATOR;
+		}
+		else
+		{
+			++pFileName;
+		}
+
+		auto size_delta = pFileName - pData->szDllPath;
+
+		hr = StringCbCopyW(pFileName, sizeof(pData->szDllPath) - size_delta, new_name);
+		if (FAILED(hr))
+		{
+			INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+			return INJ_ERR_STRINGC_XXX_FAIL;
+		}
 
 		auto ren_ret = _wrename(OldFilePath, pData->szDllPath);
 		if (ren_ret)

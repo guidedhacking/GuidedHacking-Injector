@@ -65,6 +65,7 @@
 #define INJ_ERR_INVALID_PEB_DATA			0x0000002C	//internal error					: -						: peb data required to erase/fake header or unlike the module from the peb wasn't findable
 #define INJ_ERR_UPDATE_PROTECTION_FAILED	0x0000002D	//NtProtectVirtualMemory			: NTSTATUS				: updating the page protection of the pe header failed
 #define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002E	//internal error					: -						: can't resolve address of the wow64 ntdll
+#define INJ_ERR_INVALID_PATH_SEPERATOR		0x0000002F	//internal error					: -						: can't find '\' in a path. '/' as seperators aren't supported.
 
 
 ///////////////////

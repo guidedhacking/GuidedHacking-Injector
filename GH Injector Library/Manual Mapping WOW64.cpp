@@ -35,7 +35,17 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
 
-	const wchar_t * pDllName = wcsrchr(szDllFile, '\\') + 1; 
+	const wchar_t * pDllName = wcsrchr(szDllFile, '\\');
+	if (!pDllName)
+	{
+		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		return INJ_ERR_INVALID_PATH_SEPERATOR;
+	}
+	else
+	{
+		++pDllName;
+	}
 	
 	hr = StringCbLengthW(pDllName, sizeof(data.szNameBuffer), &len);
 	if (FAILED(hr))
