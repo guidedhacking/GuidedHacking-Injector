@@ -10,6 +10,10 @@
 //If needed:
 //auto ValidateInjectionFunctions	= (f_ValidateInjectionFunctions)GetProcAddress(hInjectionMod, "ValidateInjectionFunctions");
 //auto RestorenjectionFunctions		= (f_RestoreInjectionFunctions)GetProcAddress(hInjectionMod, "RestorenjectionFunctions");
+//
+//Symbol state:
+//auto GetSymbolState 		= (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
+//auto GetDownloadProgress 	= (f_GetDownloadProgress)GetProcAddress(hInjectionMod, "GetDownloadProgress");
 
 #pragma once
 

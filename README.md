@@ -44,6 +44,9 @@ Session seperation can be bypassed with all methods.
 
 You can easily use mapper by including the compiled binaries in your project. Check the provided Injection.h header for more information.
 Make sure you have the compiled binaries in the working directory of your program.
+On first run the injection module will download pdb files for the native (and when run on x64 the wow64) version of the ntdll.dll to resolve symbol addresses.
+The injector can only function if that process is finished. The injection module exports GetSymbolState which will return INJ_ERROR_SUCCESS (0) if the pdb download and resolving of all required addresses is completed.
+Additionally GetDownloadProgress can be used to determine the progress of the download as percentage.
 
 ```cpp
 
@@ -52,6 +55,12 @@ Make sure you have the compiled binaries in the working directory of your progra
 HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
 	
 auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
+auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
+
+while (GetSymbolState() != 0)
+{
+	Sleep(10);
+}
 
 DWORD TargetProcessId;
 
