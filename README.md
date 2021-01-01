@@ -67,7 +67,7 @@ DWORD TargetProcessId;
 INJECTIONDATAA data =
 {
 	"",
-	TargetProcessId;,
+	TargetProcessId,
 	INJECTION_MODE::IM_LoadLibraryExW,
 	LAUNCH_METHOD::LM_NtCreateThreadEx,
 	NULL,
