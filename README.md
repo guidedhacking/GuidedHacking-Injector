@@ -1,7 +1,7 @@
 ## GH Injector Library
 
 A feature-rich DLL injection library which supports x86, WOW64 and x64 injections.
-It features four injection methods, four shellcode execution methods and various additional options.
+It features five injection methods, four shellcode execution methods and various additional options.
 Session seperation can be bypassed with all methods.
 
 ----
@@ -11,6 +11,7 @@ Session seperation can be bypassed with all methods.
 - LoadLibraryExW
 - LdrLoadDll
 - LdrpLoadDll
+- LdrpLoadDllInternal
 - ManualMapping
 
 ### Shellcode execution methods
@@ -37,6 +38,13 @@ Session seperation can be bypassed with all methods.
 	- Thread cloaking
 - Handle hijacking
 - Hook scanning/restoring
+- Fancy process picker
+
+### Shortcut generation:
+
+Too lazy to reopen the injector everytime you want to inject the same dll? Generate a shortcut.
+Select the dll you want to inject in the list, configure the options you want and make sure the target process is running. Then click the "Generate Shortcut" button and a shortcut will be generated in the directory of the injector.
+Now you can just double click to perform the injection. The spawned console injector waits for the specified target process to launch.
 
 ----
 
