@@ -50,12 +50,16 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("pData is invalid\n");
+
 		return InitErrorStruct(nullptr, ReCa<INJECTIONDATAW*>(pData), -1, INJ_ERR_NO_DATA, error_data);
 	}
 	
 	if (!pData->szDllPath)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("Invalid path\n");
 
 		return InitErrorStruct(nullptr, ReCa<INJECTIONDATAW*>(pData), -1, INJ_ERR_INVALID_FILEPATH, error_data);
 	}
@@ -68,6 +72,8 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+		LOG("StringCchLengthA failed: %08X\n", hr);
+
 		return InitErrorStruct(nullptr, ReCa<INJECTIONDATAW*>(pData), -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 	}
 
@@ -75,6 +81,8 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	if (err)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)err);
+
+		LOG("mbstowcs_s failed: %08X\n", (DWORD)err);
 
 		return InitErrorStruct(nullptr, ReCa<INJECTIONDATAW*>(pData), -1, INJ_ERR_STR_CONVERSION_TO_W_FAILED, error_data);
 	}
@@ -86,6 +94,8 @@ DWORD __stdcall InjectA(INJECTIONDATAA * pData)
 	data.Timeout			= pData->Timeout;
 	data.hHandleValue		= pData->hHandleValue;
 	data.GenerateErrorLog	= pData->GenerateErrorLog;
+
+	LOG("Initialized INJECTIONDATAW\n");
 
 	LOG("Forwarding call to InjectW\n");
 
@@ -108,18 +118,24 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("pData is invalid\n");
+
 		return InitErrorStruct(nullptr, pData, -1, INJ_ERR_NO_DATA, error_data);
 	}
 
 	RetVal = ResolveImports(error_data);
 	if (RetVal != INJ_ERR_SUCCESS)
 	{
+		LOG("PDB download incomplete or import missing: %08X\n", RetVal);
+
 		return InitErrorStruct(nullptr, pData, -1, RetVal, error_data);
 	}
 		
 	if (!pData->szDllPath)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("Invalid path\n");
 
 		return InitErrorStruct(nullptr, pData, -1, INJ_ERR_INVALID_FILEPATH, error_data);
 	}
@@ -130,6 +146,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("File doesn't exist: %08X\n", error_data.AdvErrorCode);
+
 		return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_FILE_DOESNT_EXIST, error_data);
 	}
 
@@ -137,16 +155,22 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("Invalid process identifier specified\n");
+
 		return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_INVALID_PID, error_data);
 	}
 
 	if (pData->Flags & INJ_LOAD_DLL_COPY)
 	{
+		LOG("Copying dll into temp directory\n");
+
 		size_t len_out = 0;
 		HRESULT hr = StringCchLengthW(pData->szDllPath, MAXPATH_IN_TCHAR, &len_out);
 		if (FAILED(hr) || !len_out)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+			LOG("StringCchLengthW failed: %08X\n", hr);
 
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
@@ -160,6 +184,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("GetTempPathW failed: %08X\n", error_data.AdvErrorCode);
+
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_GET_TEMP_DIR, error_data);
 		}
 
@@ -168,12 +194,16 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+			LOG("StringCchCatW failed: %08X\n", hr);
+
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
 		if (!CopyFileW(pData->szDllPath, new_path, FALSE))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("CopyFileW failed: %08X\n", error_data.AdvErrorCode);
 
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_COPY_FILE, error_data);
 		}
@@ -183,6 +213,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+			LOG("StringCbCopyW failed: %08X\n", hr);
+
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
@@ -191,6 +223,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 
 	if (pData->Flags & INJ_SCRAMBLE_DLL_NAME)
 	{
+		LOG("Scramblind dll name\n");
+
 		wchar_t new_name[15]{ 0 };
 		UINT seed = rand() + pData->Flags;
 		LARGE_INTEGER pfc{ 0 };
@@ -229,13 +263,17 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+			LOG("StringCchCopyW failed: %08X\n", hr);
+
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 		}
 
 		wchar_t * pFileName = wcsrchr(pData->szDllPath, '\\');
 		if (!pFileName)
 		{
-			INIT_ERROR_DATA(error_data, (DWORD)hr);
+			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+			LOG("wcsrchr failed\n");
 
 			return INJ_ERR_INVALID_PATH_SEPERATOR;
 		}
@@ -251,6 +289,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+			LOG("StringCbCopyW failed: %08X\n", hr);
+
 			return INJ_ERR_STRINGC_XXX_FAIL;
 		}
 
@@ -258,6 +298,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		if (ren_ret)
 		{
 			INIT_ERROR_DATA(error_data, (DWORD)errno);
+
+			LOG("_wrename failed: %08X\n", (DWORD)error_data.AdvErrorCode);
 
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_RENAME_FILE, error_data);
 		}
@@ -270,10 +312,14 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	{
 		if (pData->hHandleValue) 
 		{
+			LOG("hHandleValue = %08X\n", pData->hHandleValue);
+
 			hTargetProc = MPTR(pData->hHandleValue);
 		}
 		else
 		{
+			LOG("Forwarding call to handle hijacking\n");
+
 			return HijackHandle(pData, error_data);
 		}
 	}
@@ -290,6 +336,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("OpenProcess failed: %08X\n", (DWORD)error_data.AdvErrorCode);
+
 			return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_OPEN_PROCESS, error_data);
 		}
 	}
@@ -299,15 +347,23 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("Invalid process handle: %08X\n", (DWORD)error_data.AdvErrorCode);
+
 		return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_INVALID_PROC_HANDLE, error_data);
 	}
+
+	LOG("Attached to target process\n");
 
 	if (!K32GetModuleBaseNameW(hTargetProc, NULL, pData->szTargetProcessExeFileName, sizeof(pData->szTargetProcessExeFileName) / sizeof(pData->szTargetProcessExeFileName[0])))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("K32GetModuleBaseNameW failed: %08X\n", (DWORD)error_data.AdvErrorCode);
 		
 		return InitErrorStruct(szDllPath, pData, -1, INJ_ERR_CANT_GET_EXE_FILENAME, error_data);
 	}
+
+	LOG("Validating specified file\n");
 
 	DWORD FileErr = FILE_ERR_SUCCESS;
 	bool native_target = true;
@@ -325,16 +381,18 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 	FileErr = ValidateFile(szDllPath, IMAGE_FILE_MACHINE_I386);
 #endif
 
-	if (FileErr)
+	if (FileErr != FILE_ERR_SUCCESS)
 	{
 		INIT_ERROR_DATA(error_data, FileErr);
+
+		LOG("Invalid file specified\n");
 
 		return InitErrorStruct(szDllPath, pData, native_target, INJ_ERR_PLATFORM_MISMATCH, error_data);
 	}
 
 	LOG("File validated and prepared for injection:\n%ls\n", pData->szDllPath);
 	
-	HINSTANCE hOut	= NULL;
+	HINSTANCE hOut = NULL;
 
 #ifdef _WIN64
 	if (native_target)
@@ -363,6 +421,8 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 
 DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 {
+	LOG("Begin HijackHandle\n");
+
 	wchar_t * szDllPath = pData->szDllPath;
 
 	DWORD access_mask = PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_QUERY_INFORMATION;
@@ -375,6 +435,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	if (handles.empty())
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("No compatible handle found\n");
 
 		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_HIJACK_NO_HANDLES, error_data);
 	}
@@ -390,6 +452,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
+		LOG("StringCbCopyW failed: %08X\n", error_data.AdvErrorCode);
+
 		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 	}
 
@@ -397,6 +461,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 	if (FAILED(hr))
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
+
+		LOG("StringCbCatW failed: %08X\n", error_data.AdvErrorCode);
 
 		return InitErrorStruct(szDllPath, pData, true, INJ_ERR_STRINGC_XXX_FAIL, error_data);
 	}
@@ -430,6 +496,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			LastErrCode = INJ_ERR_HIJACK_NO_NATIVE_HANDLE;
 			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+			LOG("Can't open process %06X\n", i.OwnerPID);
+
 			CloseHandle(hHijackProc);
 			
 			continue;
@@ -443,10 +511,14 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			LastErrCode = INJ_ERR_HIJACK_INJ_FAILED;
 			INIT_ERROR_DATA(error_data, inj_ret);
 
+			LOG("Failed to load injection module into process %06X: %08X\n", i.OwnerPID, inj_ret);
+
 			CloseHandle(hHijackProc);
 			
 			continue;
 		}
+
+		LOG("Injection module loaded\n");
 
 		HINSTANCE hInjectionModuleEx = hijack_data.hDllOut;
 		f_Routine pRemoteInjectW = ReCa<f_Routine>(ReCa<UINT_PTR>(InjectW) - ReCa<UINT_PTR>(g_hInjMod) + ReCa<UINT_PTR>(hInjectionModuleEx));
@@ -456,6 +528,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 		{
 			LastErrCode = INJ_ERR_HIJACK_OUT_OF_MEMORY_EXT;
 			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 			EjectDll(hHijackProc, hInjectionModuleEx);
 
@@ -470,6 +544,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			LastErrCode = INJ_ERR_HIJACK_WPM_FAIL;
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
 			VirtualFreeEx(hHijackProc, pArg, 0, MEM_RELEASE);
 			EjectDll(hHijackProc, hInjectionModuleEx);
 
@@ -480,8 +556,14 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 
 		pData->hHandleValue = 0;
 
+		LOG("Injection data written to hijack process\n");
+
+		LOG("Entering StartRoutine\n");
+
 		DWORD hijack_ret = INJ_ERR_SUCCESS;
 		DWORD remote_ret = StartRoutine(hHijackProc, pRemoteInjectW, pArg, LAUNCH_METHOD::LM_NtCreateThreadEx, false, hijack_ret, pData->Timeout, error_data);
+
+		LOG("Return from StartRoutine\n");
 		
 		INJECTIONDATAW data_out{ 0 };
 		ReadProcessMemory(hHijackProc, pArg, &data_out, sizeof(INJECTIONDATAW), nullptr);
@@ -495,6 +577,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 		{
 			LastErrCode = remote_ret;
 
+			LOG("StartRoutine failed: %08X\n", remote_ret);
+
 			continue;
 		}
 
@@ -503,8 +587,12 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			LastErrCode = INJ_ERR_HIJACK_REMOTE_INJ_FAIL;
 			INIT_ERROR_DATA(error_data, hijack_ret);
 
+			LOG("Hijack injection failed: %08X\n", hijack_ret);
+
 			continue;
 		}
+
+		LOG("Hijack injection succeeded\nImagebase = %p\n", (void *)data_out.hDllOut);
 
 		pData->hDllOut = data_out.hDllOut;
 
@@ -515,6 +603,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 
 	pData->Flags = OrigFlags;
 
+	LOG("End HijackHandle\n");
+
 	return InitErrorStruct(szDllPath, pData, true, LastErrCode, error_data);
 }
 
@@ -524,11 +614,15 @@ HRESULT __stdcall GetVersionA(char * out, size_t cb_size)
 
 	if (!out)
 	{
+		LOG("GetVersionA: out = nullptr\n");
+
 		return E_INVALIDARG;
 	}
 
 	if (sizeof(GH_INJ_VERSIONA) > cb_size)
 	{
+		LOG("GetVersionA: buffer too small (%d bytes required)\n", sizeof(GH_INJ_VERSIONA));
+
 		return TYPE_E_BUFFERTOOSMALL;
 	}
 
@@ -541,11 +635,15 @@ HRESULT __stdcall GetVersionW(wchar_t * out, size_t cb_size)
 
 	if (!out)
 	{
+		LOG("GetVersionW: out = nullptr\n");
+
 		return E_INVALIDARG;
 	}
 
-	if (sizeof(GH_INJ_VERSIONA) > cb_size)
+	if (sizeof(GH_INJ_VERSIONW) > cb_size)
 	{
+		LOG("GetVersionA: buffer too small (%d bytes required)\n", sizeof(GH_INJ_VERSIONW));
+
 		return TYPE_E_BUFFERTOOSMALL;
 	}
 
@@ -558,27 +656,37 @@ DWORD __stdcall GetSymbolState()
 
 	if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 	{
+		LOG("Native symbols not loaded\n");
+
 		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
 	}
 
 	DWORD sym_ret = sym_ntdll_native_ret.get();
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
+		LOG("Native symbol loading failed: %08X\n", sym_ret);
+
 		return sym_ret;
 	}
 
 #ifdef _WIN64
 	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 	{
+		LOG("WOW64 symbols not loaded\n");
+
 		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
 	}
 
 	sym_ret = sym_ntdll_wow64_ret.get();
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
+		LOG("WOW64 symbol loading failed: %08X\n", sym_ret);
+
 		return sym_ret;
 	}
 #endif
+
+	LOG("All symbols loaded\n");
 
 	return SYMBOL_ERR_SUCCESS;
 }

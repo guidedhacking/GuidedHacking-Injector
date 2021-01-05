@@ -97,15 +97,6 @@ bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 	int		* pRootPageNumber	= ReCa<int*>(pdb_raw + (size_t)pPDBHeader->root_stream_page_number_list_number * pPDBHeader->page_size);
 	auto	* pRootStream		= ReCa<RootStream7*>(pdb_raw + (size_t)(*pRootPageNumber) * pPDBHeader->page_size);
 
-	int size = 0;
-	for (int i = 0; i < pRootStream->num_streams; ++i)
-	{
-		if (pRootStream->stream_sizes[i] == 0xFFFFFFFF)
-			continue;
-
-		size += pRootStream->stream_sizes[i];
-	}
-	
 	std::map<int, std::vector<int>> streams;
 	int current_page_number = 0;
 	
@@ -140,7 +131,7 @@ bool SYMBOL_PARSER::VerifyExistingPdb(const GUID & guid)
 	return (guid_eq == 0);
 }
 
-DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection)
+DWORD SYMBOL_PARSER::Initialize(const std::wstring szModulePath, const std::wstring path, std::wstring * pdb_path_out, bool Redownload, bool WaitForConnection)
 {
 	if (m_Ready)
 	{
@@ -149,7 +140,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 	m_bInterruptEvent = false;
 
-	std::ifstream File(szModulePath, std::ios::binary | std::ios::ate);
+	std::ifstream File(szModulePath.c_str(), std::ios::binary | std::ios::ate);
 	if (!File.good())
 	{
 		return SYMBOL_ERR_CANT_OPEN_MODULE;
@@ -258,7 +249,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		m_szPdbPath += '\\';
 	}
 
-	if (!CreateDirectoryA(m_szPdbPath.c_str(), nullptr))
+	if (!CreateDirectoryW(m_szPdbPath.c_str(), nullptr))
 	{
 		if (GetLastError() != ERROR_ALREADY_EXISTS)
 		{
@@ -266,9 +257,9 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		}
 	}
 
-	m_szPdbPath += x86 ? "x86\\" : "x64\\";
+	m_szPdbPath += x86 ? L"x86\\" : L"x64\\";
 
-	if (!CreateDirectoryA(m_szPdbPath.c_str(), nullptr))
+	if (!CreateDirectoryW(m_szPdbPath.c_str(), nullptr))
 	{
 		if (GetLastError() != ERROR_ALREADY_EXISTS)
 		{
@@ -276,11 +267,14 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		}
 	}
 
-	m_szPdbPath += pdb_info->PdbFileName;
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+
+	std::wstring szPdbFileName(conv.from_bytes(pdb_info->PdbFileName));
+	m_szPdbPath += szPdbFileName;
 		
 	DWORD Filesize = 0;
 	WIN32_FILE_ATTRIBUTE_DATA file_attr_data{ 0 };
-	if (GetFileAttributesExA(m_szPdbPath.c_str(), GetFileExInfoStandard, &file_attr_data))
+	if (GetFileAttributesExW(m_szPdbPath.c_str(), GetFileExInfoStandard, &file_attr_data))
 	{
 		Filesize = file_attr_data.nFileSizeLow;
 
@@ -291,7 +285,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 		if (Redownload)
 		{
-			DeleteFileA(m_szPdbPath.c_str());
+			DeleteFileW(m_szPdbPath.c_str());
 		}
 	}	
 	else
@@ -310,41 +304,27 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 			return SYMBOL_ERR_CANT_CONVERT_PDB_GUID;
 		}
-		
-		char a_GUID[100]{ 0 };
-		size_t l_GUID = 0;
-		if (wcstombs_s(&l_GUID, a_GUID, w_GUID, sizeof(a_GUID)) || !l_GUID)
+
+		std::wstring guid_filtered;
+		for (UINT i = 0; w_GUID[i]; ++i)
 		{
-			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
-
-			delete[] pRawData;
-
-			return SYMBOL_ERR_GUID_TO_ANSI_FAILED;
-		}
-
-		std::string guid_filtered;
-		for (UINT i = 0; i != l_GUID; ++i)
-		{
-			if ((a_GUID[i] >= '0' && a_GUID[i] <= '9') || (a_GUID[i] >= 'A' && a_GUID[i] <= 'F') || (a_GUID[i] >= 'a' && a_GUID[i] <= 'f'))
+			if ((w_GUID[i] >= '0' && w_GUID[i] <= '9') || (w_GUID[i] >= 'A' && w_GUID[i] <= 'F') || (w_GUID[i] >= 'a' && w_GUID[i] <= 'f'))
 			{
-				guid_filtered += a_GUID[i];
+				guid_filtered += w_GUID[i];
 			}
 		}
 
-		char age[3]{ 0 };
-		_itoa_s(pdb_info->Age, age, 10);
-
-		std::string url = "https://msdl.microsoft.com/download/symbols/";
-		url += pdb_info->PdbFileName;
+		std::wstring url = L"https://msdl.microsoft.com/download/symbols/";
+		url += szPdbFileName;
 		url += '/';
 		url += guid_filtered;
-		url += age;
+		url += std::to_wstring(pdb_info->Age);
 		url += '/';
-		url += pdb_info->PdbFileName;
+		url += szPdbFileName;
 
 		if (WaitForConnection)
 		{
-			while (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
+			while (InternetCheckConnectionW(L"https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
 				Sleep(25);
 
@@ -359,11 +339,11 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 			}
 		}
 
-		char szCacheFile[MAX_PATH]{ 0 };
+		wchar_t szCacheFile[MAX_PATH]{ 0 };
 
 		m_DlMgr.SetInterruptEvent(m_hInterruptEvent);
 
-		if (FAILED(URLDownloadToCacheFileA(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, &m_DlMgr)))
+		if (FAILED(URLDownloadToCacheFileW(nullptr, url.c_str(), szCacheFile, MAX_PATH , NULL, &m_DlMgr)))
 		{
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
@@ -372,7 +352,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 			return SYMBOL_ERR_DOWNLOAD_FAILED;
 		}
 
-		if (!CopyFileA(szCacheFile, m_szPdbPath.c_str(), FALSE))
+		if (!CopyFileW(szCacheFile, m_szPdbPath.c_str(), FALSE))
 		{
 			VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
 
@@ -390,7 +370,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 	if (!Filesize)
 	{
-		if (!GetFileAttributesExA(m_szPdbPath.c_str(), GetFileExInfoStandard, &file_attr_data))
+		if (!GetFileAttributesExW(m_szPdbPath.c_str(), GetFileExInfoStandard, &file_attr_data))
 		{
 			return SYMBOL_ERR_CANT_ACCESS_PDB_FILE;
 		}
@@ -398,7 +378,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		Filesize = file_attr_data.nFileSizeLow;
 	}
 
-	m_hPdbFile = CreateFileA(m_szPdbPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, NULL, nullptr);
+	m_hPdbFile = CreateFileW(m_szPdbPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, NULL, nullptr);
 	if (m_hPdbFile == INVALID_HANDLE_VALUE)
 	{
 		return SYMBOL_ERR_CANT_OPEN_PDB_FILE;
@@ -412,7 +392,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 		return SYMBOL_ERR_CANT_OPEN_PROCESS;
 	}
 
-	if (!SymInitialize(m_hProcess, m_szPdbPath.c_str(), FALSE))
+	if (!SymInitializeW(m_hProcess, m_szPdbPath.c_str(), FALSE))
 	{
 		CloseHandle(m_hProcess);
 		CloseHandle(m_hPdbFile);
@@ -424,7 +404,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::string szModulePath, const std::strin
 
 	SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_AUTO_PUBLICS);
 
-	m_SymbolTable = SymLoadModuleEx(m_hProcess, nullptr, m_szPdbPath.c_str(), nullptr, 0x10000000, Filesize, nullptr, NULL);
+	m_SymbolTable = SymLoadModuleExW(m_hProcess, nullptr, m_szPdbPath.c_str(), nullptr, 0x10000000, Filesize, nullptr, NULL);
 	if (!m_SymbolTable)
 	{
 		SymCleanup(m_hProcess);

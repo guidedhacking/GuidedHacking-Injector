@@ -115,6 +115,8 @@ BOOL DownloadManager::SetInterruptEvent(HANDLE hInterrupt)
         CloseHandle(m_hInterruptEvent);
     }
 
+    LOG("New interrupt event specified\n");
+
     return DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS);
 }
 

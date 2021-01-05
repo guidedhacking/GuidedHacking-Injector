@@ -6,10 +6,14 @@
 
 DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
+	LOG("Begin SR_HijackThread_WOW64\n");
+
 	ProcessInfo PI;
 	if (!PI.SetProcess(hTargetProc))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("Can't initialize ProcessInfo class\n");
 
 		return SR_HT_ERR_PROC_INFO_FAIL;
 	}
@@ -37,13 +41,19 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("No compatible thread found\n");
+
 		return SR_HT_ERR_NO_THREADS;
 	}
+
+	LOG("Target thread %06X\n", ThreadID);
 
 	HANDLE hThread = OpenThread(THREAD_SET_CONTEXT | THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, ThreadID);
 	if (!hThread)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("OpenThread failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_HT_ERR_OPEN_THREAD_FAIL;
 	}
@@ -52,17 +62,23 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("SuspendThread failed: %08X\n", error_data.AdvErrorCode);
+
 		CloseHandle(hThread);
 
 		return SR_HT_ERR_SUSPEND_FAIL;
 	}
 
+	LOG("Target thread suspended\n");
+
 	WOW64_CONTEXT OldContext{ 0 };
-	OldContext.ContextFlags = CONTEXT_CONTROL;
+	OldContext.ContextFlags = WOW64_CONTEXT_ALL;
 
 	if (!Wow64GetThreadContext(hThread, &OldContext))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("Wow64GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -74,6 +90,8 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	if (!pMem)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
@@ -117,6 +135,8 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	*ReCa<DWORD*>(Shellcode + 0x06 + sizeof(SR_REMOTE_DATA_WOW64)) = OldEIP;
 	*ReCa<DWORD*>(Shellcode + 0x10 + sizeof(SR_REMOTE_DATA_WOW64)) = MDWD(pMem);
 
+	LOG("Shellcode prepared\n");
+
 	void * pRemoteFunc	= ReCa<BYTE*>(pMem) + sizeof(SR_REMOTE_DATA_WOW64);
 	OldContext.Eip		= MDWD(pRemoteFunc);
 
@@ -124,9 +144,13 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
+	LOG("Hijacking thread with\n pRoutine = %p\n pArg = %p\n", pRemoteFunc, pMem);
+
 	if (!WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -139,6 +163,8 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("Wow64SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+
 		ResumeThread(hThread);
 		CloseHandle(hThread);
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
@@ -146,9 +172,13 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 		return SR_HT_ERR_SET_CONTEXT_FAIL;
 	}
 
+	LOG("EIP replaced\n");
+
 	if (ResumeThread(hThread) == (DWORD)-1)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("ResumeThread failed: %08X\n", error_data.AdvErrorCode);
 
 		OldContext.Eip = OldEIP;
 		Wow64SetThreadContext(hThread, &OldContext);
@@ -160,22 +190,51 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 		return SR_HT_ERR_RESUME_FAIL;
 	}
 
+	LOG("Thread resumed\n");
+
 	PostThreadMessageW(ThreadID, WM_NULL, 0, 0);
+
+	Sleep(SR_REMOTE_DELAY);
 
 	SR_REMOTE_DATA_WOW64 data;
 	data.State			= (DWORD)SR_REMOTE_STATE::SR_RS_ExecutionPending;
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
+	LOG("Entering wait state\n");
+
 	auto Timer = GetTickCount64();
 	while (GetTickCount64() - Timer < Timeout)
 	{
-		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
+		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
+		if (bRet)
 		{
 			if (data.State == (DWORD)SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 			{
+				LOG("Shelldata retrieved\n");
+
 				break;
 			}
+		}
+		else
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			if (SuspendThread(hThread) != (DWORD)-1)
+			{
+				OldContext.Eip = OldEIP;
+
+				if (Wow64SetThreadContext(hThread, &OldContext) && ResumeThread(hThread) != (DWORD)-1)
+				{
+					CloseHandle(hThread);
+
+					VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+				}
+			}
+
+			return SR_HT_ERR_RPM_FAIL;
 		}
 
 		Sleep(10);
@@ -193,6 +252,8 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 
 				if (Wow64SetThreadContext(hThread, &OldContext) && ResumeThread(hThread) != (DWORD)-1)
 				{
+					LOG("Shell timed out\n");
+
 					CloseHandle(hThread);
 
 					VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
@@ -202,6 +263,8 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 			}
 		}
 
+		LOG("pRoutine timed out\n");
+
 		CloseHandle(hThread);
 
 		return SR_HT_ERR_REMOTE_TIMEOUT;
@@ -210,7 +273,11 @@ DWORD SR_HijackThread_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	CloseHandle(hThread);
 	VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
+	LOG("pRoutine returned: %08X\n", data.Ret);
+
 	Out = data.Ret;
+
+	LOG("End SR_HijackThread_WOW64\n");
 	
 	return SR_ERR_SUCCESS;
 }

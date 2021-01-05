@@ -15,12 +15,16 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	std::ifstream File(szFile, std::ios::binary | std::ios::ate);
 	if (!File.good())
 	{
+		LOG("Can't open file\n");
+
 		return FILE_ERR_CANT_OPEN_FILE;
 	}
 
 	auto FileSize = File.tellg();
 	if (FileSize < 0x1000)
 	{
+		LOG("Specified file is too small\n");
+
 		return FILE_ERR_INVALID_FILE_SIZE;
 	}
 
@@ -32,6 +36,15 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	auto * pDos = ReCa<IMAGE_DOS_HEADER*>(headers);
 	auto * pNT	= ReCa<IMAGE_NT_HEADERS*>(headers + pDos->e_lfanew); //no need for correct nt headers type
 
+	if (pDos->e_lfanew > 0x1000)
+	{
+		delete[] headers;
+
+		LOG("Invalid DOS header\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
 	WORD	magic		= pDos->e_magic;
 	DWORD	signature	= pNT->Signature;
 	WORD	machine		= pNT->FileHeader.Machine;
@@ -41,10 +54,12 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 
 	if (magic != IMAGE_DOS_SIGNATURE || signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
 	{
+		LOG("Invalid PE header\n");
+
 		return FILE_ERR_INVALID_FILE;
 	}
 
-	return 0;
+	return FILE_ERR_SUCCESS;
 }
 
 bool GetOwnModulePathA(char * pOut, size_t BufferCchSize)

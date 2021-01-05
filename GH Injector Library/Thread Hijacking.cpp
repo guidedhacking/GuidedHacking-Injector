@@ -4,10 +4,14 @@
 
 DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
+	LOG("Begin SR_HijackThread\n");
+
 	ProcessInfo PI;
 	if (!PI.SetProcess(hTargetProc))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("Can't initialize ProcessInfo class\n");
 
 		return SR_HT_ERR_PROC_INFO_FAIL;
 	}
@@ -36,13 +40,19 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("No compatible thread found\n");
+
 		return SR_HT_ERR_NO_THREADS;
 	}
+
+	LOG("Target thread %06X\n", ThreadID);
 
 	HANDLE hThread = OpenThread(THREAD_SET_CONTEXT | THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, ThreadID);
 	if (!hThread)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("OpenThread failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_HT_ERR_OPEN_THREAD_FAIL;
 	}
@@ -50,6 +60,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	if (SuspendThread(hThread) == (DWORD)-1)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("SuspendThread failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
@@ -63,6 +75,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+
 		ResumeThread(hThread);
 		CloseHandle(hThread);
 
@@ -73,6 +87,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	if (!pMem)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
@@ -181,13 +197,19 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 
 #endif
 
+	LOG("Shellcode prepared\n");
+
 	auto * sr_data = ReCa<SR_REMOTE_DATA*>(Shellcode);
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
+	LOG("Hijacking thread with\n pRoutine = %p\n pArg = %p\n", pRemoteFunc, pMem);
+
 	if (!WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -200,6 +222,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+
 		ResumeThread(hThread);
 		CloseHandle(hThread);
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
@@ -207,9 +231,17 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		return SR_HT_ERR_SET_CONTEXT_FAIL;
 	}
 
+#ifdef _WIN64
+	LOG("RIP replaced\n");
+#else
+	LOG("EIP replaced\n");
+#endif
+
 	if (ResumeThread(hThread) == (DWORD)-1)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("ResumeThread failed: %08X\n", error_data.AdvErrorCode);
 
 #ifdef _WIN64
 		OldContext.Rip = OldRIP;
@@ -225,6 +257,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		return SR_HT_ERR_RESUME_FAIL;
 	}
 
+	LOG("Thread resumed\n");
+
 	PostThreadMessageW(ThreadID, WM_NULL, 0, 0);
 
 	Sleep(SR_REMOTE_DELAY);
@@ -234,15 +268,43 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
+	LOG("Entering wait state\n");
+
 	auto Timer = GetTickCount64();
 	while (GetTickCount64() - Timer < Timeout)
 	{
-		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
+		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
+		if (bRet)
 		{
 			if (data.State == SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 			{
+				LOG("Shelldata retrieved\n");
+
 				break;
 			}
+		}
+		else
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			if (SuspendThread(hThread) != (DWORD)-1)
+			{
+#ifdef _WIN64
+				OldContext.Rip = OldRIP;
+#else
+				OldContext.Eip = OldEIP;
+#endif
+				if (SetThreadContext(hThread, &OldContext) && ResumeThread(hThread) != (DWORD)-1)
+				{
+					CloseHandle(hThread);
+
+					VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+				}
+			}
+
+			return SR_HT_ERR_RPM_FAIL;
 		}
 
 		Sleep(10);
@@ -256,6 +318,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		{
 			if (SuspendThread(hThread) != (DWORD)-1)
 			{
+				LOG("Shell timed out\n");
+
 #ifdef _WIN64
 				OldContext.Rip = OldRIP;
 #else
@@ -272,6 +336,8 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 			}
 		}
 
+		LOG("pRoutine timed out\n");
+
 		CloseHandle(hThread);
 
 		return SR_HT_ERR_REMOTE_TIMEOUT;
@@ -280,7 +346,11 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	CloseHandle(hThread);
 	VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
+	LOG("pRoutine returned: %08X\n", data.Ret);
+
 	Out	= data.Ret;
+
+	LOG("End SR_HijackThread\n");
 
 	return SR_ERR_SUCCESS;
 }

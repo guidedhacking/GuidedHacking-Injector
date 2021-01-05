@@ -234,6 +234,25 @@ typedef struct _PEB
 	PEB_LDR_DATA * Ldr;
 } PEB, *PPEB;
 
+typedef struct _RTL_INVERTED_FUNCTION_TABLE_ENTRY
+{
+	IMAGE_RUNTIME_FUNCTION_ENTRY *	ExceptionDirectory;
+	PVOID							ImageBase;
+	ULONG							ImageSize;
+	ULONG							ExceptionDirectorySize;
+} RTL_INVERTED_FUNCTION_TABLE_ENTRY, * PRTL_INVERTED_FUNCTION_TABLE_ENTRY;
+
+//based on darthtons stuff
+//https://github.com/DarthTon/Blackbone/blob/231f1747161cce6944589c4a748c4d0a71340fbd/src/BlackBone/Include/Win8Specific.h#L57
+typedef struct _RTL_INVERTED_FUNCTION_TABLE
+{
+	ULONG Count;
+	ULONG MaxCount;
+	ULONG Epoch;
+	UCHAR Overflow;
+	RTL_INVERTED_FUNCTION_TABLE_ENTRY Entries[ANYSIZE_ARRAY];
+} RTL_INVERTED_FUNCTION_TABLE, * PRTL_INVERTED_FUNCTION_TABLE;
+
 typedef struct _CLIENT_ID
 {
 	HANDLE UniqueProcess;
@@ -407,16 +426,16 @@ typedef struct _OBJECT_ATTRIBUTES
 	(p)->SecurityQualityOfService	= NULL; \
 }
 
-typedef struct _IO_STATUS_BLOCK 
+typedef struct _IO_STATUS_BLOCK
 {
-	union 
+	union
 	{
 		NTSTATUS Status;
 		PVOID Pointer;
 	} DUMMYUNIONNAME;
 
 	ULONG_PTR Information;
-} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+} IO_STATUS_BLOCK, * PIO_STATUS_BLOCK;
 
 #ifdef _WIN64
 
@@ -513,7 +532,7 @@ typedef ALIGN_86 struct _PEB32
 
 #pragma region function prototypes
 
-using f_NtCreateThreadEx = NTSTATUS (__stdcall*)	
+using f_NtCreateThreadEx = NTSTATUS (__stdcall *)	
 (
 	HANDLE		*	pHandle, 
 	ACCESS_MASK		DesiredAccess, 
@@ -528,7 +547,7 @@ using f_NtCreateThreadEx = NTSTATUS (__stdcall*)
 	void		*	pAttrListOut
 );
 
-using f_LdrLoadDll = NTSTATUS (__stdcall*)	
+using f_LdrLoadDll = NTSTATUS (__stdcall *)	
 (
 	wchar_t			*	szOptPath, 
 	ULONG				ulFlags, 
@@ -536,7 +555,7 @@ using f_LdrLoadDll = NTSTATUS (__stdcall*)
 	HANDLE			*	pOut
 );
 
-using f_LdrpLoadDll = NTSTATUS (__fastcall*)
+using f_LdrpLoadDll = NTSTATUS (__fastcall *)
 (
 	UNICODE_STRING				*	dll_path, 
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
@@ -544,7 +563,19 @@ using f_LdrpLoadDll = NTSTATUS (__fastcall*)
 	LDR_DATA_TABLE_ENTRY		**	ldr_out
 );
 
-using f_LdrGetDllHandleEx = NTSTATUS (__stdcall*)
+using f_LdrpLoadDllInternal = NTSTATUS (__fastcall *)
+(
+	UNICODE_STRING				*	dll_path, 
+	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
+	LDRP_LOAD_CONTEXT_FLAGS			Flags,
+	ULONG32							Unknown0,	//set to 4
+	LDR_DATA_TABLE_ENTRY		*	Unknown1,	//set to nullptr
+	LDR_DATA_TABLE_ENTRY		*	Unknown2,	//set to nullptr
+	LDR_DATA_TABLE_ENTRY		**	ldr_out,
+	ULONG_PTR					*	Unknown3	//set to pointer to nullptr
+);
+
+using f_LdrGetDllHandleEx = NTSTATUS (__stdcall *)
 (
 	ULONG				Flags,
 	PWSTR				OptDllPath,
@@ -553,7 +584,7 @@ using f_LdrGetDllHandleEx = NTSTATUS (__stdcall*)
 	PVOID			*	DllHandle
 );
 
-using f_LdrGetProcedureAddress = NTSTATUS (__stdcall*)
+using f_LdrGetProcedureAddress = NTSTATUS (__stdcall *)
 (
 	PVOID				BaseAddress,
 	ANSI_STRING		*	Name,
@@ -561,7 +592,7 @@ using f_LdrGetProcedureAddress = NTSTATUS (__stdcall*)
 	PVOID			*	ProcedureAddress
 );
 
-using f_NtQueryInformationProcess = NTSTATUS (__stdcall*)
+using f_NtQueryInformationProcess = NTSTATUS (__stdcall *)
 (
 	HANDLE					hTargetProc, 
 	PROCESSINFOCLASS		PIC, 
@@ -570,7 +601,7 @@ using f_NtQueryInformationProcess = NTSTATUS (__stdcall*)
 	ULONG				*	SizeOut
 );
 
-using f_NtQuerySystemInformation = NTSTATUS	(__stdcall*)
+using f_NtQuerySystemInformation = NTSTATUS	(__stdcall *)
 (
 	SYSTEM_INFORMATION_CLASS		SIC, 
 	void						*	pBuffer, 
@@ -578,7 +609,7 @@ using f_NtQuerySystemInformation = NTSTATUS	(__stdcall*)
 	ULONG						*	SizeOut
 );
 
-using f_NtQueryInformationThread = NTSTATUS (__stdcall*)
+using f_NtQueryInformationThread = NTSTATUS (__stdcall *)
 (
 	HANDLE				hThread, 
 	THREADINFOCLASS		TIC, 
@@ -587,7 +618,7 @@ using f_NtQueryInformationThread = NTSTATUS (__stdcall*)
 	ULONG			*	SizeOut
 );
 
-using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall*)
+using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall *)
 (
 	HANDLE		hThread, 
 	void	*	pRoutine, 
@@ -596,7 +627,7 @@ using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall*)
 	void	*	pArg3
 );
 
-using f_LdrpPreprocessDllName = NTSTATUS (__fastcall*)
+using f_LdrpPreprocessDllName = NTSTATUS (__fastcall *)
 (
 	UNICODE_STRING				* DllName,
 	LDRP_UNICODE_STRING_BUNDLE	* OutputDllName,
@@ -604,58 +635,66 @@ using f_LdrpPreprocessDllName = NTSTATUS (__fastcall*)
 	LDRP_LOAD_CONTEXT_FLAGS		* LoadContextFlags
 );
 
-using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall*)
+using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall *)
 (
 	void	*	hDll,
 	DWORD		SizeOfImage
 );
 
-using f_LdrpHandleTlsData = NTSTATUS (__fastcall*)
+using f_LdrpHandleTlsData = NTSTATUS (__fastcall *)
 (
 	LDR_DATA_TABLE_ENTRY * pEntry
 );
 
-using f_memmove = VOID (__cdecl*)
+using f_LdrpAcquireLoaderLock = NTSTATUS(__fastcall *)
+(
+);
+
+using f_LdrpReleaseLoaderLock = NTSTATUS(__fastcall *)
+(
+);
+
+using f_memmove = VOID (__cdecl *)
 (
 	PVOID	UNALIGNED	Destination,
 	LPCVOID	UNALIGNED	Source,
 	SIZE_T				Length
 );
 
-using f_RtlZeroMemory = VOID(__stdcall*)
+using f_RtlZeroMemory = VOID (__stdcall *)
 (
 	PVOID	UNALIGNED	Destination,
 	SIZE_T				Length
 );
 
-using f_RtlAllocateHeap = PVOID (__stdcall*)
+using f_RtlAllocateHeap = PVOID (__stdcall *)
 (
 	PVOID	HeapHandle,
 	ULONG	Flags,
 	SIZE_T	Size
 );
 
-using f_RtlFreeHeap = BOOLEAN (__stdcall*)
+using f_RtlFreeHeap = BOOLEAN (__stdcall *)
 (
 	PVOID	HeapHandle,
 	ULONG	Flags,
 	PVOID	BaseAddress
 );
 
-using f_RtlAnsiStringToUnicodeString = NTSTATUS (__stdcall*)
+using f_RtlAnsiStringToUnicodeString = NTSTATUS (__stdcall *)
 (
 	UNICODE_STRING	*	DestinationString,
 	ANSI_STRING		*	SourceString,
 	BOOLEAN				AllocateDestinationString
 );
 
-using f_RtlRbRemoveNode = VOID (__stdcall*)
+using f_RtlRbRemoveNode = VOID (__stdcall *)
 (
 	RTL_RB_TREE			* pTree,
 	RTL_BALANCED_NODE	* pNode
 );
 
-using f_NtOpenFile = NTSTATUS (__stdcall*)
+using f_NtOpenFile = NTSTATUS (__stdcall *)
 (
 	HANDLE				*	hFileOut,
 	ACCESS_MASK				DesiredAccess,
@@ -665,7 +704,7 @@ using f_NtOpenFile = NTSTATUS (__stdcall*)
 	ULONG					OpenOptions
 );
 
-using f_NtReadFile = NTSTATUS (__stdcall*)
+using f_NtReadFile = NTSTATUS (__stdcall *)
 (
 	HANDLE					FileHandle,
 	HANDLE					hOptEvent,
@@ -678,7 +717,7 @@ using f_NtReadFile = NTSTATUS (__stdcall*)
 	ULONG				*	pOptKey
 );
 
-using f_NtSetInformationFile = NTSTATUS (__stdcall*)
+using f_NtSetInformationFile = NTSTATUS (__stdcall *)
 (
 	HANDLE						FileHandle,
 	IO_STATUS_BLOCK			*	IoStatusBlock,
@@ -687,7 +726,7 @@ using f_NtSetInformationFile = NTSTATUS (__stdcall*)
 	FILE_INFORMATION_CLASS		FileInformationClass
 );
 
-using f_NtQueryInformationFile = NTSTATUS(__stdcall*)
+using f_NtQueryInformationFile = NTSTATUS(__stdcall *)
 (
 	HANDLE						FileHandle,
 	IO_STATUS_BLOCK			*	pIoStatusBlock,
@@ -696,12 +735,12 @@ using f_NtQueryInformationFile = NTSTATUS(__stdcall*)
 	FILE_INFORMATION_CLASS		FileInformationClass
 );
 
-using f_NtClose = NTSTATUS (__stdcall*)
+using f_NtClose = NTSTATUS (__stdcall *)
 (
 	HANDLE Handle
 );
 
-using f_NtAllocateVirtualMemory = NTSTATUS (__stdcall*)
+using f_NtAllocateVirtualMemory = NTSTATUS (__stdcall *)
 (
 	HANDLE			ProcessHandle,
 	PVOID		*	BaseAddress,
@@ -711,7 +750,7 @@ using f_NtAllocateVirtualMemory = NTSTATUS (__stdcall*)
 	ULONG			Protect
 );
 
-using f_NtFreeVirtualMemory = NTSTATUS (__stdcall*)
+using f_NtFreeVirtualMemory = NTSTATUS (__stdcall *)
 (
 	HANDLE		ProcessHandle,
 	PVOID	*	BaseAddress,
@@ -719,7 +758,7 @@ using f_NtFreeVirtualMemory = NTSTATUS (__stdcall*)
 	ULONG		FreeType
 );
 
-using f_NtProtectVirtualMemory = NTSTATUS (__stdcall*)
+using f_NtProtectVirtualMemory = NTSTATUS (__stdcall *)
 (
 	HANDLE		ProcessHandle,
 	PVOID	*	BaseAddress,
@@ -728,9 +767,10 @@ using f_NtProtectVirtualMemory = NTSTATUS (__stdcall*)
 	ULONG	*	OldAccess
 );
 
-using f_LdrpModuleBaseAddressIndex	= RTL_RB_TREE*;
-using f_LdrpMappingInfoIndex		= RTL_RB_TREE*;
-using f_LdrpHeap					= PVOID*;
+using f_LdrpModuleBaseAddressIndex	= RTL_RB_TREE *;
+using f_LdrpMappingInfoIndex		= RTL_RB_TREE *;
+using f_LdrpHeap					= PVOID *;
+using f_LdrpInvertedFunctionTable	= RTL_INVERTED_FUNCTION_TABLE *;
 
 #pragma endregion
 

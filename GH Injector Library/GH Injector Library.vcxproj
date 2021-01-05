@@ -150,7 +150,7 @@
       <WarningLevel>Level4</WarningLevel>
       <ConformanceMode>true</ConformanceMode>
       <DebugInformationFormat>None</DebugInformationFormat>
-      <TreatWarningAsError>false</TreatWarningAsError>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <CallingConvention>FastCall</CallingConvention>

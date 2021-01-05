@@ -4,17 +4,14 @@
 
 DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
+	LOG("Begin SR_SetWindowsHookEx\n");
 
-	wchar_t RootPath[MAX_PATH]{ 0 };
-	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
-
-	wchar_t InfoPath[MAX_PATH]{ 0 };
-	StringCbCopyW(InfoPath, sizeof(InfoPath), g_RootPathW.c_str());
-	StringCbCatW(InfoPath, sizeof(InfoPath), SM_INFO_FILENAME);
-
-	if (FileExists(InfoPath))
+	std::wstring InfoPath = g_RootPathW;
+	InfoPath += SM_INFO_FILENAME;
+		
+	if (FileExists(InfoPath.c_str()))
 	{
-		DeleteFileW(InfoPath);
+		DeleteFileW(InfoPath.c_str());
 	}
 
 	std::wofstream swhex_info(InfoPath, std::ios_base::out | std::ios_base::app);
@@ -22,7 +19,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		swhex_info.close();
+		LOG("Failed to create info file\n");
 
 		return SR_SWHEX_ERR_CANT_OPEN_INFO_TXT;
 	}
@@ -32,10 +29,15 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		swhex_info.close();
+		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
-		return SR_SWHEX_ERR_VAE_FAIL;
+		swhex_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_SWHEX_ERR_CANT_ALLOC_MEM;
 	}
+
+	LOG("Codecave allocated at %p\n", pMem);
 	
 #ifdef _WIN64
 
@@ -118,20 +120,25 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+		swhex_info.close();
+		DeleteFileW(InfoPath.c_str());
 
 		return SR_SWHEX_ERR_WPM_FAIL;
 	}
 
+	LOG("Hooks called with\n pRoutine = %p\n pArg = %p\n", pRemoteFunc, pMem);
+
 	swhex_info << std::dec << GetProcessId(hTargetProc) << '!' << std::hex << ReCa<ULONG_PTR>(pRemoteFunc) << std::endl;
 	swhex_info.close();
 
-	StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME);
+	std::wstring smPath = g_RootPathW;
+	smPath += SM_EXE_FILENAME;
 
-	wchar_t cmdLine[MAX_PATH]{ 0 };
-	StringCbCatW(cmdLine, sizeof(cmdLine), L"\"");
-	StringCbCatW(cmdLine, sizeof(cmdLine), SM_EXE_FILENAME);
-	StringCbCatW(cmdLine, sizeof(cmdLine), L"\" 0");
+	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME "\"";
 
 	PROCESS_INFORMATION pi{ 0 };
 	STARTUPINFOW		si{ 0 };
@@ -139,14 +146,21 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	si.dwFlags		= STARTF_USESHOWWINDOW;
 	si.wShowWindow	= SW_HIDE;
 
+	LOG("Data and command line prepared\n");
+
 	if (TargetSessionId != -1)
 	{
+		LOG("Target process is in a different session\n");
+
 		HANDLE hUserToken = nullptr;
 		if (!WTSQueryUserToken(TargetSessionId, &hUserToken))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("WTSQueryUserToken failed: %08X\n", error_data.AdvErrorCode);
+
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
 			return SR_SWHEX_ERR_WTSQUERY_FAIL;
 		}
@@ -156,8 +170,11 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("DuplicateTokenEx failed: %08X\n", error_data.AdvErrorCode);
+
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
 			return SR_SWHEX_ERR_DUP_TOKEN_FAIL;
 		}
@@ -168,29 +185,36 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("GetTokenInformation failed: %08X\n", error_data.AdvErrorCode);
+
 			CloseHandle(hNewToken);
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
 			return SR_SWHEX_ERR_GET_ADMIN_TOKEN_FAIL;
 		}
+
 		HANDLE hAdminToken = admin_token.LinkedToken;
 
-		si.cb			= sizeof(si);
-		si.dwFlags		= STARTF_USESHOWWINDOW;
-		si.wShowWindow	= SW_HIDE;
+		LOG("Token prepared\n");
 
-		if (!CreateProcessAsUserW(hAdminToken, RootPath, cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		if (!CreateProcessAsUserW(hAdminToken, smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("CreateProcessAsUserW failed: %08X\n", error_data.AdvErrorCode);
 
 			CloseHandle(hAdminToken);
 			CloseHandle(hNewToken);
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
 			return SR_SWHEX_ERR_CANT_CREATE_PROCESS;
 		}
+
+		LOG("%ls launched\n", SM_EXE_FILENAME);
 
 		CloseHandle(hAdminToken);
 		CloseHandle(hNewToken);
@@ -198,24 +222,36 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	}
 	else
 	{		
-		if (!CreateProcessW(RootPath, cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		if (!CreateProcessW(smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("CreateProcessW failed: %08X\n", error_data.AdvErrorCode);
+
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
 			return SR_SWHEX_ERR_CANT_CREATE_PROCESS;
 		}
+
+		LOG("%ls launched\n", SM_EXE_FILENAME);
 	}
 
+	LOG("Entering wait state\n");
+
 	Sleep(SR_REMOTE_DELAY);
+
+	auto Timer = GetTickCount64();
 
 	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
+		LOG("%ls timed out: %08X\n", SM_EXE_FILENAME, error_data.AdvErrorCode);
+
 		TerminateProcess(pi.hProcess, 0);
+		DeleteFileW(InfoPath.c_str());
 
 		return SR_SWHEX_ERR_SWHEX_TIMEOUT;
 	}
@@ -226,9 +262,13 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
+	DeleteFileW(InfoPath.c_str());
+
 	if (ExitCode != SWHEX_ERR_SUCCESS)
 	{
 		INIT_ERROR_DATA(error_data, ExitCode);
+
+		LOG("%ls failed: %08X\n", SM_EXE_FILENAME, ExitCode);
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
@@ -240,15 +280,27 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
-	auto Timer = GetTickCount64();
 	while (GetTickCount64() - Timer < Timeout)
 	{
-		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
+		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
+		if (bRet)
 		{
 			if (data.State == SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 			{
+				LOG("Shelldata retrieved\n");
+
 				break;
 			}
+		}
+		else
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+			return SR_SWHEX_ERR_RPM_FAIL;
 		}
 
 		Sleep(10);
@@ -260,10 +312,16 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("Shell timed out\n");
+
 		return SR_SWHEX_ERR_REMOTE_TIMEOUT;
 	}
 
+	LOG("pRoutine returned: %08X\n", data.Ret);
+
 	Out = data.Ret;
+
+	LOG("End SR_SetWindowsHookEx\n");
 
 	return SR_ERR_SUCCESS;
 }

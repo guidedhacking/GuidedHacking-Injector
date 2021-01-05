@@ -21,14 +21,7 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		MMAP_NATIVE::ManualMap(nullptr, nullptr, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
 #endif
 
-#ifdef DEBUG_INFO
-		AllocConsole();
-
-		FILE * pFile = nullptr;
-		freopen_s(&pFile, "CONOUT$", "w", stdout);
-#endif
-
-		LOG("GH Injector V%ls attached at %p\n", GH_INJ_VERSION, hDll);
+		LOG("GH Injector V%ls loaded\nImagebase = %p\n", GH_INJ_VERSION, hDll);
 
 		g_hInjMod = hDll;
 
@@ -49,14 +42,16 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 			return FALSE;
 		}
 
-		size_t buffer_size = MAX_PATH;
-		char * szWindowsDir = new char[buffer_size];
+		wchar_t * szWindowsDir = nullptr;
 
-		if (_dupenv_s(&szWindowsDir, &buffer_size, "WINDIR"))
+		if (_wdupenv_s(&szWindowsDir, nullptr, L"WINDIR") || !szWindowsDir)
 		{
 			LOG("Couldn't resolve %%WINDIR%%\n");
 
-			delete[] szWindowsDir;
+			if (szWindowsDir)
+			{
+				free(szWindowsDir);
+			}
 
 			return FALSE;
 		}
@@ -64,21 +59,25 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		g_RootPathA = szRootPathA;
 		g_RootPathW = szRootPathW;
 
-		LOG("Rootpath is %s\n", szRootPathA);
+		LOG("Rootpath is %ls\n", szRootPathW);
 
-		std::string szNtDllNative = szWindowsDir;
-		szNtDllNative += "\\System32\\ntdll.dll";
+		std::wstring szNtDllNative = szWindowsDir;
+		szNtDllNative += L"\\System32\\ntdll.dll";
 
-		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathA, nullptr, false, true);
+		LOG("Launching PDB thread(s)\n");
+
+		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathW, nullptr, false, true);
 
 #ifdef _WIN64
-		std::string szNtDllWOW64 = szWindowsDir;
-		szNtDllWOW64 += "\\SysWOW64\\ntdll.dll";
+		std::wstring szNtDllWOW64 = szWindowsDir;
+		szNtDllWOW64 += L"\\SysWOW64\\ntdll.dll";
 
-		sym_ntdll_wow64_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathA, nullptr, false, true);
+		sym_ntdll_wow64_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathW, nullptr, false, true);
 #endif
 
-		delete[] szWindowsDir;
+		free(szWindowsDir);
+
+		LOG("DllMain exit\n");
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{

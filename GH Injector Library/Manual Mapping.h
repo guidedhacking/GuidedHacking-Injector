@@ -43,7 +43,7 @@ namespace MMAP_NATIVE
 		ALIGN NT_FUNC_LOCAL(RtlFreeHeap);
 
 		ALIGN NT_FUNC_LOCAL(LdrGetDllHandleEx);
-		ALIGN NT_FUNC_LOCAL(LdrpLoadDll);
+		ALIGN NT_FUNC_LOCAL(LdrpLoadDllInternal);
 		ALIGN NT_FUNC_LOCAL(LdrGetProcedureAddress);
 
 		ALIGN NT_FUNC_LOCAL(RtlAnsiStringToUnicodeString);
@@ -52,9 +52,13 @@ namespace MMAP_NATIVE
 		ALIGN NT_FUNC_LOCAL(RtlInsertInvertedFunctionTable);
 		ALIGN NT_FUNC_LOCAL(LdrpHandleTlsData);
 
+		ALIGN NT_FUNC_LOCAL(LdrpAcquireLoaderLock);
+		ALIGN NT_FUNC_LOCAL(LdrpReleaseLoaderLock);
+
 		ALIGN NT_FUNC_LOCAL(LdrpModuleBaseAddressIndex);
 		ALIGN NT_FUNC_LOCAL(LdrpMappingInfoIndex);
 		ALIGN NT_FUNC_LOCAL(LdrpHeap);
+		ALIGN NT_FUNC_LOCAL(LdrpInvertedFunctionTable);
 
 		void * pLdrpHeap;
 
@@ -106,7 +110,7 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(RtlFreeHeap);
 
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrGetDllHandleEx);
-		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpLoadDll);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpLoadDllInternal);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrGetProcedureAddress);
 
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(RtlAnsiStringToUnicodeString);
@@ -115,9 +119,13 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(RtlInsertInvertedFunctionTable);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpHandleTlsData);
 
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpAcquireLoaderLock);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpReleaseLoaderLock);
+
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpModuleBaseAddressIndex);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpMappingInfoIndex);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpHeap);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpInvertedFunctionTable);
 
 		MANUAL_MAPPING_FUNCTION_TABLE_WOW64();
 	};

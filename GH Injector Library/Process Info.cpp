@@ -491,7 +491,7 @@ bool ProcessInfo::IsThreadInAlertableState()
 	else if (ctx.Rip == m_WaitFunctionReturnAddress[4])
 	{
 		BOOLEAN Alertable = FALSE;
-		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x30), &Alertable, sizeof(Alertable), nullptr))
+		if (ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Rsp + 0x30), &Alertable, sizeof(Alertable), nullptr))
 		{
 			return (Alertable == TRUE);
 		}
@@ -499,7 +499,7 @@ bool ProcessInfo::IsThreadInAlertableState()
 	else if (ctx.Rip == m_WaitFunctionReturnAddress[5])
 	{
 		DWORD Flags = FALSE;
-		if (ReadProcessMemory(m_hCurrentProcess, reinterpret_cast<void*>(ctx.Rsp + 0x28), &Flags, sizeof(Flags), nullptr))
+		if (ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Rsp + 0x28), &Flags, sizeof(Flags), nullptr))
 		{
 			return ((Flags & MWMO_ALERTABLE) != 0);
 		}

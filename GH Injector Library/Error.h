@@ -61,11 +61,16 @@
 #define INJ_ERR_LLEXW_FAILED				0x00000028	//LoadLibraryExW					: win32 error			: LoadLibraryExW failed loading the dll
 #define INJ_ERR_LDRLDLL_FAILED				0x00000029	//LdrLoadDll						: NTSTATUS				: LdrLoadDll failed loading the dll
 #define INJ_ERR_LDRPLDLL_FAILED				0x0000002A	//LdrpLoadDll						: NTSTATUS				: LdrpLoadDll failed loading the dll
-#define INJ_ERR_CANT_GET_PEB				0x0000002B	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
-#define INJ_ERR_INVALID_PEB_DATA			0x0000002C	//internal error					: -						: peb data required to erase/fake header or unlike the module from the peb wasn't findable
-#define INJ_ERR_UPDATE_PROTECTION_FAILED	0x0000002D	//NtProtectVirtualMemory			: NTSTATUS				: updating the page protection of the pe header failed
-#define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002E	//internal error					: -						: can't resolve address of the wow64 ntdll
-#define INJ_ERR_INVALID_PATH_SEPERATOR		0x0000002F	//internal error					: -						: can't find '\' in a path. '/' as seperators aren't supported.
+#define INJ_ERR_LDRPLDLLINTERNAL_FAILED		0x0000002B	//LdrpLoadDllInternal				: NTSTATUS				: LdrpLoadDllInternal failed loading the dll
+#define INJ_ERR_CANT_GET_PEB				0x0000002C	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
+#define INJ_ERR_INVALID_PEB_DATA			0x0000002D	//internal error					: -						: peb data required to erase/fake header or unlike the module from the peb wasn't findable
+#define INJ_ERR_UPDATE_PROTECTION_FAILED	0x0000002E	//NtProtectVirtualMemory			: NTSTATUS				: updating the page protection of the pe header failed
+#define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002F	//internal error					: -						: can't resolve address of the wow64 ntdll
+#define INJ_ERR_INVALID_PATH_SEPERATOR		0x00000030	//internal error					: -						: can't find '\' in a path. '/' as seperators aren't supported
+#define INJ_ERR_LDRP_PREPROCESS_FAILED		0x00000031	//LdrpPreprocessDllName				: NTSTATUS				: preprocessing the dll name for LdrpLoadDll(Internal) failed
+#define INJ_ERR_INVALID_POINTER				0x00000032	//internal error					: -						: an invalid funtion pointer was passed to SetRawPrintCallback
+#define INJ_ERR_NOT_IMPLEMENTED				0x00000033	//internal error					: -						: the module was compiled without DEBUG_INFO being defined, check pch.h for more information if you want to redirect debug output
+#define INJ_ERR_KERNEL32_MISSING			0x00000034	//internal error					: -						: failed to resolve address of kernel32.dll (native)
 
 
 ///////////////////
@@ -140,24 +145,25 @@
 #define SR_HT_ERR_RESUME_FAIL				0x10200009	//ResumeThread				: win32 error			: resuming the thread failed
 #define SR_HT_ERR_REMOTE_TIMEOUT			0x1020000A	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT (can't be deallocated safely)
 #define SR_HT_ERR_REMOTE_PENDING_TIMEOUT	0x1020000B	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT while pending (can be deallocated safely)
+#define SR_HT_ERR_RPM_FAIL					0x1020000C	//ReadProcessMemory			: win32 error			: reading the results of the shellcode failed
 
 ////////////////////
 ///SetWindowsHookEx
-														//Source				:	error description
+														//Source				: advanced error type	: error description
 
-#define SR_SWHEX_ERR_CANT_QUERY_INFO_PATH	0x10300001	//internal error		:	can't resolve own module filepath
-#define SR_SWHEX_ERR_CANT_OPEN_INFO_TXT		0x10300002	//internal error		:	can't open swhex info file
-#define SR_SWHEX_ERR_VAE_FAIL				0x10300003	//VirtualAllocEx		:	win32 error
-#define SR_SWHEX_ERR_CNHEX_MISSING			0x10300004	//GetProcAddressEx		:	can't find pointer to CallNextHookEx
-#define SR_SWHEX_ERR_WPM_FAIL				0x10300005	//WriteProcessMemory	:	win32 error
-#define SR_SWHEX_ERR_WTSQUERY_FAIL			0x10300006	//WTSQueryUserToken		:	win32 error
-#define SR_SWHEX_ERR_DUP_TOKEN_FAIL			0x10300007	//DuplicateTokenEx		:	win32 error
-#define SR_SWHEX_ERR_GET_ADMIN_TOKEN_FAIL	0x10300008	//GetTokenInformation	:	win32 error
-#define SR_SWHEX_ERR_CANT_CREATE_PROCESS	0x10300009	//CreateProcessAsUserW	:	win32 error
-														//CreateProcessW		:	win32 error
-#define SR_SWHEX_ERR_SWHEX_TIMEOUT			0x1030000A	//WaitForSingleObject	:	win32 error
-#define SR_SWHEX_ERR_SWHEX_EXT_ERROR		0x1030000B	//SM_EXE_FILENAME.exe	:	"GH Injector SM - XX.exe" error code, 0x30100001 - 0x30100006 (see below) or win32 exception
-#define SR_SWHEX_ERR_REMOTE_TIMEOUT			0x1030000C	//internal error		:	execution time exceeded SR_REMOTE_TIMEOUT
+#define SR_SWHEX_ERR_CANT_OPEN_INFO_TXT		0x10300001	//internal error		: -						: can't open swhex info file
+#define SR_SWHEX_ERR_CANT_ALLOC_MEM			0x10300002	//VirtualAllocEx		: win32 error			: memory allocation for the shellcode failed
+#define SR_SWHEX_ERR_WPM_FAIL				0x10300003	//WriteProcessMemory	: win32 error			: writing the shellcode into the target process' memory failed
+#define SR_SWHEX_ERR_WTSQUERY_FAIL			0x10300004	//WTSQueryUserToken		: win32 error			: failed to query the token for the target process user session
+#define SR_SWHEX_ERR_DUP_TOKEN_FAIL			0x10300005	//DuplicateTokenEx		: win32 error			: failed to duplicate the token for the target process user session
+#define SR_SWHEX_ERR_GET_ADMIN_TOKEN_FAIL	0x10300006	//GetTokenInformation	: win32 error			: failed to retrieve information from the token handle
+#define SR_SWHEX_ERR_CANT_CREATE_PROCESS	0x10300007	//CreateProcessAsUserW	: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
+														//CreateProcessW		: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
+#define SR_SWHEX_ERR_SWHEX_TIMEOUT			0x10300008	//WaitForSingleObject	: win32 error			:
+#define SR_SWHEX_ERR_REMOTE_TIMEOUT			0x10300009	//internal error		: -						: execution time exceeded SR_REMOTE_TIMEOUT
+#define SR_SWHEX_ERR_RPM_FAIL				0x1030000A	//ReadProcessMemory		: win32 error			: reading the results of the shellcode failed
+
+#define SR_SWHEX_ERR_SWHEX_EXT_ERROR		0x1030000B	//SM_EXE_FILENAME.exe	: "GH Injector SM - XX.exe" error code, 0x30100001 - 0x30100006 (see below) or win32 exception
 
 ///////////////
 ///QueueUserAPC
@@ -168,7 +174,8 @@
 #define SR_QUAPC_ERR_WPM_FAIL				0x10400003	//WriteProcessMemory		: win32 error			: writing the shellcode into the target process' memory failed
 #define SR_QUAPC_ERR_PROC_INFO_FAIL			0x10400004	//internal error			: -						: can't grab process information
 #define SR_QUAPC_ERR_NO_THREADS				0x10400005	//internal error			: -						: no threads to queue an apc to
-#define SR_QUAPC_ERR_REMOTE_TIMEOUT			0x10400006	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT (can be deallocated safely)
+#define SR_QUAPC_ERR_REMOTE_TIMEOUT			0x10400006	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT
+#define SR_QUAPC_ERR_RPM_FAIL				0x10400007	//WriteProcessMemory		: win32 error			: reading the results of the shellcode failed
 
 
 
@@ -299,13 +306,3 @@ memset(data.szFileName, 0, sizeof(data.szFileName));								\
 memset(data.szFunctionName, 0, sizeof(data.szFunctionName));						\
 memcpy(data.szFileName, __FILENAMEW__,  ((size_t)lstrlenW(__FILENAMEW__)) * 2);		\
 memcpy(data.szFunctionName, __FUNCTIONW__, ((size_t)lstrlenW(__FUNCTIONW__)) * 2);
-
-//#define DEBUG_INFO
-
-#ifdef DEBUG_INFO
-#define LOG printf
-#else
-#define LOG
-#endif
-
-//#define DUMP_SHELLCODE

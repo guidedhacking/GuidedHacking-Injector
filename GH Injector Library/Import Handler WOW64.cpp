@@ -21,7 +21,7 @@ bool InitializeWow64NtDll()
 		hSnapProc = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	}
 
-	if (hSnapProc == INVALID_HANDLE_VALUE)
+	if (!hSnapProc || hSnapProc == INVALID_HANDLE_VALUE)
 	{
 		return false;
 	}
@@ -95,6 +95,7 @@ DWORD LoadNtSymbolWOW64(T & Function, const char * szFunction)
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
 		LOG("Failed to load WOW64 function: %s\n", szFunction);
+
 		return 0;
 	}
 
@@ -109,12 +110,16 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
+		LOG("Failed to get WOW64 ntdll\n");
+
 		return INJ_ERR_WOW64_NTDLL_MISSING;
 	}
 
 	if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("WOW64 symbol loading not finished\n");
 
 		return INJ_ERR_SYMBOL_INIT_NOT_DONE;
 	}
@@ -124,11 +129,16 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, sym_ret);
 
+		LOG("WOW64 symbol loading failed: %08X\n", sym_ret);
+
 		return INJ_ERR_SYMBOL_INIT_FAIL;
 	}
 
+	LOG("Start loading WOW64 ntdll symbols\n");
+
 	if (LoadNtSymbolWOW64(S_FUNC(LdrLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrpLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpLoadDllInternal)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
 	if (LoadNtSymbolWOW64(S_FUNC(LdrGetDllHandleEx)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrGetProcedureAddress)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
@@ -157,9 +167,15 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	if (LoadNtSymbolWOW64(S_FUNC(RtlInsertInvertedFunctionTable)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrpHandleTlsData)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpAcquireLoaderLock)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpReleaseLoaderLock)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
 	if (LoadNtSymbolWOW64(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadNtSymbolWOW64(S_FUNC(LdrpHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadNtSymbolWOW64(S_FUNC(LdrpInvertedFunctionTable)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	LOG("WOW64 ntdll symbols loaded\n");
 
 	return INJ_ERR_SUCCESS;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING //ur mom
+
 //winapi shit
 #include <Windows.h>
 
@@ -8,6 +10,8 @@
 #include <Psapi.h>
 
 //string shit
+#include <codecvt> 
+#include <string>
 #include <strsafe.h>
 #include <tchar.h>
 
@@ -35,11 +39,7 @@
 #pragma warning(disable: 4324) //structure member alignment resulting in additional bytes being added as padding
 #pragma warning(disable: 6001) //uninitialized memory & handles (false positive in for loops with continue statements)
 #pragma warning(disable: 6258) //TerminateThread warning
-#pragma warning(disable: 6387) //pointer could be 0 (false positive in "Manual Mapping WOW64.cpp")
-
-#ifdef _DEBUG
-#include <iostream>
-#endif
+//#pragma warning(disable: 6387) //pointer could be 0 (false positive in "Manual Mapping WOW64.cpp")
 
 //reinterpret_cast = too long to type
 #define ReCa reinterpret_cast
@@ -76,6 +76,7 @@ enum class INJECTION_MODE
 	IM_LoadLibraryExW,
 	IM_LdrLoadDll,
 	IM_LdrpLoadDll,
+	IM_LdrpLoadDllInternal,
 	IM_ManualMap
 };
 
@@ -96,4 +97,34 @@ enum class LAUNCH_METHOD
 #define ALIGN ALIGN_64
 #else
 #define ALIGN ALIGN_86
+#endif
+
+//Define DEBUG_INFO for console output
+//Define CUSTOM_PRINT (and DEBUG_INFO) to redirect the output to a custom window/file/control etc.
+//With SetRawPrintCallback you can specify the callback to be called when a debug print occurs. The passed string is raw meaning all parameters have been parsed and converted.
+//Call SetRawPrintCallback(nullptr) if you want to reset the callback pointer
+//If both DEBUG_INFO and CUSTOM_PRINT are defined but no callback was passed to SetRawPrintCallback puts it's used instead
+
+#define DEBUG_INFO
+#define CUSTOM_PRINT
+//#define DUMP_SHELLCODE
+
+#ifdef CUSTOM_PRINT
+using f_raw_print_callback = void(__stdcall *)(const char * szText);
+inline f_raw_print_callback g_print_raw_callback = nullptr;
+void custom_print(const char * format, ...);
+#else
+using f_raw_print_callback = void*;
+#endif
+
+DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print);
+
+#ifdef DEBUG_INFO
+	#ifdef CUSTOM_PRINT
+		#define LOG custom_print
+	#else
+		#define LOG printf
+	#endif
+#else
+	#define LOG
 #endif

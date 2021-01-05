@@ -23,6 +23,7 @@ namespace NATIVE
 
 	NT_FUNC(LdrLoadDll);
 	NT_FUNC(LdrpLoadDll);
+	NT_FUNC(LdrpLoadDllInternal);
 
 	NT_FUNC(LdrGetDllHandleEx);
 	NT_FUNC(LdrGetProcedureAddress);
@@ -37,6 +38,9 @@ namespace NATIVE
 	NT_FUNC(LdrpPreprocessDllName);
 	NT_FUNC(RtlInsertInvertedFunctionTable);
 	NT_FUNC(LdrpHandleTlsData);
+
+	NT_FUNC(LdrpAcquireLoaderLock);
+	NT_FUNC(LdrpReleaseLoaderLock);
 
 	NT_FUNC(memmove);
 	NT_FUNC(RtlZeroMemory);
@@ -61,6 +65,7 @@ namespace NATIVE
 	NT_FUNC(LdrpModuleBaseAddressIndex);
 	NT_FUNC(LdrpMappingInfoIndex);
 	NT_FUNC(LdrpHeap);
+	NT_FUNC(LdrpInvertedFunctionTable);
 }
 
 DWORD ResolveImports(ERROR_DATA & error_data);
@@ -74,6 +79,7 @@ namespace WOW64
 		
 	WOW64_FUNCTION_POINTER(LdrLoadDll);
 	WOW64_FUNCTION_POINTER(LdrpLoadDll);
+	WOW64_FUNCTION_POINTER(LdrpLoadDllInternal);
 
 	WOW64_FUNCTION_POINTER(LdrGetDllHandleEx);
 	WOW64_FUNCTION_POINTER(LdrGetProcedureAddress);
@@ -88,6 +94,9 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(LdrpPreprocessDllName);
 	WOW64_FUNCTION_POINTER(RtlInsertInvertedFunctionTable);
 	WOW64_FUNCTION_POINTER(LdrpHandleTlsData);
+
+	WOW64_FUNCTION_POINTER(LdrpAcquireLoaderLock);
+	WOW64_FUNCTION_POINTER(LdrpReleaseLoaderLock);
 
 	WOW64_FUNCTION_POINTER(memmove);
 	WOW64_FUNCTION_POINTER(RtlZeroMemory);
@@ -112,6 +121,7 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(LdrpModuleBaseAddressIndex);
 	WOW64_FUNCTION_POINTER(LdrpMappingInfoIndex);
 	WOW64_FUNCTION_POINTER(LdrpHeap);
+	WOW64_FUNCTION_POINTER(LdrpInvertedFunctionTable);
 }
 
 DWORD ResolveImports_WOW64(ERROR_DATA & error_data);

@@ -9,11 +9,11 @@ class SYMBOL_PARSER
 {
 	HANDLE m_hProcess;
 
-	HANDLE		m_hPdbFile;
-	std::string	m_szPdbPath;
-	DWORD64		m_SymbolTable;
+	HANDLE			m_hPdbFile;
+	std::wstring	m_szPdbPath;
+	DWORD64			m_SymbolTable;
 
-	std::string m_szModulePath;
+	std::wstring m_szModulePath;
 
 	bool m_Initialized;
 	bool m_Ready;
@@ -30,7 +30,7 @@ public:
 	SYMBOL_PARSER();
 	~SYMBOL_PARSER();
 
-	DWORD Initialize(const std::string szModulePath, const std::string path, std::string * pdb_path_out, bool Redownload, bool WaitForConnection = false);
+	DWORD Initialize(const std::wstring szModulePath, const std::wstring path, std::wstring * pdb_path_out, bool Redownload, bool WaitForConnection = false);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 
 	void Interrupt();
