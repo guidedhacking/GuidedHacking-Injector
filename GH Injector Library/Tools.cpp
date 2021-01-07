@@ -143,12 +143,9 @@ bool IsElevatedProcess(HANDLE hTargetProc)
 
 void ErrorLog(ERROR_INFO * info)
 {
-	wchar_t ErrorLogName[] = L"GH_Inj_Log.txt";
+	auto FullPath = g_RootPathW;
+	FullPath += L"GH_Inj_Log.txt";
 
-	wchar_t FullPath[MAX_PATH]{ 0 };
-	StringCbCopyW(FullPath, sizeof(FullPath), g_RootPathW.c_str());
-	StringCbCatW(FullPath, sizeof(FullPath), ErrorLogName);
-		
 	time_t time_raw	= time(nullptr);
 	tm time_info;
 	localtime_s(&time_info, &time_raw);
@@ -189,7 +186,7 @@ void ErrorLog(ERROR_INFO * info)
 	std::wofstream error_log(FullPath, std::ios_base::out | std::ios_base::app);
 	if (!error_log.good())
 	{
-		LOG("Failed to open/create error log file:\n%ls\n", FullPath);
+		LOG("Failed to open/create error log file:\n%ls\n", FullPath.c_str());
 
 		return;
 	}
@@ -225,6 +222,9 @@ std::wstring InjectionModeToString(INJECTION_MODE mode)
 
 		case INJECTION_MODE::IM_LdrpLoadDll:
 			return std::wstring(L"LdrpLoadDll");
+
+		case INJECTION_MODE::IM_LdrpLoadDllInternal:
+			return std::wstring(L"LdrpLoadDllInternal");
 
 		case INJECTION_MODE::IM_ManualMap:
 			return std::wstring(L"ManualMap");

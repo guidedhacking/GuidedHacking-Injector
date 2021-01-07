@@ -282,6 +282,7 @@
 #define HOOK_SCAN_ERR_CREATE_PROCESS_FAILED			0x50000008	//CreateProcessW		:	win32 error
 #define HOOK_SCAN_ERR_WAIT_FAILED					0x50000009	//WaitForSingleObject	:	win32 error
 #define HOOK_SCAN_ERR_WAIT_TIMEOUT					0x5000000A	//WaitForSingleObject	:	waiting timed out
+#define HOOK_SCAN_ERR_BUFFER_TOO_SMALL				0x5000000B	//internal error		:	the buffer passed to ValidateInjectionFunctions is too small
 
 
 

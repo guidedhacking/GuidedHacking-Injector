@@ -98,7 +98,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	std::wstring smPath = g_RootPathW;
 	smPath += SM_EXE_FILENAME86;
 
-	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME86 "\"";
+	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME86 "\" 0";
 
 	PROCESS_INFORMATION pi{ 0 };
 	STARTUPINFOW		si{ 0 };
@@ -156,6 +156,8 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 		LOG("Token prepared\n");
 
+		LOG("Launching %ls:\n %ls\n", SM_EXE_FILENAME86, cmdLine);
+
 		if (!CreateProcessAsUserW(hAdminToken, smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
@@ -178,6 +180,8 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	}
 	else
 	{
+		LOG("Launching %ls:\n %ls\n", SM_EXE_FILENAME86, cmdLine);
+
 		if (!CreateProcessW(smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());

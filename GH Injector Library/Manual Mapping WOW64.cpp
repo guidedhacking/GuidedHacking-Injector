@@ -120,7 +120,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 	LOG("Shell written to memory\n");
 
-	LOG("Enterting StartRoutine_WOW64\n");
+	LOG("Entering StartRoutine_WOW64\n");
 
 	DWORD remote_ret = 0;
 	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);

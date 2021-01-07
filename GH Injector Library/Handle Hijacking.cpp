@@ -11,7 +11,7 @@ NTSTATUS EnumHandles(char * pBuffer, ULONG Size, ULONG * SizeOut, UINT & Count)
 
 	if (NT_FAIL(ntRet))
 	{
-		LOG("Failed to grab handle list\n");
+		LOG("Failed to grab handle list: %08X\n", ntRet);
 
 		return ntRet;
 	}

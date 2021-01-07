@@ -488,15 +488,19 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			LastErrCode = INJ_ERR_CANT_OPEN_PROCESS;
 			INIT_ERROR_DATA(error_data, GetLastError());
 
+			LOG("Failed to attach to process %06X\n", i.OwnerPID);
+
 			continue;
 		}
+
+		LOG("Attached to process %06X\n", i.OwnerPID);
 					
 		if (!IsElevatedProcess(hHijackProc) || !IsNativeProcess(hHijackProc))
 		{
 			LastErrCode = INJ_ERR_HIJACK_NO_NATIVE_HANDLE;
 			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-			LOG("Can't open process %06X\n", i.OwnerPID);
+			LOG("Process isn't elevated or native\n");
 
 			CloseHandle(hHijackProc);
 			
@@ -518,7 +522,7 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			continue;
 		}
 
-		LOG("Injection module loaded\n");
+		LOG("Injection module loaded into hijack process\n");
 
 		HINSTANCE hInjectionModuleEx = hijack_data.hDllOut;
 		f_Routine pRemoteInjectW = ReCa<f_Routine>(ReCa<UINT_PTR>(InjectW) - ReCa<UINT_PTR>(g_hInjMod) + ReCa<UINT_PTR>(hInjectionModuleEx));
@@ -553,6 +557,8 @@ DWORD HijackHandle(INJECTIONDATAW * pData, ERROR_DATA & error_data)
 			
 			continue;
 		}
+
+		LOG("Handle value: %04X\n", i.hValue);
 
 		pData->hHandleValue = 0;
 

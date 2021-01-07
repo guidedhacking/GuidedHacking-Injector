@@ -138,7 +138,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	std::wstring smPath = g_RootPathW;
 	smPath += SM_EXE_FILENAME;
 
-	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME "\"";
+	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME "\" 0";
 
 	PROCESS_INFORMATION pi{ 0 };
 	STARTUPINFOW		si{ 0 };
@@ -199,6 +199,8 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 
 		LOG("Token prepared\n");
 
+		LOG("Launching %ls:\n %ls\n", SM_EXE_FILENAME, cmdLine);
+
 		if (!CreateProcessAsUserW(hAdminToken, smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
@@ -221,7 +223,9 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 		CloseHandle(hUserToken);
 	}
 	else
-	{		
+	{
+		LOG("Launching %ls:\n %ls\n", SM_EXE_FILENAME, cmdLine);
+
 		if (!CreateProcessW(smPath.c_str(), cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());

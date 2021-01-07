@@ -128,7 +128,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 
 	LOG("Shell written to memory\n");
 
-	LOG("Enterting StartRoutine\n");
+	LOG("Entering StartRoutine\n");
 
 	DWORD remote_ret = 0;
 	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);

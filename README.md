@@ -31,20 +31,14 @@ Session seperation can be bypassed with all methods.
 - TLS initialization
 - Security cookie initalization
 
-### Additional features
+### Additional features:
+
 - Various cloaking options
 	- PEB unlinking
 	- PE header cloaking
 	- Thread cloaking
 - Handle hijacking
 - Hook scanning/restoring
-- Fancy process picker
-
-### Shortcut generation:
-
-Too lazy to reopen the injector everytime you want to inject the same dll? Generate a shortcut.
-Select the dll you want to inject in the list, configure the options you want and make sure the target process is running. Then click the "Generate Shortcut" button and a shortcut will be generated in the directory of the injector.
-Now you can just double click to perform the injection. The spawned console injector waits for the specified target process to launch.
 
 ----
 

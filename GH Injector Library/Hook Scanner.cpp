@@ -326,6 +326,8 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 	{
 		LOG("Provided buffer too small\n");
 
+		ErrorCode = HOOK_SCAN_ERR_BUFFER_TOO_SMALL;
+
 		return false;
 	}
 
@@ -381,9 +383,9 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 		*CountOut = SuccessCount;
 	}
 
-	LOG("%d of %d hook(s) restored\n", SuccessCount, Count);
-
 	CloseHandle(hTargetProc);
+
+	LOG("%d of %d hook(s) restored\n", SuccessCount, Count);
 
 	return true;
 }
