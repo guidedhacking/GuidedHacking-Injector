@@ -20,6 +20,7 @@ Session seperation can be bypassed with all methods.
 - Thread hijacking
 - SetWindowsHookEx
 - QueueUserAPC
+- KernelCallback
 
 ### Manual mapping features:
 
@@ -30,6 +31,9 @@ Session seperation can be bypassed with all methods.
 - SEH support
 - TLS initialization
 - Security cookie initalization
+- Loader Lock
+- Shift image
+- Clean datadirectories
 
 ### Additional features:
 
@@ -46,9 +50,9 @@ Session seperation can be bypassed with all methods.
 
 You can easily use mapper by including the compiled binaries in your project. Check the provided Injection.h header for more information.
 Make sure you have the compiled binaries in the working directory of your program.
-On first run the injection module will download pdb files for the native (and when run on x64 the wow64) version of the ntdll.dll to resolve symbol addresses.
-The injector can only function if that process is finished. The injection module exports GetSymbolState which will return INJ_ERROR_SUCCESS (0) if the pdb download and resolving of all required addresses is completed.
-Additionally GetDownloadProgress can be used to determine the progress of the download as percentage.
+On first run the injection module has to download PDB files for the native (and when run on x64 the wow64) version of the ntdll.dll to resolve symbol addresses. Use the exported StartDownload function to begin the download.
+The injector can only function if the downloads are finished. The injection module exports GetSymbolState and GetImportState which will return INJ_ERROR_SUCCESS (0) if the PDB download and resolving of all required addresses is completed.
+Additionally GetDownloadProgress can be used to determine the progress of the download as percentage. If the injection module is to be unloaded during the download process call InterruptDownload or there's a chance that the dll will deadlock your process.
 
 ```cpp
 
@@ -58,8 +62,17 @@ HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
 	
 auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
 auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
+auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
+auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
+
+StartDownload();
 
 while (GetSymbolState() != 0)
+{
+	Sleep(10);
+}
+
+while (GetImportState() != 0)
 {
 	Sleep(10);
 }
