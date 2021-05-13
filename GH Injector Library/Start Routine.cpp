@@ -6,7 +6,7 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 {
 	DWORD Ret = 0;
 
-	LOG("Entering StartRoutine\n");
+	LOG("    Entering StartRoutine\n");
 	
 	switch (Method)
 	{
@@ -19,6 +19,7 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			break;
 
 		case LAUNCH_METHOD::LM_SetWindowsHookEx:
+		case LAUNCH_METHOD::LM_KernelCallback:
 		{
 			NTSTATUS ntRet = 0;
 			ULONG OwnSession	= GetSessionId(GetCurrentProcess(), ntRet);
@@ -42,7 +43,15 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			{
 				TargetSession = (ULONG)-1;
 			}
-			Ret = SR_SetWindowsHookEx(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+
+			if (Method == LAUNCH_METHOD::LM_SetWindowsHookEx)
+			{
+				Ret = SR_SetWindowsHookEx(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+			}
+			else
+			{
+				Ret = SR_KernelCallback(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+			}
 
 			break;
 		}
@@ -58,7 +67,7 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			break;
 	}
 
-	LOG("End StartRoutine\n");
-	
+	LOG("    Exiting StartRoutine\n");
+		
 	return Ret;
 }

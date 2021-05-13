@@ -2,8 +2,8 @@
 
 #include "Import Handler.h"
 
-void EjectDll(HANDLE hTargetProc, HINSTANCE hModBase);
-//Unloads a Dll using FreeLibrary by creating a thread in the target process using NtCreateThreadEx (native only).
+bool EjectDll(HANDLE hTargetProc, HINSTANCE hModule);
+//Unloads a dll using LdrUnloadDll by creating a thread in the target process using NtCreateThreadEx (native only).
 //
 //Arguments:
 //		hTargetProc (HANDLE):
@@ -13,8 +13,9 @@ void EjectDll(HANDLE hTargetProc, HINSTANCE hModBase);
 ///				PROCESS_VM_OPERATION
 ///				PROCESS_VM_WRITE
 ///				PROCESS_VM_READ
-//		hModBase (HINSTANCE):
+//		hModule (HINSTANCE):
 ///			The baseaddress of the module to unload.
 //
-//Returnvalue:
-///		void
+//Returnvalue (bool):
+///		true:	the module was unloaded successfully.
+///		false:	something went wrong, see logs

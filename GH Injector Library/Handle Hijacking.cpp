@@ -11,7 +11,7 @@ NTSTATUS EnumHandles(char * pBuffer, ULONG Size, ULONG * SizeOut, UINT & Count)
 
 	if (NT_FAIL(ntRet))
 	{
-		LOG("Failed to grab handle list: %08X\n", ntRet);
+		LOG("     Failed to grab handle list: %08X\n", ntRet);
 
 		return ntRet;
 	}
@@ -19,7 +19,7 @@ NTSTATUS EnumHandles(char * pBuffer, ULONG Size, ULONG * SizeOut, UINT & Count)
 	auto * pHandleInfo = ReCa<SYSTEM_HANDLE_INFORMATION*>(pBuffer);
 	Count = pHandleInfo->NumberOfHandles;
 	
-	LOG("%d handles found\n", Count);
+	LOG("     %d handles found\n", Count);
 
 	return ntRet;
 }
@@ -70,15 +70,10 @@ std::vector<handle_data> FindProcessHandles(DWORD TargetPID, DWORD WantedHandleA
 
 	auto handles = EnumProcessHandles();
 
-	LOG("%d process handles found\n", (DWORD)handles.size());
+	LOG("    %d process handles found\n", (DWORD)handles.size());
 
 	for (const auto & i : handles)
 	{
-		if ((i.GrantedAccess & WantedHandleAccess) != WantedHandleAccess)
-		{
-			continue;
-		}
-
 		DWORD CurrentPID = i.UniqueProcessId;
 		if (CurrentPID == OwnPID || CurrentPID == TargetPID)
 		{
@@ -87,6 +82,11 @@ std::vector<handle_data> FindProcessHandles(DWORD TargetPID, DWORD WantedHandleA
 
 		HANDLE hCurrentProc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, CurrentPID);
 		if (!hCurrentProc)
+		{
+			continue;
+		}
+
+		if ((i.GrantedAccess & WantedHandleAccess) != WantedHandleAccess)
 		{
 			continue;
 		}
@@ -107,7 +107,7 @@ std::vector<handle_data> FindProcessHandles(DWORD TargetPID, DWORD WantedHandleA
 		CloseHandle(hCurrentProc);
 	}
 
-	LOG("%d handle(s) to target process found\n", (DWORD)Ret.size());
+	LOG("    %d handle(s) to target process found\n", (DWORD)Ret.size());
 
 	return Ret;
 }

@@ -22,6 +22,7 @@ class SYMBOL_PARSER
 	HANDLE	m_hInterruptEvent;
 	bool	m_bInterruptEvent;
 	float	m_fProgress;
+	bool	m_bStartDownload;
 
 	bool VerifyExistingPdb(const GUID & guid);
 
@@ -30,9 +31,10 @@ public:
 	SYMBOL_PARSER();
 	~SYMBOL_PARSER();
 
-	DWORD Initialize(const std::wstring szModulePath, const std::wstring path, std::wstring * pdb_path_out, bool Redownload, bool WaitForConnection = false);
+	DWORD Initialize(const std::wstring szModulePath, const std::wstring path, std::wstring * pdb_path_out, bool Redownload, bool WaitForConnection = false, bool AutoDownload = false);
 	DWORD GetSymbolAddress(const char * szSymbolName, DWORD & RvaOut);
 
+	void SetDownload(bool bDownload);
 	void Interrupt();
 	float GetDownloadProgress();
 };
@@ -75,9 +77,7 @@ struct GUID_StreamData
 #ifdef  _WIN64
 inline SYMBOL_PARSER				sym_ntdll_wow64;
 inline std::shared_future<DWORD>	sym_ntdll_wow64_ret;
-inline DWORD						sym_ntdll_wow64_thread_id;
 #endif
 
 inline SYMBOL_PARSER				sym_ntdll_native;
 inline std::shared_future<DWORD>	sym_ntdll_native_ret;
-inline DWORD						sym_ntdll_native_thread_id;

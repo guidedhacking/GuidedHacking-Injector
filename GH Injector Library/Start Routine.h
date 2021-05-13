@@ -21,6 +21,8 @@ using f_Routine = DWORD(__stdcall*)(void * pArg);
 #define SR_REMOTE_DELAY 50
 //small waiting period before checking remote results, probably not necessary
 
+#define KERNEL_CALLBACK_TABLE_SIZE 200
+
 ALIGN struct SR_REMOTE_DATA
 {
 	ALIGN SR_REMOTE_STATE	State;
@@ -66,6 +68,7 @@ DWORD SR_NtCreateThreadEx	(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, 
 DWORD SR_HijackThread		(HANDLE hTargetProc, f_Routine pRoutine, void * pArg,							DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
 DWORD SR_SetWindowsHookEx	(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId,	DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
 DWORD SR_QueueUserAPC		(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, 							DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
+DWORD SR_KernelCallback		(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULONG TargetSessionId,	DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
 //Subroutines called by StartRoutine.
 
 #ifdef _WIN64
@@ -88,4 +91,6 @@ DWORD SR_NtCreateThreadEx_WOW64	(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, D
 DWORD SR_HijackThread_WOW64		(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg,							DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
 DWORD SR_SetWindowsHookEx_WOW64	(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId,	DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
 DWORD SR_QueueUserAPC_WOW64		(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg,							DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
+DWORD SR_KernelCallback_WOW64	(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId,	DWORD & Out, DWORD Timeout, ERROR_DATA & error_data);
+//Subroutines called by StartRoutine_WOW64.
 #endif

@@ -666,7 +666,7 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 
 	if (m_WaitFunctionReturnAddress_WOW64[0] == 0)
 	{
-		HINSTANCE hNTDLL = GetModuleHandleEx_WOW64(m_hCurrentProcess, TEXT("ntdll.dll"));
+		HINSTANCE hNTDLL = GetModuleHandleExW_WOW64(m_hCurrentProcess, L"ntdll.dll");
 		if (!hNTDLL)
 		{
 			return false;
@@ -689,7 +689,7 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtRemoveIoCompletionEx", Address);
 		m_WaitFunctionReturnAddress_WOW64[4] = Address + NT_RET_OFFSET_86;
 
-		HINSTANCE hWIN32U = GetModuleHandleEx_WOW64(m_hCurrentProcess, TEXT("win32u.dll"));
+		HINSTANCE hWIN32U = GetModuleHandleExW_WOW64(m_hCurrentProcess, L"win32u.dll");
 		if (hWIN32U)
 		{
 			GetProcAddressEx_WOW64(m_hCurrentProcess, hWIN32U, "NtUserMsgWaitForMultipleObjectsEx", Address);

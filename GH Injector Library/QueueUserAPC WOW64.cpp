@@ -6,7 +6,7 @@
 
 DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
-	LOG("Begin SR_QueueUserAPC_WOW64\n");
+	LOG("     Begin SR_QueueUserAPC_WOW64\n");
 
 	BYTE Shellcode[] =
 	{
@@ -48,7 +48,7 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_QUAPC_ERR_CANT_ALLOC_MEM;
 	}
@@ -59,28 +59,28 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	sr_data->pArg	  = pArg;
 	sr_data->pRoutine = pRoutine;
 
-	LOG("Codecave allocated at %p\n", pMem);
+	LOG("      Codecave allocated at %p\n", pMem);
 
 	BOOL bRet = WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr);
 	if (!bRet)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
 		return SR_QUAPC_ERR_WPM_FAIL;
 	}
 
-	LOG("Queueing APCs with\n pRoutine = %p\n pArg = %p\n", pRemoteFunc, pMem);
+	LOG("      Queueing APCs with\n      pRoutine = %p\n      pArg = %p\n", pRemoteFunc, pMem);
 
 	ProcessInfo PI;
 	if (!PI.SetProcess(hTargetProc))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("Can't initialize ProcessInfo class\n");
+		LOG("      Can't initialize ProcessInfo class\n");
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
@@ -109,7 +109,7 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 
 			if (NT_SUCCESS(NATIVE::RtlQueueApcWow64Thread(hThread, pRemoteFunc, pMem, nullptr, nullptr)))
 			{
-				LOG("APC queued to thread %06X\n", ThreadID);
+				LOG("      APC queued to thread %06X\n", ThreadID);
 
 				PostThreadMessageW(ThreadID, WM_NULL, 0, 0);
 				APC_Queued = true;
@@ -123,14 +123,14 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("No compatible thread found\n");
+		LOG("      No compatible thread found\n");
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
 		return SR_QUAPC_ERR_NO_THREADS;
 	}
 
-	LOG("Entering wait state\n");
+	LOG("      Entering wait state\n");
 
 	Sleep(SR_REMOTE_DELAY);
 
@@ -147,7 +147,7 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 		{
 			if (data.State == (DWORD)SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 			{
-				LOG("Shelldata retrieved\n");
+				LOG("      Shelldata retrieved\n");
 
 				break;
 			}
@@ -156,7 +156,7 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			LOG("      ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 			return SR_QUAPC_ERR_RPM_FAIL;
 		}
@@ -168,16 +168,14 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("Shell timed out\n");
+		LOG("      Shell timed out\n");
 
 		return SR_QUAPC_ERR_REMOTE_TIMEOUT;
 	}
 
-	LOG("pRoutine returned: %08X\n", data.Ret);
+	LOG("      pRoutine returned: %08X\n", data.Ret);
 
 	Out = data.Ret;
-
-	LOG("End SR_QueueUserAPC\n");
 
 	return SR_ERR_SUCCESS;
 }

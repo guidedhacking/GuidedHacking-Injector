@@ -4,19 +4,19 @@
 
 DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
-	LOG("Begin SR_NtCreateThreadEx\n");
+	LOG("     Begin SR_NtCreateThreadEx\n");
 
 	void * pEntrypoint = nullptr;
 	if (CloakThread)
 	{
-		LOG("Thread cloaking specified\n");
+		LOG("      Thread cloaking specified\n");
 
 		ProcessInfo pi;
 		if (!pi.SetProcess(hTargetProc))
 		{
 			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-			LOG("Can't initialize ProcessInfo class\n");
+			LOG("      Can't initialize ProcessInfo class\n");
 
 			return SR_NTCTE_ERR_PROC_INFO_FAIL;
 		}
@@ -109,7 +109,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_NTCTE_ERR_CANT_ALLOC_MEM;
 	}
@@ -120,28 +120,28 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
-	LOG("Codecave allocated at %p\n", pMem);
+	LOG("      Codecave allocated at %p\n", pMem);
 
 	BOOL bRet = WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr);
 	if (!bRet)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
 		return SR_NTCTE_ERR_WPM_FAIL;
 	}
 	
-	LOG("Creating thread with\n pRoutine = %p\n pArg = %p\n", pRemoteFunc, pMem);
+	LOG("      Creating thread with\n       pRoutine = %p\n       pArg = %p\n", pRemoteFunc, pMem);
 		
 	NTSTATUS ntRet = NATIVE::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
 	if (NT_FAIL(ntRet) || !hThread)
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)ntRet);
 
-		LOG("NtCreateThreadEx failed: %08X\n", (DWORD)ntRet);
+		LOG("      NtCreateThreadEx failed: %08X\n", (DWORD)ntRet);
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
@@ -150,7 +150,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 	auto TID = GetThreadId(hThread);
 
-	LOG("Thread created with TID = %06X (%06d)\n", TID, TID);
+	LOG("      Thread created with TID = %06X (%06d)\n", TID, TID);
 	
 	if (CloakThread)
 	{
@@ -161,7 +161,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+			LOG("      GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
 
 			TerminateThread(hThread, 0);
 			CloseHandle(hThread);
@@ -171,7 +171,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 			return SR_NTCTE_ERR_GET_CONTEXT_FAIL;
 		}
 
-		LOG("Loaded thread context\n");
+		LOG("      Loaded thread context\n");
 
 #ifdef _WIN64
 		ctx.Rcx = ReCa<DWORD64>(pRemoteFunc);
@@ -183,7 +183,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+			LOG("      SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
 
 			TerminateThread(hThread, 0);
 			CloseHandle(hThread);
@@ -193,13 +193,13 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 			return SR_NTCTE_ERR_SET_CONTEXT_FAIL;
 		}
 
-		LOG("Thread redirected\n");
+		LOG("      Thread redirected\n");
 
 		if (ResumeThread(hThread) == (DWORD)-1)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("ResumeThread failed: %08X\n", error_data.AdvErrorCode);
+			LOG("      ResumeThread failed: %08X\n", error_data.AdvErrorCode);
 
 			TerminateThread(hThread, 0);
 			CloseHandle(hThread);
@@ -209,10 +209,10 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 			return SR_NTCTE_ERR_RESUME_FAIL;
 		}
 
-		LOG("Thread resumed\n");
+		LOG("      Thread resumed\n");
 	}
 
-	LOG("Entering wait state\n");
+	LOG("      Entering wait state\n");
 
 	Sleep(SR_REMOTE_DELAY);
 	
@@ -221,7 +221,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	{
 		INIT_ERROR_DATA(error_data, dwWaitRet);
 
-		LOG("WaitForSingleObject failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      WaitForSingleObject failed: %08X\n", error_data.AdvErrorCode);
 
 		TerminateThread(hThread, 0);
 		CloseHandle(hThread);
@@ -231,14 +231,14 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 		return SR_NTCTE_ERR_REMOTE_TIMEOUT;
 	}
 
-	LOG("Thread finished execution\n");
+	LOG("      Thread finished execution\n");
 
 	DWORD dwExitCode = 0;
 	if (!GetExitCodeThread(hThread, &dwExitCode))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("GetExitCodeThread failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      GetExitCodeThread failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
@@ -257,14 +257,14 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 
 	if (bRet)
 	{
-		LOG("Thread exit data retrieved\n");
+		LOG("      Thread exit data retrieved\n");
 	}
 
 	if (dwExitCode == 0xFFFFFFFF)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("Shellcode creation failed\n");
+		LOG("      Shellcode creation failed\n");
 
 		return SR_NTCTE_ERR_SHELLCODE_SETUP_FAIL;
 	}
@@ -272,16 +272,14 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	{
 		INIT_ERROR_DATA(error_data, dwErr);
 
-		LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("      ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_NTCTE_ERR_RPM_FAIL;
 	}
 
-	LOG("pRoutine returned: %08X\n", data.Ret);
+	LOG("      pRoutine returned: %08X\n", data.Ret);
 
 	Out	= data.Ret;
-
-	LOG("End SR_NtCreateThreadEx\n");
 			
 	return SR_ERR_SUCCESS;
 }

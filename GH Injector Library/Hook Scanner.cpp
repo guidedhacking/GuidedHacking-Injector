@@ -2,11 +2,13 @@
 
 #include "Hook Scanner.h"
 
-static const char Modules[][MAX_PATH] =
+#define MOD_COUNT 3
+
+static const wchar_t Modules[][MAX_PATH] =
 {
-	"kernel32.dll",
-	"KernelBase.dll",
-	"ntdll.dll"
+	L"kernel32.dll",
+	L"KernelBase.dll",
+	L"ntdll.dll"
 };
 
 static const char k32_functions[][MAX_PATH] =
@@ -61,7 +63,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 		LastWin32Error	= GetLastError();
 		ErrorCode		= HOOK_SCAN_ERR_CANT_OPEN_PROCESS;
 
-		LOG("OpenProcess failed: %08X\n", LastWin32Error);
+		LOG(" OpenProcess failed: %08X\n", LastWin32Error);
 
 		return false;
 	}
@@ -73,7 +75,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 	{
 		CloseHandle(hTargetProc);
 
-		LOG("WOW64 process can't scan x64 process\n");
+		LOG(" WOW64 process can't scan x64 process\n");
 
 		ErrorCode = HOOK_SCAN_ERR_PLATFORM_MISMATCH;
 
@@ -91,16 +93,15 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 	{
 #ifdef _WIN64
 
-		LOG("WOW64 hook scan\n");
+		LOG(" WOW64 hook scan\n");
+		LOG("  Modules to scan:\n");
 
-		HINSTANCE h_remote_K32	= GetModuleHandleExA_WOW64(hTargetProc, Modules[0]);
-		HINSTANCE h_remote_KB	= GetModuleHandleExA_WOW64(hTargetProc, Modules[1]);
-		HINSTANCE h_remote_NT	= GetModuleHandleExA_WOW64(hTargetProc, Modules[2]);
-
-		LOG("Modules to scan:\n");
-		LOG("kernel32   = %p\n", h_remote_K32);
-		LOG("kernelbase = %p\n", h_remote_KB);
-		LOG("ntdll      = %p\n", h_remote_NT);
+		HINSTANCE hModules[MOD_COUNT]{ 0 };
+		for (int i = 0; i < MOD_COUNT; ++i)
+		{
+			hModules[i] = GetModuleHandleExW_WOW64(hTargetProc, Modules[i]);
+			LOG("   %.11ls = %08X\n", Modules[i], MDWD(hModules[i]));
+		}
 
 		PROCESS_INFORMATION pi{ 0 };
 		STARTUPINFOW si{ 0 };
@@ -118,7 +119,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			LastWin32Error	= GetLastError();
 			ErrorCode		= HOOK_SCAN_ERR_CREATE_EVENT_FAILED;
 
-			LOG("CreateEventEx failed: %08X\n", LastWin32Error);
+			LOG("  CreateEventEx failed: %08X\n", LastWin32Error);
 
 			CloseHandle(hTargetProc);
 
@@ -131,7 +132,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			LastWin32Error	= GetLastError();
 			ErrorCode		= HOOK_SCAN_ERR_CREATE_EVENT_FAILED;
 
-			LOG("CreateEventEx failed: %08X\n", LastWin32Error);
+			LOG("  CreateEventEx failed: %08X\n", LastWin32Error);
 
 			CloseHandle(hEventStart);
 			CloseHandle(hTargetProc);
@@ -139,7 +140,6 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			return false;
 		}
 
-		//yes, this code exists. deal with it
 		wchar_t hEventStart_string[9]{ 0 };
 		_ultow_s(MDWD(hEventStart), hEventStart_string, 0x10);
 
@@ -151,9 +151,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 		StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
 
 		wchar_t cmdLine[MAX_PATH]{ 0 };
-		StringCbCatW(cmdLine, sizeof(cmdLine), L"\"");
-		StringCbCatW(cmdLine, sizeof(cmdLine), SM_EXE_FILENAME86);
-		StringCbCatW(cmdLine, sizeof(cmdLine), L"\" 1 ");
+		StringCbCatW(cmdLine, sizeof(cmdLine), L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ");
 		StringCbCatW(cmdLine, sizeof(cmdLine), hEventStart_string);
 		StringCbCatW(cmdLine, sizeof(cmdLine), L" ");
 		StringCbCatW(cmdLine, sizeof(cmdLine), hEventEnd_string);
@@ -163,7 +161,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			LastWin32Error	= GetLastError();
 			ErrorCode		= HOOK_SCAN_ERR_CREATE_PROCESS_FAILED;
 
-			LOG("CreateProcessW failed: %08X\n", LastWin32Error);
+			LOG("  CreateProcessW failed: %08X\n", LastWin32Error);
 
 			CloseHandle(hEventStart);
 			CloseHandle(hEventEnd);
@@ -187,7 +185,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 				ErrorCode		= HOOK_SCAN_ERR_WAIT_TIMEOUT;
 			}
 
-			LOG("WaitForSingleObject failed: %08X\n", LastWin32Error);
+			LOG("  WaitForSingleObject failed: %08X\n", LastWin32Error);
 
 			CloseHandle(hEventStart);
 			CloseHandle(hEventEnd);
@@ -200,42 +198,42 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 			return false;
 		}
 
-		LOG("Loading templates\n");
+		LOG("  Loading templates\n");
 
-		if (h_remote_K32)
+		if (hModules[0])
 		{
 			for (auto i = 0; i != sizeof(k32_functions) / sizeof(k32_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[0], k32_functions[i], h_remote_K32, nullptr, 0, 0, NULL });
-				LOG(" %s\n", k32_functions[i]);
+				HookDataOutV.push_back({ Modules[0], k32_functions[i], hModules[0], nullptr, 0, 0, NULL });
+				LOG("   %s\n", k32_functions[i]);
 			}
 		}
 
-		if (h_remote_KB)
+		if (hModules[1])
 		{
 			for (auto i = 0; i != sizeof(kb_functions) / sizeof(kb_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[1], kb_functions[i], h_remote_KB, nullptr, 0, 0, NULL });
-				LOG(" %s\n", kb_functions[i]);
+				HookDataOutV.push_back({ Modules[1], kb_functions[i], hModules[1], nullptr, 0, 0, NULL });
+				LOG("   %s\n", kb_functions[i]);
 			}
 		}
 
-		if (h_remote_NT)
+		if (hModules[2])
 		{
 			for (auto i = 0; i != sizeof(nt_functions) / sizeof(nt_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[2], nt_functions[i], h_remote_NT, nullptr, 0, 0, NULL });
-				LOG(" %s\n", nt_functions[i]);
+				HookDataOutV.push_back({ Modules[2], nt_functions[i], hModules[2], nullptr, 0, 0, NULL });
+				LOG("   %s\n", nt_functions[i]);
 			}
 		}
 
-		LOG("Scanning for hooks\n");
+		LOG("  Scanning for hooks\n");
 
 		for (auto & i : HookDataOutV)
 		{
 			if (ScanForHook_WOW64(i, hTargetProc, pi.hProcess))
 			{
-				LOG("Hooked: %s (%d)\n", i.FunctionName, i.ChangeCount);
+				LOG("   Hooked: %s (%d)\n", i.FunctionName, i.ChangeCount);
 
 				if (ScanCount < Count)
 				{
@@ -257,51 +255,53 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 	}
 	else
 	{
-		LOG("Native hook scan\n");
+		LOG(" Native hook scan\n");
 
-		HINSTANCE h_remote_K32	= GetModuleHandleA(Modules[0]);
-		HINSTANCE h_remote_KB	= GetModuleHandleA(Modules[1]);
-		HINSTANCE h_remote_NT	= GetModuleHandleA(Modules[2]);
+		LOG("  Modules to scan:\n");
 
-		LOG("Modules to scan:\n");
-		LOG("kernel32   = %p\n", h_remote_K32);
-		LOG("kernelbase = %p\n", h_remote_KB);
-		LOG("ntdll      = %p\n", h_remote_NT);
+		HINSTANCE hModules[MOD_COUNT]{ 0 };
+		for (int i = 0; i < MOD_COUNT; ++i)
+		{
+			hModules[i] = GetModuleHandleW(Modules[i]);
+			LOG("   %.11ls = %p\n", Modules[i], hModules[i]);
+		}
 
-		if (h_remote_K32)
+		LOG("  Loading templates\n");
+
+		if (hModules[0])
 		{
 			for (auto i = 0; i != sizeof(k32_functions) / sizeof(k32_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[0], k32_functions[i], h_remote_K32, nullptr, 0, 0, NULL });
-				LOG(" %s\n", k32_functions[i]);
+				HookDataOutV.push_back({ Modules[0], k32_functions[i], hModules[0], nullptr, 0, 0, NULL });
+				LOG("   %s\n", k32_functions[i]);
 			}
 		}
 
-		if (h_remote_KB)
+		if (hModules[1])
 		{
 			for (auto i = 0; i != sizeof(kb_functions) / sizeof(kb_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[1], kb_functions[i], h_remote_KB, nullptr, 0, 0, NULL });
-				LOG(" %s\n", kb_functions[i]);
+				HookDataOutV.push_back({ Modules[1], kb_functions[i], hModules[1], nullptr, 0, 0, NULL });
+				LOG("   %s\n", kb_functions[i]);
 			}
 		}
 
-		if (h_remote_NT)
+		if (hModules[2])
 		{
 			for (auto i = 0; i != sizeof(nt_functions) / sizeof(nt_functions[0]); ++i)
 			{
-				HookDataOutV.push_back({ Modules[2], nt_functions[i], h_remote_NT, nullptr, 0, 0, NULL });
-				LOG(" %s\n", nt_functions[i]);
+				HookDataOutV.push_back({ Modules[2], nt_functions[i], hModules[2], nullptr, 0, 0, NULL });
+				LOG("   %s\n", nt_functions[i]);
 			}
 		}
 
-		LOG("Scanning for hooks\n");
+		LOG(" Scanning for hooks\n");
 
 		for (auto & i : HookDataOutV)
 		{
 			if(ScanForHook(i, hTargetProc))
 			{
-				LOG("Hook: %s (%d)\n", i.FunctionName, i.ChangeCount);
+				LOG("   Hook: %s (%d)\n", i.FunctionName, i.ChangeCount);
 
 				if (ScanCount < Count)
 				{
@@ -324,7 +324,7 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 
 	if (ScanCount > Count)
 	{
-		LOG("Provided buffer too small\n");
+		LOG("  Provided buffer too small: %d hooks found, buffer is %d hook entries big\n", ScanCount, Count);
 
 		ErrorCode = HOOK_SCAN_ERR_BUFFER_TOO_SMALL;
 
@@ -353,7 +353,7 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 		LastWin32Error	= GetLastError();
 		ErrorCode		= HOOK_SCAN_ERR_CANT_OPEN_PROCESS;
 
-		LOG("OpenProcess failed: %08X\n", LastWin32Error);
+		LOG(" OpenProcess failed: %08X\n", LastWin32Error);
 
 		return false;
 	}
@@ -363,13 +363,13 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 	{
 		if (HookDataIn[i].ChangeCount && (HookDataIn[i].ErrorCode == HOOK_SCAN_ERR_SUCCESS))
 		{
-			LOG("Restoring %s\n", HookDataIn[i].FunctionName);
+			LOG("  Restoring %s\n", HookDataIn[i].FunctionName);
 
 			if (!WriteProcessMemory(hTargetProc, HookDataIn[i].pFunc, HookDataIn[i].OriginalBytes, sizeof(HookDataIn[i].OriginalBytes), nullptr))
 			{
 				HookDataIn[i].ErrorCode = GetLastError();
 
-				LOG("WriteProcessMemory failed: %08X\n", HookDataIn[i].ErrorCode);
+				LOG("   WriteProcessMemory failed: %08X\n", HookDataIn[i].ErrorCode);
 			}
 			else
 			{
@@ -392,12 +392,12 @@ bool __stdcall RestoreInjectionFunctions(DWORD dwTargetProcessId, DWORD & ErrorC
 
 bool ScanForHook(HookInfo & Info, HANDLE hTargetProc)
 {
-	Info.pFunc = ReCa<void*>(GetProcAddress(Info.hModuleBase, Info.FunctionName));
+	Info.pFunc = ReCa<void *>(GetProcAddress(Info.hModuleBase, Info.FunctionName));
 	if (!Info.pFunc)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_GETPROCADDRESS_FAILED;
 
-		LOG("GetProcAddress failed: %08X\n", GetLastError());
+		LOG("    GetProcAddress failed on %s with error %08X\n", Info.FunctionName, GetLastError());
 
 		return false;
 	}
@@ -407,7 +407,7 @@ bool ScanForHook(HookInfo & Info, HANDLE hTargetProc)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED;
 
-		LOG("ReadProcessMemory failed: %08X\n", GetLastError());
+		LOG("    ReadProcessMemory failed on %s with error %08X\n", Info.FunctionName, GetLastError());
 
 		return false;
 	}

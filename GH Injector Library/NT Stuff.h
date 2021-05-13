@@ -1,8 +1,11 @@
 #pragma once
 
-#ifndef _WIN32
-#error Rly?
-#endif
+//I honestly can't give proper credit here as most of the stuff is stolen from somewhere ages ago
+//Sources I definitely stole from:
+//https://www.geoffchappell.com
+//https://github.com/DarthTon
+//https://github.com/reactos
+//Bill Gates
 
 #include "pch.h"
 
@@ -96,20 +99,20 @@ typedef struct _ANSI_STRING
 	USHORT	Length;
 	USHORT	MaxLength;
 	char *  szBuffer;
-} ANSI_STRING, *PANSI_STRING;
+} ANSI_STRING, * PANSI_STRING;
 
 typedef struct _UNICODE_STRING
 {
 	WORD		Length;
 	WORD		MaxLength;
 	wchar_t *	szBuffer;
-} UNICODE_STRING, *PUNICODE_STRING;
+} UNICODE_STRING, * PUNICODE_STRING;
 
 typedef struct _LDRP_UNICODE_STRING_BUNDLE
 {
 	UNICODE_STRING	String;
 	WCHAR			StaticBuffer[128];
-} LDRP_UNICODE_STRING_BUNDLE, *PLDRP_UNICODE_STRING_BUNDLE;
+} LDRP_UNICODE_STRING_BUNDLE, * PLDRP_UNICODE_STRING_BUNDLE;
 
 typedef struct _RTL_BALANCED_NODE
 {
@@ -129,43 +132,38 @@ typedef struct _RTL_BALANCED_NODE
 		UCHAR Balance : 2;
 		ULONG_PTR ParentValue;
 	};
-} RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
+} RTL_BALANCED_NODE, * PRTL_BALANCED_NODE;
 
 typedef struct _RTL_RB_TREE
 {
 	RTL_BALANCED_NODE * Root;
 	RTL_BALANCED_NODE * Min;
-} RTL_RB_TREE, *PRTL_RB_TREE;
+} RTL_RB_TREE, * PRTL_RB_TREE;
 
-struct _LDR_DDAG_NODE;
-
-typedef struct _LDRP_INCOMING_DEPENDENCY
+typedef struct _LDR_SERVICE_TAG_RECORD
 {
-	_LDRP_INCOMING_DEPENDENCY * Next;
-	_LDR_DDAG_NODE * Node;
-} LDRP_INCOMING_DEPENDENCY, *PLDRP_INCOMING_DEPENDENCY;
+	struct _LDR_SERVICE_TAG_RECORD * Next;
+	ULONG ServiceTag;
+} LDR_SERVICE_TAG_RECORD, * PLDR_SERVICE_TAG_RECORD;
 
-typedef struct _LDRP_DEPENDENCY
+typedef struct _LDRP_CSLIST
 {
-	_LDRP_DEPENDENCY			*	Next;
-	_LDR_DDAG_NODE				*	DependencyNode;
-	_LDRP_INCOMING_DEPENDENCY	*	IncomingDependenciesLink;
-	_LDR_DDAG_NODE				*	ParentNode;
-} LDRP_DEPENDENCY, *PLDRP_DEPENDENCY;
+	struct _SINGLE_LIST_ENTRY * Tail;
+} LDRP_CSLIST, * PLDRP_CSLIST;
 
 typedef struct _LDR_DDAG_NODE
 {
-	LIST_ENTRY					Modules;
-	PVOID						ServiceTagList;
-	ULONG						LoadCount;
-	ULONG						LoadWhileUnloadingCount;
-	ULONG						LowestLink;
-	PLDRP_DEPENDENCY			Dependencies;
-	PLDRP_INCOMING_DEPENDENCY	IncomingDependencies;
-	LDR_DDAG_STATE				State;
-	PVOID						CondenseLink;
-	ULONG						PreorderNumber;
-} LDR_DDAG_NODE, *PLDR_DDAG_NODE;
+	LIST_ENTRY				Modules;
+	PLDR_SERVICE_TAG_RECORD	ServiceTagList;
+	ULONG					LoadCount;
+	ULONG					LoadWhileUnloadingCount;
+	ULONG					LowestLink;
+	PLDRP_CSLIST			Dependencies;
+	PLDRP_CSLIST			IncomingDependencies;
+	LDR_DDAG_STATE			State;
+	SINGLE_LIST_ENTRY		CondenseLink;
+	ULONG					PreorderNumber;
+} LDR_DDAG_NODE, * PLDR_DDAG_NODE;
 
 typedef struct _LDR_DATA_TABLE_ENTRY
 {
@@ -213,7 +211,7 @@ typedef struct _LDR_DATA_TABLE_ENTRY
 	ULONG ReferenceCount;
 	ULONG DependentLoadFlags;
 	UCHAR SigningLevel;
-} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+} LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
 
 typedef struct _PEB_LDR_DATA
 {
@@ -226,13 +224,65 @@ typedef struct _PEB_LDR_DATA
 	void *		EntryInProgress;
 	BYTE		ShutdownInProgress;
 	HANDLE		ShutdownThreadId;
-} PEB_LDR_DATA, *PPEB_LDR_DATA;
+} PEB_LDR_DATA, * PPEB_LDR_DATA;
 
-typedef struct _PEB
+struct PEB
 {
-	void * Reserved[3];
-	PEB_LDR_DATA * Ldr;
-} PEB, *PPEB;
+	BOOLEAN InheritedAddressSpace;
+	BOOLEAN ReadImageFileExecOptions;
+	BOOLEAN BeingDebugged; 
+
+	union
+	{
+		UCHAR BitField;
+		struct
+		{
+			UCHAR ImageUsedLargePages			: 1;
+			UCHAR IsProtectedProcess			: 1;
+			UCHAR IsImageDynamicallyRelocated	: 1;
+			UCHAR SkipPatchingUser32Forwarders	: 1;
+			UCHAR IsPackagedProcess				: 1;
+			UCHAR IsAppContainer				: 1;
+			UCHAR IsProtectedProcessLight		: 1;
+			UCHAR IsLongPathAwareProcess		: 1;
+		};
+	};
+
+	HANDLE Mutant;
+
+	PVOID			ImageBaseAddress;
+	PEB_LDR_DATA *	Ldr;
+
+	PVOID				 *	ProcessParameters;
+	PVOID					SubSystemData;
+	HANDLE					ProcessHeap;
+	RTL_CRITICAL_SECTION *	FastPebLock;
+	PVOID					AtlThunkSListPtr;
+	PVOID					IFEOKey;
+
+	union
+	{
+		ULONG CrossProcessFlags;
+		struct
+		{
+			ULONG ProcessInJob					: 1;
+			ULONG ProcessInitializing			: 1;
+			ULONG ProcessUsingVEH				: 1;
+			ULONG ProcessUsingVCH				: 1;
+			ULONG ProcessUsingFTH				: 1;
+			ULONG ProcessPreviouslyThrottled	: 1;
+			ULONG ProcessCurrentlyThrottled		: 1;
+			ULONG ProcessImagesHotPatched		: 1;
+			ULONG ReservedBits0					: 24;
+		};
+	};
+
+	union
+	{
+		PVOID KernelCallbackTable;
+		PVOID UserSharedInfoPtr;
+	};
+};
 
 typedef struct _RTL_INVERTED_FUNCTION_TABLE_ENTRY
 {
@@ -267,12 +317,12 @@ typedef struct _PROCESS_BASIC_INFORMATION
 	LONG		BasePriority;
 	HANDLE		UniqueProcessId;
 	HANDLE		InheritedFromUniqueProcessId;
-} PROCESS_BASIC_INFORMATION, *PPROCESS_BASIC_INFORMATION;
+} PROCESS_BASIC_INFORMATION, * PPROCESS_BASIC_INFORMATION;
 
 typedef struct _PROCESS_SESSION_INFORMATION
 {
 	ULONG SessionId;
-} PROCESS_SESSION_INFORMATION, *PPROCESS_SESSION_INFORMATION;
+} PROCESS_SESSION_INFORMATION, * PPROCESS_SESSION_INFORMATION;
 
 typedef struct _THREAD_BASIC_INFORMATION
 {
@@ -282,7 +332,7 @@ typedef struct _THREAD_BASIC_INFORMATION
 	KAFFINITY               AffinityMask;
 	KPRIORITY               Priority;
 	KPRIORITY               BasePriority;
-} THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
+} THREAD_BASIC_INFORMATION, * PTHREAD_BASIC_INFORMATION;
 
 typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO
 {
@@ -293,13 +343,13 @@ typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO
 	WORD HandleValue;
 	void * Object;
 	ULONG GrantedAccess;
-} SYSTEM_HANDLE_TABLE_ENTRY_INFO, *PSYSTEM_HANDLE_TABLE_ENTRY_INFO;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO, * PSYSTEM_HANDLE_TABLE_ENTRY_INFO;
 
 typedef struct _SYSTEM_HANDLE_INFORMATION
 {
 	ULONG NumberOfHandles;
 	SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
-} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+} SYSTEM_HANDLE_INFORMATION, * PSYSTEM_HANDLE_INFORMATION;
 
 typedef struct _SYSTEM_THREAD_INFORMATION
 {
@@ -314,7 +364,7 @@ typedef struct _SYSTEM_THREAD_INFORMATION
 	ULONG			ContextSwitches;
 	THREAD_STATE	ThreadState;
 	KWAIT_REASON	WaitReason;
-} SYSTEM_THREAD_INFORMATION, *PSYSTEM_THREAD_INFORMATION;
+} SYSTEM_THREAD_INFORMATION, * PSYSTEM_THREAD_INFORMATION;
 
 typedef struct _SYSTEM_PROCESS_INFORMATION
 {
@@ -353,7 +403,7 @@ typedef struct _SYSTEM_PROCESS_INFORMATION
 	LARGE_INTEGER	WriteTransferCount;
 	LARGE_INTEGER	OtherTransferCount;
 	SYSTEM_THREAD_INFORMATION Threads[1];
-} SYSTEM_PROCESS_INFORMATION, *PSYSTEM_PROCESS_INFORMATION;
+} SYSTEM_PROCESS_INFORMATION, * PSYSTEM_PROCESS_INFORMATION;
 
 typedef struct _FILE_STANDARD_INFORMATION 
 {
@@ -362,12 +412,12 @@ typedef struct _FILE_STANDARD_INFORMATION
 	ULONG         NumberOfLinks;
 	BOOLEAN       DeletePending;
 	BOOLEAN       Directory;
-} FILE_STANDARD_INFORMATION, *PFILE_STANDARD_INFORMATION;
+} FILE_STANDARD_INFORMATION, * PFILE_STANDARD_INFORMATION;
 
 typedef struct _FILE_POSITION_INFORMATION
 {
 	LARGE_INTEGER CurrentByteOffset;
-} FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
+} FILE_POSITION_INFORMATION, * PFILE_POSITION_INFORMATION;
 
 typedef union _LDRP_PATH_SEARCH_OPTIONS
 {
@@ -377,15 +427,14 @@ typedef union _LDRP_PATH_SEARCH_OPTIONS
 	{
 		ULONG32 Unknown;
 	};
-} LDRP_PATH_SEARCH_OPTIONS, *PLDRP_PATH_SEARCH_OPTIONS;
+} LDRP_PATH_SEARCH_OPTIONS, * PLDRP_PATH_SEARCH_OPTIONS;
 
 typedef struct _LDRP_PATH_SEARCH_CONTEXT
 {
-	UNICODE_STRING				DllSearchPath;
-	BOOLEAN						AllocatedOnLdrpHeap;
-	LDRP_PATH_SEARCH_OPTIONS	SearchOptions;
-	wchar_t *					OriginalFullDllName;
-} LDRP_PATH_SEARCH_CONTEXT, *PLDRP_PATH_SEARCH_CONTEXT;
+	wchar_t * DllSearchPathOut;
+	void	* unknown_0[3];
+	wchar_t * OriginalFullDllName;
+} LDRP_PATH_SEARCH_CONTEXT, * PLDRP_PATH_SEARCH_CONTEXT;
 
 typedef union _LDRP_LOAD_CONTEXT_FLAGS
 {
@@ -404,7 +453,7 @@ typedef union _LDRP_LOAD_CONTEXT_FLAGS
 		ULONG32 SearchOnlyFirstPathSegment	: 1;
 		ULONG32 RedirectedByAPISet			: 1;
 	};
-} LDRP_LOAD_CONTEXT_FLAGS, *PLDRP_LOAD_CONTEXT_FLAGS;
+} LDRP_LOAD_CONTEXT_FLAGS, * PLDRP_LOAD_CONTEXT_FLAGS;
 
 typedef struct _OBJECT_ATTRIBUTES 
 {
@@ -414,7 +463,7 @@ typedef struct _OBJECT_ATTRIBUTES
 	ULONG				Attributes;
 	PVOID				SecurityDescriptor;
 	PVOID				SecurityQualityOfService;
-}  OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
+}  OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
 
 #define InitializeObjectAttributes(p, n, a, r, s) \
 { \
@@ -444,7 +493,7 @@ typedef ALIGN_86 struct _UNICODE_STRING32
 	WORD	Length;
 	WORD	MaxLength;
 	DWORD	szBuffer;
-} UNICODE_STRING32, *PUNICODE_STRING32;
+} UNICODE_STRING32, * PUNICODE_STRING32;
 
 typedef ALIGN_86 struct _RTL_BALANCED_NODE32
 {
@@ -464,13 +513,13 @@ typedef ALIGN_86 struct _RTL_BALANCED_NODE32
 		UCHAR Balance : 2;
 		DWORD ParentValue;
 	};
-} RTL_BALANCED_NODE32, *PRTL_BALANCED_NODE32;
+} RTL_BALANCED_NODE32, * PRTL_BALANCED_NODE32;
 
 typedef ALIGN_86 struct _LARGE_INTEGER32
 {
 	DWORD LowPart;
 	DWORD HighPart;
-} LARGE_INTEGER32, *PLARGE_INTEGER32;
+} LARGE_INTEGER32, * PLARGE_INTEGER32;
 
 typedef ALIGN_86 struct _LDR_DATA_TABLE_ENTRY32
 {
@@ -505,7 +554,7 @@ typedef ALIGN_86 struct _LDR_DATA_TABLE_ENTRY32
 	ULONG				ReferenceCount;
 	ULONG				DependentLoadFlags;
 	UCHAR				SigningLevel;
-} LDR_DATA_TABLE_ENTRY32, *PLDR_DATA_TABLE_ENTRY32;
+} LDR_DATA_TABLE_ENTRY32, * PLDR_DATA_TABLE_ENTRY32;
 
 typedef ALIGN_86 struct _PEB_LDR_DATA32
 {
@@ -518,14 +567,78 @@ typedef ALIGN_86 struct _PEB_LDR_DATA32
 	DWORD			EntryInProgress;
 	BYTE			ShutdownInProgress;
 	DWORD			ShutdownThreadId;
-} PEB_LDR_DATA32, *PPEB_LDR_DATA32;
+} PEB_LDR_DATA32, * PPEB_LDR_DATA32;
 
 typedef ALIGN_86 struct _PEB32
 {
-	DWORD Reserved[3];
-	DWORD Ldr;
-} PEB32, *PPEB32;
+	BOOLEAN InheritedAddressSpace;
+	BOOLEAN ReadImageFileExecOptions;
+	BOOLEAN BeingDebugged;
 
+	union
+	{
+		UCHAR BitField;
+		struct
+		{
+			UCHAR ImageUsedLargePages			: 1;
+			UCHAR IsProtectedProcess			: 1;
+			UCHAR IsImageDynamicallyRelocated	: 1;
+			UCHAR SkipPatchingUser32Forwarders	: 1;
+			UCHAR IsPackagedProcess				: 1;
+			UCHAR IsAppContainer				: 1;
+			UCHAR IsProtectedProcessLight		: 1;
+			UCHAR IsLongPathAwareProcess		: 1;
+		};
+	};
+
+	DWORD Mutant;
+
+	DWORD ImageBaseAddress;
+	DWORD Ldr;
+
+	DWORD ProcessParameters;
+	DWORD SubSystemData;
+	DWORD ProcessHeap;
+	DWORD FastPebLock;
+	DWORD AtlThunkSListPtr;
+	DWORD IFEOKey;
+
+	union
+	{
+		ULONG CrossProcessFlags;
+		struct
+		{
+			ULONG ProcessInJob					: 1;
+			ULONG ProcessInitializing			: 1;
+			ULONG ProcessUsingVEH				: 1;
+			ULONG ProcessUsingVCH				: 1;
+			ULONG ProcessUsingFTH				: 1;
+			ULONG ProcessPreviouslyThrottled	: 1;
+			ULONG ProcessCurrentlyThrottled		: 1;
+			ULONG ProcessImagesHotPatched		: 1;
+			ULONG ReservedBits0					: 24;
+		};
+	};
+
+	union
+	{
+		DWORD KernelCallbackTable;
+		DWORD UserSharedInfoPtr;
+	};
+} PEB32, * PPEB32;
+
+typedef ALIGN_86 struct _LDRP_UNICODE_STRING_BUNDLE32
+{
+	UNICODE_STRING32	String;
+	WCHAR				StaticBuffer[128];
+} LDRP_UNICODE_STRING_BUNDLE32, * PLDRP_UNICODE_STRING_BUNDLE32;
+
+typedef ALIGN_86 struct _LDRP_PATH_SEARCH_CONTEXT32
+{
+	DWORD DllSearchPathOut;
+	DWORD unknown_0[3];
+	DWORD OriginalFullDllName;
+} LDRP_PATH_SEARCH_CONTEXT32, * PLDRP_PATH_SEARCH_CONTEXT32;
 #endif
 
 #pragma endregion
@@ -553,6 +666,11 @@ using f_LdrLoadDll = NTSTATUS (__stdcall *)
 	ULONG				ulFlags, 
 	UNICODE_STRING	*	pModuleFileName, 
 	HANDLE			*	pOut
+);
+
+using f_LdrUnloadDll = NTSTATUS (__stdcall *)
+(
+	HANDLE DllHandle
 );
 
 using f_LdrpLoadDll = NTSTATUS (__fastcall *)
@@ -646,12 +764,17 @@ using f_LdrpHandleTlsData = NTSTATUS (__fastcall *)
 	LDR_DATA_TABLE_ENTRY * pEntry
 );
 
-using f_LdrpAcquireLoaderLock = NTSTATUS(__fastcall *)
+using f_LdrLockLoaderLock = NTSTATUS(__stdcall *)
 (
+	ULONG			Flags, 
+	ULONG		*	State, 
+	ULONG_PTR	*	Cookie
 );
 
-using f_LdrpReleaseLoaderLock = NTSTATUS(__fastcall *)
+using f_LdrUnlockLoaderLock = NTSTATUS(__stdcall *)
 (
+	ULONG		Flags, 
+	ULONG_PTR	Cookie
 );
 
 using f_memmove = VOID (__cdecl *)

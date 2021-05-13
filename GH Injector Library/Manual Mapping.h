@@ -5,6 +5,10 @@
 #define RELOC_FLAG86(RelInfo) ((RelInfo >> 0x0C) == IMAGE_REL_BASED_HIGHLOW)
 #define RELOC_FLAG64(RelInfo) ((RelInfo >> 0x0C) == IMAGE_REL_BASED_DIR64)
 
+#define MIN_SHIFT_OFFSET	0x100
+#define MAX_SHIFT_OFFSET	0x1000
+#define BASE_ALIGNMENT		0x10
+
 #ifdef _WIN64
 #define RELOC_FLAG RELOC_FLAG64
 #else
@@ -52,15 +56,15 @@ namespace MMAP_NATIVE
 		ALIGN NT_FUNC_LOCAL(RtlInsertInvertedFunctionTable);
 		ALIGN NT_FUNC_LOCAL(LdrpHandleTlsData);
 
-		ALIGN NT_FUNC_LOCAL(LdrpAcquireLoaderLock);
-		ALIGN NT_FUNC_LOCAL(LdrpReleaseLoaderLock);
+		ALIGN NT_FUNC_LOCAL(LdrLockLoaderLock);
+		ALIGN NT_FUNC_LOCAL(LdrUnlockLoaderLock);
 
 		ALIGN NT_FUNC_LOCAL(LdrpModuleBaseAddressIndex);
 		ALIGN NT_FUNC_LOCAL(LdrpMappingInfoIndex);
 		ALIGN NT_FUNC_LOCAL(LdrpHeap);
 		ALIGN NT_FUNC_LOCAL(LdrpInvertedFunctionTable);
 
-		void * pLdrpHeap;
+		ALIGN void * pLdrpHeap;
 
 		MANUAL_MAPPING_FUNCTION_TABLE();
 	};
@@ -70,6 +74,8 @@ namespace MMAP_NATIVE
 		ALIGN HINSTANCE	hRet{ 0 };
 		ALIGN DWORD		Flags{ 0 };
 		ALIGN NTSTATUS	ntRet{ 0 };
+
+		ALIGN WORD ShiftOffset{ 0 };
 
 		ALIGN UNICODE_STRING DllPath{ 0 };
 		ALIGN wchar_t szPathBuffer[MAX_PATH]{ 0 };
@@ -119,22 +125,26 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(RtlInsertInvertedFunctionTable);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpHandleTlsData);
 
-		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpAcquireLoaderLock);
-		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpReleaseLoaderLock);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrLockLoaderLock);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrUnlockLoaderLock);
 
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpModuleBaseAddressIndex);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpMappingInfoIndex);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpHeap);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpInvertedFunctionTable);
 
+		ALIGN_86 DWORD pLdrpHeap;
+
 		MANUAL_MAPPING_FUNCTION_TABLE_WOW64();
 	};
 
-	ALIGN_86 struct MANUAL_MAPPING_DATA_WOW64
+	struct MANUAL_MAPPING_DATA_WOW64
 	{
 		ALIGN_86 DWORD	hRet{ 0 };
 		ALIGN_86 DWORD	Flags{ 0 };
 		ALIGN_86 DWORD	ntRet{ 0 };
+
+		ALIGN_86 WORD ShiftOffset{ 0 };
 
 		ALIGN_86 UNICODE_STRING32 DllPath{ 0 };
 		ALIGN_86 wchar_t szPathBuffer[MAX_PATH]{ 0 };

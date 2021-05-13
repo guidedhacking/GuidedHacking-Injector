@@ -8,6 +8,9 @@
 #define FILENAME L"\\SM86.txt"
 #endif
 
+#define ID_SWHEX	'0'
+#define ID_WOW64	'1'
+#define ID_KC		'2'
 
 #define SM_ERR_SUCCESS		0x00000000
 #define SM_ERR_INVALID_ARGC	0x30000001
@@ -20,6 +23,14 @@
 #define SWHEX_ERR_INVALID_INFO		0x30100004
 #define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005
 #define SWHEX_ERR_NO_WINDOWS		0x30100006
+
+#define KC_ERR_SUCCESS				0x00000000
+#define KC_ERR_INVALID_PATH			0x50100001
+#define KC_ERR_CANT_OPEN_FILE		0x50100002
+#define KC_ERR_EMPTY_FILE			0x50100003
+#define KC_ERR_INVALID_INFO			0x50100004
+#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005
+#define KC_ERR_NO_WINDOWS			0x50100006
 
 struct HookData
 {
@@ -36,3 +47,5 @@ struct EnumWindowsCallback_Data
 };
 
 DWORD _SetWindowsHookEx();
+
+DWORD _KernelCallbackTable();

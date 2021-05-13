@@ -23,10 +23,12 @@
 #define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00040000	//resolves delayed imports
 #define INJ_MM_EXECUTE_TLS				0x00080000	//executes TLS callbacks and initializes static TLS data
 #define INJ_MM_ENABLE_EXCEPTIONS		0x00100000	//enables exception handling
-#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics, if set INJ_MM_CLEAN_DATA_DIR will be ignored
+#define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics, if set INJ_MM_CLEAN_DATA_DIR and INJ_MM_SHIFT_MODULE_BASE will be ignored
 #define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
 #define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
+#define INJ_MM_RUN_UNDER_LDR_LOCK		0x01000000	//runs the DllMain under the loader lock
+#define INJ_MM_SHIFT_MODULE_BASE		0x02000000	//shifts the module base by a random offset, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
 
 #define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
 
@@ -66,18 +68,17 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData);
 //
 //Arguments:
 //		pData (INJECTIONDATAA/INJECTIONDATAW):
-///			Pointer to the information for the injection.
+///			Pointer to the information structure for the injection.
 //
 //Returnvalue (DWORD):
 ///		On success: INJ_ERR_SUCCESS.
 ///		On failure: One of the errorcodes defined in Error.h.
 
+//Internal stuff
 #define MAXPATH_IN_TCHAR	MAX_PATH
 #define MAXPATH_IN_BYTE_A	MAX_PATH * sizeof(char)
 #define MAXPATH_IN_BYTE_W	MAX_PATH * sizeof(wchar_t)
 #define MAXPATH_IN_BYTE		MAX_PATH * sizeof(TCHAR)
-//Internal stuff
-
 
 //Returns the version string of the current instance
 HRESULT __stdcall GetVersionA(char		* out, size_t cb_size);
@@ -85,4 +86,12 @@ HRESULT __stdcall GetVersionW(wchar_t	* out, size_t cb_size);
 
 //Returns the state of the symbol download threads
 //If finished SYMBOL_ERR_SUCCESS (0) is returned 
+//If still in progress INJ_ERR_SYMBOL_INIT_NOT_DONE (0x1C) is returned.
+//Other error codes are defined in Error.h.
 DWORD __stdcall GetSymbolState();
+
+//Returns the state of the import handler.
+//If finished INJ_ERR_SUCCESS (0) is returned.
+//If still in progress INJ_ERR_IMPORT_HANDLER_NOT_DONE (0x37) is returned.
+//Other error codes are defined in Error.h.
+DWORD __stdcall GetImportState();

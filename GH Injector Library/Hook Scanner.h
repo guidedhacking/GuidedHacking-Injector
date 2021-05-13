@@ -6,8 +6,8 @@
 
 struct HookInfo
 {
-	const char * ModuleName;
-	const char * FunctionName;
+	const wchar_t	* ModuleName;
+	const char		* FunctionName;
 
 	HINSTANCE		hModuleBase;
 	void		*	pFunc;

@@ -10,6 +10,7 @@ class DownloadManager : public IBindStatusCallback
 {
     HANDLE  m_hInterruptEvent;
     float   m_fProgress;
+    float   m_fOldProgress;
 
 public:
 

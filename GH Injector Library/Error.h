@@ -27,7 +27,7 @@
 #define INJ_ERR_INVALID_PID					0x00000006	//internal error					: -						: provided process id is 0
 #define INJ_ERR_CANT_OPEN_PROCESS			0x00000007	//OpenProcess						: win32 error			: opening the specified target process failed
 #define INJ_ERR_INVALID_PROC_HANDLE			0x00000008	//GetHandleInformation				: win32 error			: the provided handle value is not a valid handle
-#define INJ_ERR_CANT_GET_EXE_FILENAME		0x00000009	//(K32)GetModuleBaseNameW			: win32 error			: failed to resolve the file name of the target process
+#define INJ_ERR_CANT_GET_EXE_FILENAME		0x00000009	//QueryFullProcessImageNameW		: win32 error			: failed to resolve the file name of the target process
 #define INJ_ERR_PLATFORM_MISMATCH			0x0000000A	//internal error					: file error			: the provided file can't be injected (file error 0x20000001 - 0x20000003)
 #define INJ_ERR_CANT_GET_TEMP_DIR			0x0000000B	//GetTempPathW						: win32 error			: unable to retrieve the path to the current users temp directory
 #define INJ_ERR_CANT_COPY_FILE				0x0000000C	//CopyFileW							: win32 error			: unable to create a copy of the specified dll file
@@ -65,12 +65,18 @@
 #define INJ_ERR_CANT_GET_PEB				0x0000002C	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
 #define INJ_ERR_INVALID_PEB_DATA			0x0000002D	//internal error					: -						: peb data required to erase/fake header or unlike the module from the peb wasn't findable
 #define INJ_ERR_UPDATE_PROTECTION_FAILED	0x0000002E	//NtProtectVirtualMemory			: NTSTATUS				: updating the page protection of the pe header failed
-#define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002F	//internal error					: -						: can't resolve address of the wow64 ntdll
+#define INJ_ERR_WOW64_NTDLL_MISSING			0x0000002F	//internal error					: -						: can't resolve address of the wow64 ntdll.dll
 #define INJ_ERR_INVALID_PATH_SEPERATOR		0x00000030	//internal error					: -						: can't find '\' in a path. '/' as seperators aren't supported
 #define INJ_ERR_LDRP_PREPROCESS_FAILED		0x00000031	//LdrpPreprocessDllName				: NTSTATUS				: preprocessing the dll name for LdrpLoadDll(Internal) failed
 #define INJ_ERR_INVALID_POINTER				0x00000032	//internal error					: -						: an invalid funtion pointer was passed to SetRawPrintCallback
 #define INJ_ERR_NOT_IMPLEMENTED				0x00000033	//internal error					: -						: the module was compiled without DEBUG_INFO being defined, check pch.h for more information if you want to redirect debug output
 #define INJ_ERR_KERNEL32_MISSING			0x00000034	//internal error					: -						: failed to resolve address of kernel32.dll (native)
+#define INJ_ERR_WOW64_KERNEL32_MISSING		0x00000035	//internal error					: -						: can't resolve address of the wow64 kernel32.dll
+#define INJ_ERR_OPEN_WOW64_PROCESS			0x00000036	//OpenProcess						: win32 error			: failed to attach to wow64 process to resolve addresses
+#define INJ_ERR_IMPORT_HANDLER_NOT_DONE		0x00000037	//internal error					: -						: import handler isn't finished resolving all required functions or is waiting for symbol parser thread(s) to finish
+#define INJ_ERR_WCSRCHR_FAILED				0x00000038	//wcsrchr							: -						: wcsrchr failed to find a character in a string (usually '\\' in a path)
+#define INJ_ERR_TARGET_EXE_NAME_IS_NULL		0x00000039	//internal error					: -						: the length of the name of the specified process is 0
+#define INJ_ERR_LDR_ENTRY_IS_NULL			0x0000003A	//internal error					: -						: LdrpLoadDll(Internal) didn't return a valid LDR_DATA_TABLE_ENTRY pointer
 
 
 ///////////////////
@@ -89,9 +95,10 @@
 #define INJ_MM_ERR_IMPORT_FAIL					0x0040000A	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
 #define INJ_MM_ERR_DELAY_IMPORT_FAIL			0x0040000B	//internal error					: NTSTATUS				: one module couldn't be loaded or an import couldn't be resolved, if ntRet is STATUS_HEAP_CORRUPTION, memory allocation failed
 #define INJ_MM_ERR_ENABLING_SEH_FAILED			0x0040000C	//RtlInsertInvertedFunctionTable	: NTSTATUS				: enabling exception handling by calling RtlInsertInvertedFunctionTable failed
-#define INJ_MM_ERR_INVALID_HEAP_HANDLE			0x0040000D	//internal error					: -						: the provided pointer to the LdrpHeap is invalid
-#define INJ_MM_ERR_CANT_GET_PEB					0x0040000E	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
-#define INJ_MM_ERR_INVALID_PEB_DATA				0x0040000F	//internal error					: -						: peb data required to fake header wasn't findable
+#define INJ_MM_ERR_NOT_IN_LDRP_SEH_TABLE		0x0040000D	//internal error					: -						: RtlInsertInvertedFunctionTable didn't insert data into LdrpInvertedFunctionTable, manual insertion currently not supported
+#define INJ_MM_ERR_INVALID_HEAP_HANDLE			0x0040000E	//internal error					: -						: the provided pointer to the LdrpHeap is invalid
+#define INJ_MM_ERR_CANT_GET_PEB					0x0040000F	//__readgsqword or __readfsdword	: -						: reading the linear address of the PEB failed
+#define INJ_MM_ERR_INVALID_PEB_DATA				0x00400010	//internal error					: -						: peb data required to fake header wasn't findable
 
 
 
@@ -159,7 +166,7 @@
 #define SR_SWHEX_ERR_GET_ADMIN_TOKEN_FAIL	0x10300006	//GetTokenInformation	: win32 error			: failed to retrieve information from the token handle
 #define SR_SWHEX_ERR_CANT_CREATE_PROCESS	0x10300007	//CreateProcessAsUserW	: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
 														//CreateProcessW		: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
-#define SR_SWHEX_ERR_SWHEX_TIMEOUT			0x10300008	//WaitForSingleObject	: win32 error			:
+#define SR_SWHEX_ERR_SWHEX_TIMEOUT			0x10300008	//WaitForSingleObject	: win32 error			: SM_EXE_FILENAME.exe execution time exceeded
 #define SR_SWHEX_ERR_REMOTE_TIMEOUT			0x10300009	//internal error		: -						: execution time exceeded SR_REMOTE_TIMEOUT
 #define SR_SWHEX_ERR_RPM_FAIL				0x1030000A	//ReadProcessMemory		: win32 error			: reading the results of the shellcode failed
 
@@ -176,6 +183,27 @@
 #define SR_QUAPC_ERR_NO_THREADS				0x10400005	//internal error			: -						: no threads to queue an apc to
 #define SR_QUAPC_ERR_REMOTE_TIMEOUT			0x10400006	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT
 #define SR_QUAPC_ERR_RPM_FAIL				0x10400007	//WriteProcessMemory		: win32 error			: reading the results of the shellcode failed
+
+///////////////
+///KernelCallback
+													//Source				: advanced error type	: error description
+
+#define SR_KC_ERR_CANT_OPEN_INFO_TXT	0x10500001	//internal error		: -						: can't open kc info file
+#define SR_KC_ERR_PROC_INFO_FAIL		0x10500002	//internal error		: -						: can't grab process information
+#define SR_KC_ERR_CANT_GET_PEB			0x10500003	//internal error		: -						: failed to retrieve pointer to the (wow64) peb
+#define SR_KC_ERR_RPM_FAIL				0x10500004	//ReadProcessMemory		: win32 error			: failed to read memory from the target process
+#define SR_KC_ERR_NO_INITIALIZED		0x10500005	//internal error		: -						: the kernel callback table is not initialized
+#define SR_KC_ERR_CANT_ALLOC_MEM		0x10500006	//VirtualAllocEx		: win32 error			: memory allocation for the shellcode/table failed
+#define SR_KC_ERR_WPM_FAIL				0x10500007	//WriteProcessMemory	: win32 error			: writing the shellcode/table into the target process' memory failed
+#define SR_KC_ERR_WTSQUERY_FAIL			0x10500008	//WTSQueryUserToken		: win32 error			: failed to query the token for the target process user session
+#define SR_KC_ERR_DUP_TOKEN_FAIL		0x10500009	//DuplicateTokenEx		: win32 error			: failed to duplicate the token for the target process user session
+#define SR_KC_ERR_GET_ADMIN_TOKEN_FAIL	0x1050000A	//GetTokenInformation	: win32 error			: failed to retrieve information from the token handle
+#define SR_KC_ERR_CANT_CREATE_PROCESS	0x1050000B	//CreateProcessAsUserW	: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
+													//CreateProcessW		: win32 error			: failed to launch SM_EXE_FILENAME.exe to execute shellcode
+#define SR_KC_ERR_KC_TIMEOUT			0x1050000C	//WaitForSingleObject	: win32 error			: SM_EXE_FILENAME.exe execution time exceeded
+#define SR_KC_ERR_REMOTE_TIMEOUT		0x1050000D	//internal error		: -						: execution time exceeded SR_REMOTE_TIMEOUT
+
+#define SR_KC_ERR_KC_EXT_ERROR			0x1050000E	//SM_EXE_FILENAME.exe	: "GH Injector SM - XX.exe" error code, 0x50100001 - 0x50100006 (see below) or win32 exception
 
 
 
@@ -210,9 +238,10 @@
 #define SM_ERR_INVALID_ARGV	0x30000002			//main		:	GH Injector SM - XX.exe was called with invalid arguments
 
 ////////////////////////////////////////////////////////////
-///GH Injector SM - XX.exe - SetWindowsHookEx specific erros:
-#define SWHEX_ERR_SUCCESS			0x00000000
+//GH Injector SM - XX.exe specific errors:
 
+///SetWindowHookEx:
+#define SWHEX_ERR_SUCCESS 0x00000000
 												//Source				:	error description
 
 #define SWHEX_ERR_INVALID_PATH		0x30100001	//StringCchLengthW		:	path exceeds MAX_PATH * 2 chars
@@ -221,6 +250,17 @@
 #define SWHEX_ERR_INVALID_INFO		0x30100004	//internal error		:	provided info is wrong / invalid
 #define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005	//EnumWindows			:	API fail
 #define SWHEX_ERR_NO_WINDOWS		0x30100006	//internal error		:	no compatible window found
+
+///KernelCallbackTable
+#define KC_ERR_SUCCESS 0x00000000
+												//Source				:	error description
+
+#define KC_ERR_INVALID_PATH			0x50100001	//StringCchLengthW		:	path exceeds MAX_PATH * 2 chars
+#define KC_ERR_CANT_OPEN_FILE		0x50100002	//std::ifstream::good	:	openening the SMXX.txt failed
+#define KC_ERR_EMPTY_FILE			0x50100003	//internal error		:	SMXX.txt is empty
+#define KC_ERR_INVALID_INFO			0x50100004	//internal error		:	provided info is wrong / invalid
+#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005	//EnumWindows			:	API fail
+#define KC_ERR_NO_WINDOWS			0x50100006	//internal error		:	no compatible window found
 
 
 

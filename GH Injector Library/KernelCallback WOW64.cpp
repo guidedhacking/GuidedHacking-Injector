@@ -4,9 +4,9 @@
 
 #include "Start Routine.h"
 
-DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
+DWORD SR_KernelCallback_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, ULONG TargetSessionId, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
-	LOG("     Begin SR_SetWindowsHookEx_WOW64\n");
+	LOG("     Begin SR_KernelCallback_WOW64\n");
 
 	std::wstring InfoPath = g_RootPathW;
 	InfoPath += SM_INFO_FILENAME86;
@@ -16,30 +16,119 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 		DeleteFileW(InfoPath.c_str());
 	}
 
-	std::wofstream swhex_info(InfoPath, std::ios_base::out | std::ios_base::app);
-	if (!swhex_info.good())
+	std::wofstream kc_info(InfoPath, std::ios_base::out | std::ios_base::app);
+	if (!kc_info.good())
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
 		LOG("      Failed to create info file\n");
 
-		return SR_SWHEX_ERR_CANT_OPEN_INFO_TXT;
+		return SR_KC_ERR_CANT_OPEN_INFO_TXT;
 	}
 
-	void * pMem = VirtualAllocEx(hTargetProc, nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+	ProcessInfo PI;
+	if (!PI.SetProcess(hTargetProc))
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("      Can't initialize ProcessInfo class\n");
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_PROC_INFO_FAIL;
+	}
+
+	auto pPEB = PI.GetPEB_WOW64();
+
+	if (!pPEB)
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("      Failed to get PEB pointer\n");
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_CANT_GET_PEB;
+	}
+
+	PEB32 peb;
+	if (!ReadProcessMemory(hTargetProc, pPEB, &peb, sizeof(PEB32), nullptr))
+	{
+		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("      ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_RPM_FAIL;
+	}
+
+	if (!peb.KernelCallbackTable)
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG("      Kernel callback table not initialized\n");
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_NO_INITIALIZED;
+	}
+
+	LOG("      Kernel callback table located at %08X\n", peb.KernelCallbackTable);
+
+	DWORD kct[KERNEL_CALLBACK_TABLE_SIZE]{ 0 };
+	auto size = KERNEL_CALLBACK_TABLE_SIZE;
+
+	auto bRet = ReadProcessMemory(hTargetProc, MPTR(peb.KernelCallbackTable), kct, size * sizeof(DWORD), nullptr);
+	if (!bRet)
+	{
+		if (GetLastError() == ERROR_PARTIAL_COPY) //guessed size may overlap with uninitalized page
+		{
+			DWORD base = peb.KernelCallbackTable;
+			DWORD end = base + size * sizeof(DWORD);
+
+			end &= 0xFFFFF000;
+
+			size = (int)(end - base) / sizeof(DWORD); //round down to next page boundary
+
+			LOG("      Resized table to %08X bytes\n", size);
+
+			bRet = ReadProcessMemory(hTargetProc, MPTR(peb.KernelCallbackTable), kct, size * sizeof(DWORD), nullptr);
+		}
+
+		if (!bRet)
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("      ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			kc_info.close();
+			DeleteFileW(InfoPath.c_str());
+
+			return SR_KC_ERR_RPM_FAIL;
+		}
+	}
+
+	LOG("      Copied kernel callback table\n");
+
+	SIZE_T alloc_size = 0x100 + size * sizeof(DWORD);
+
+	void * pMem = VirtualAllocEx(hTargetProc, nullptr, alloc_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (!pMem)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
 		LOG("      VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
-		swhex_info.close();
+		kc_info.close();
 		DeleteFileW(InfoPath.c_str());
 
-		return SR_SWHEX_ERR_CANT_ALLOC_MEM;
+		return SR_KC_ERR_CANT_ALLOC_MEM;
 	}
-
-	LOG("      Codecave allocated at %p\n", pMem);
 
 	BYTE Shellcode[] =
 	{
@@ -72,7 +161,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 	*ReCa<DWORD *>(Shellcode + 0x02 + sizeof(SR_REMOTE_DATA_WOW64)) = MDWD(pMem);
 
-	void * pRemoteFunc = ReCa<BYTE *>(pMem) + sizeof(SR_REMOTE_DATA_WOW64);
+	DWORD pRemoteFunc = MDWD(pMem) + sizeof(SR_REMOTE_DATA_WOW64);
 
 	auto * sr_data = ReCa<SR_REMOTE_DATA_WOW64 *>(Shellcode);
 	sr_data->pArg		= pArg;
@@ -85,20 +174,58 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
-		swhex_info.close();
 
-		return SR_SWHEX_ERR_WPM_FAIL;
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_WPM_FAIL;
 	}
 
-	LOG("      Hooks called with\n       pRoutine = %p\n      pArg = %08X\n", pRemoteFunc, MDWD(pMem));
+	LOG("      Hooks called with\n       pRoutine = %08X\n       pArg = %08X\n", pRemoteFunc, MDWD(pMem));
 
-	swhex_info << std::dec << GetProcessId(hTargetProc) << '!' << std::hex << MDWD(pRemoteFunc) << std::endl;
-	swhex_info.close();
+	kct[0] = pRemoteFunc;
+	auto table_offset	= ALIGN_UP(sizeof(Shellcode), sizeof(DWORD));
+	auto pTable			= ReCa<BYTE *>(pMem) + table_offset;
+
+	if (!WriteProcessMemory(hTargetProc, pTable, kct, size * sizeof(DWORD), nullptr))
+	{
+		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_WPM_FAIL;
+	}
+
+	LOG("      Copied kernel callback table into target process at %08X\n", MDWD(pTable));
+
+	if (!WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &pTable, sizeof(DWORD), nullptr))
+	{
+		INIT_ERROR_DATA(error_data, GetLastError());
+
+		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+		kc_info.close();
+		DeleteFileW(InfoPath.c_str());
+
+		return SR_KC_ERR_WPM_FAIL;
+	}
+
+	LOG("      Updated kernel callback table pointer\n");
+
+	kc_info << std::dec << GetProcessId(hTargetProc) << std::endl;
+	kc_info.close();
 
 	std::wstring smPath = g_RootPathW;
 	smPath += SM_EXE_FILENAME86;
 
-	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME86 "\" " ID_SWHEX;
+	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME86 "\" " ID_KC;
 
 	PROCESS_INFORMATION pi{ 0 };
 	STARTUPINFOW		si{ 0 };
@@ -108,7 +235,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 	LOG("      Data and command line prepared\n");
 
-	if (TargetSessionId != -1) 
+	if (TargetSessionId != -1)
 	{
 		LOG("      Target process is in a different session\n");
 
@@ -119,9 +246,11 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			LOG("      WTSQueryUserToken failed: %08X\n", error_data.AdvErrorCode);
 
+			WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
-			return SR_SWHEX_ERR_WTSQUERY_FAIL;
+			return SR_KC_ERR_WTSQUERY_FAIL;
 		}
 
 		HANDLE hNewToken = nullptr;
@@ -131,10 +260,12 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			LOG("      DuplicateTokenEx failed: %08X\n", error_data.AdvErrorCode);
 
+			WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
-			return SR_SWHEX_ERR_DUP_TOKEN_FAIL;
+			return SR_KC_ERR_DUP_TOKEN_FAIL;
 		}
 
 		DWORD SizeOut = 0;
@@ -145,11 +276,13 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			LOG("      GetTokenInformation failed: %08X\n", error_data.AdvErrorCode);
 
+			WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 			CloseHandle(hNewToken);
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
-			return SR_SWHEX_ERR_GET_ADMIN_TOKEN_FAIL;
+			return SR_KC_ERR_GET_ADMIN_TOKEN_FAIL;
 		}
 
 		HANDLE hAdminToken = admin_token.LinkedToken;
@@ -164,12 +297,14 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			LOG("      CreateProcessAsUserW failed: %08X\n", error_data.AdvErrorCode);
 
+			WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 			CloseHandle(hAdminToken);
 			CloseHandle(hNewToken);
 			CloseHandle(hUserToken);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
-			return SR_SWHEX_ERR_CANT_CREATE_PROCESS;
+			return SR_KC_ERR_CANT_CREATE_PROCESS;
 		}
 
 		LOG("      %ls launched\n", SM_EXE_FILENAME86);
@@ -188,9 +323,11 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			LOG("      CreateProcessW failed: %08X\n", error_data.AdvErrorCode);
 
+			WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+			DeleteFileW(InfoPath.c_str());
 
-			return SR_SWHEX_ERR_CANT_CREATE_PROCESS;
+			return SR_KC_ERR_CANT_CREATE_PROCESS;
 		}
 
 		LOG("      %ls launched\n", SM_EXE_FILENAME86);
@@ -200,6 +337,8 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 	Sleep(SR_REMOTE_DELAY);
 
+	auto Timer = GetTickCount64();
+
 	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, Timeout);
 	if (dwWaitRet != WAIT_OBJECT_0)
 	{
@@ -207,10 +346,14 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 		LOG("      %ls timed out: %08X\n", SM_EXE_FILENAME86, error_data.AdvErrorCode);
 
+		WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 		TerminateProcess(pi.hProcess, 0);
+		DeleteFileW(InfoPath.c_str());
 
-		return SR_SWHEX_ERR_SWHEX_TIMEOUT;
+		return SR_KC_ERR_KC_TIMEOUT;
 	}
+
+	WriteProcessMemory(hTargetProc, &pPEB->KernelCallbackTable, &peb.KernelCallbackTable, sizeof(DWORD), nullptr);
 
 	DWORD ExitCode = 0;
 	GetExitCodeProcess(pi.hProcess, &ExitCode);
@@ -218,14 +361,16 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
-	if (ExitCode != SWHEX_ERR_SUCCESS)
+	DeleteFileW(InfoPath.c_str());
+
+	if (ExitCode != KC_ERR_SUCCESS)
 	{
 		INIT_ERROR_DATA(error_data, ExitCode);
 
-		LOG("      %ls failed: %08X\n", SM_EXE_FILENAME86, ExitCode);
-		
+		LOG("      %ls failed: %08X\n", SM_EXE_FILENAME, ExitCode);
+
 		VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
-		
+
 		return ExitCode;
 	}
 
@@ -234,11 +379,9 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
-	auto Timer = GetTickCount64();
 	while (GetTickCount64() - Timer < Timeout)
 	{
-		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
-		if (bRet)
+		if (ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr))
 		{
 			if (data.State == (DWORD)SR_REMOTE_STATE::SR_RS_ExecutionFinished)
 			{
@@ -255,7 +398,7 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
-			return SR_SWHEX_ERR_RPM_FAIL;
+			return SR_KC_ERR_RPM_FAIL;
 		}
 
 		Sleep(10);
@@ -269,12 +412,12 @@ DWORD SR_SetWindowsHookEx_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DW
 
 		LOG("      Shell timed out\n");
 
-		return SR_SWHEX_ERR_REMOTE_TIMEOUT;
+		return SR_KC_ERR_REMOTE_TIMEOUT;
 	}
 
 	LOG("      pRoutine returned: %08X\n", data.Ret);
 
-	Out	= data.Ret;
+	Out = data.Ret;
 
 	return SR_ERR_SUCCESS;
 }

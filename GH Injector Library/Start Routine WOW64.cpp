@@ -7,6 +7,8 @@
 DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pArg, LAUNCH_METHOD Method, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	DWORD Ret = 0;
+
+	LOG("    Entering StartRoutine_WOW64\n");
 	
 	switch (Method)
 	{
@@ -19,6 +21,7 @@ DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pAr
 			break;
 
 		case LAUNCH_METHOD::LM_SetWindowsHookEx:
+		case LAUNCH_METHOD::LM_KernelCallback:
 		{
 			NTSTATUS ntRet = 0;
 			ULONG OwnSession	= GetSessionId(GetCurrentProcess(), ntRet);
@@ -42,7 +45,15 @@ DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pAr
 			{
 				TargetSession = (ULONG)-1;
 			}
-			Ret = SR_SetWindowsHookEx_WOW64(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+
+			if (Method == LAUNCH_METHOD::LM_SetWindowsHookEx)
+			{
+				Ret = SR_SetWindowsHookEx_WOW64(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+			}
+			else
+			{
+				Ret = SR_KernelCallback_WOW64(hTargetProc, pRoutine, pArg, TargetSession, Out, Timeout, error_data);
+			}
 			
 			break;
 		}
@@ -57,6 +68,8 @@ DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pAr
 			Ret = SR_ERR_INVALID_LAUNCH_METHOD;
 			break;
 	}
+
+	LOG("    Exiting StartRoutine_WOW64\n");
 	
 	return Ret;
 }

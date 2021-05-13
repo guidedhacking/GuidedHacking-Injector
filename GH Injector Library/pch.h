@@ -19,38 +19,39 @@
 #include <fstream>
 
 //dank shit
-#include <vector>
 #include <ctime>
 #include <map>
+#include <random>
+#include <vector>
 
 //session shit
 #include <wtsapi32.h>
 
 //symbol shit
 #include <DbgHelp.h>
-#include <urlmon.h>
 #include <future>
+#include <urlmon.h>
 
 //internet shit
 #include <WinInet.h>
 
 //warning shit
-#pragma warning(disable: 4201) //unnamed union
+#pragma warning(disable: 4201) //unnamed union (nt strucutres like unnamed unions)
 #pragma warning(disable: 4324) //structure member alignment resulting in additional bytes being added as padding
 #pragma warning(disable: 6001) //uninitialized memory & handles (false positive in for loops with continue statements)
 #pragma warning(disable: 6258) //TerminateThread warning
-//#pragma warning(disable: 6387) //pointer could be 0 (false positive in "Manual Mapping WOW64.cpp")
+#pragma warning(disable: 28159) //I want to used GetTickCount, suck it Bill
 
 //reinterpret_cast = too long to type
 #define ReCa reinterpret_cast
 
-//Macro to convert 32-bit DWORD into void*.
+//Macro to convert 32-bit DWORD into void*
 #define MPTR(d) (void*)(ULONG_PTR)d
 
-//Macro to convert void* into 32-bit DWORD.
+//Macro to convert dumb 64-types into a DWORD without triggereing C4302 or C4311
 #define MDWD(p) (DWORD)((ULONG_PTR)p & 0xFFFFFFFF)
 
-//Macro used to export the functions with a proper name.
+//Macro used to export the functions with a proper name
 #define EXPORT_FUNCTION(export_name, link_name) comment(linker, "/EXPORT:" export_name "=" link_name)
 
 //converts the __FILEW__ macro to filename only (thanks stackoverflow)
@@ -86,7 +87,8 @@ enum class LAUNCH_METHOD
 	LM_NtCreateThreadEx,
 	LM_HijackThread,
 	LM_SetWindowsHookEx,
-	LM_QueueUserAPC
+	LM_QueueUserAPC,
+	LM_KernelCallback
 };
 
 //macro to avoid compiler and shellcode related alignment issues (unlikely but just to be sure)

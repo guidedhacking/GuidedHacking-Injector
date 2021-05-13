@@ -21,7 +21,7 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 		MMAP_NATIVE::ManualMap(nullptr, nullptr, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
 #endif
 
-		LOG("GH Injector V%ls loaded\nImagebase = %p\n", GH_INJ_VERSION, hDll);
+		LOG("GH Injector V%ls loaded\nImagebase = %p\n", GH_INJ_VERSIONW, hDll);
 
 		g_hInjMod = hDll;
 
@@ -66,50 +66,38 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 
 		LOG("Launching PDB thread(s)\n");
 
-		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathW, nullptr, false, true);
+		sym_ntdll_native_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_native, szNtDllNative, g_RootPathW, nullptr, false, true, false);
 
 #ifdef _WIN64
 		std::wstring szNtDllWOW64 = szWindowsDir;
 		szNtDllWOW64 += L"\\SysWOW64\\ntdll.dll";
 
-		sym_ntdll_wow64_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathW, nullptr, false, true);
+		sym_ntdll_wow64_ret = std::async(std::launch::async, &SYMBOL_PARSER::Initialize, &sym_ntdll_wow64, szNtDllWOW64, g_RootPathW, nullptr, false, true, false);
 #endif
 
 		free(szWindowsDir);
+
+		LOG("Launching import resolver thread\n");
+
+		import_handler_ret = std::async(std::launch::async, &ResolveImports, std::ref(import_handler_error_data));
 
 		LOG("DllMain exit\n");
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
-		LOG("GH Injector V%ls detaching\n", GH_INJ_VERSION);
-
 		if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 		{
-			LOG("Attempting to interrupt native ntdll.pdb donwload thread\n");
-
-			sym_ntdll_native.Interrupt();
-
-			if (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
-			{
-				LOG("Native ntdll pdb download thread didn't exit properly.\n");
-			}
+			LOG("ntdll.pdb download thread didn't exit properly.\n");
 		}
 
 #ifdef _WIN64
 		if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
 		{
-			LOG("Attempting to interrupt wow64 ntdll.pdb donwload thread\n");
-
-			sym_ntdll_wow64.Interrupt();
-
-			if (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
-			{
-				LOG("Wow64 ntdll pdb download thread didn't exit properly.\n");
-			}
-		}
+			LOG("wntdll.pdb download thread didn't exit properly.\n");
+		}		
 #endif
 
-		LOG("GH Injector V%ls detached\n", GH_INJ_VERSION);
+		LOG("GH Injector V%ls detached\n", GH_INJ_VERSIONW);
 	}
 	
 	return TRUE;

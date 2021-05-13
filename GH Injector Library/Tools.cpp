@@ -2,6 +2,12 @@
 
 #include "Tools.h"
 
+static FLOAT g_vNTDLL = 0.0;
+static const FLOAT g_Win7	= 6.1f;
+static const FLOAT g_Win8	= 6.2f;
+static const FLOAT g_Win81	= 6.3f;
+static const FLOAT g_Win10	= 10.0f;
+
 std::wstring InjectionModeToString(INJECTION_MODE mode);
 std::wstring LaunchMethodToString(LAUNCH_METHOD method);
 
@@ -34,25 +40,34 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	File.close();
 
 	auto * pDos = ReCa<IMAGE_DOS_HEADER*>(headers);
-	auto * pNT	= ReCa<IMAGE_NT_HEADERS*>(headers + pDos->e_lfanew); //no need for correct nt headers type
+	WORD magic = pDos->e_magic;
+	
+	if (magic != IMAGE_DOS_SIGNATURE)
+	{
+		delete[] headers;
+
+		LOG("Invalid DOS header signature\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
 
 	if (pDos->e_lfanew > 0x1000)
 	{
 		delete[] headers;
 
-		LOG("Invalid DOS header\n");
+		LOG("Invalid nt header offset\n");
 
 		return FILE_ERR_INVALID_FILE;
 	}
 
-	WORD	magic		= pDos->e_magic;
+	auto * pNT = ReCa<IMAGE_NT_HEADERS *>(headers + pDos->e_lfanew); //no need for correct nt headers type
 	DWORD	signature	= pNT->Signature;
 	WORD	machine		= pNT->FileHeader.Machine;
 	WORD	character	= pNT->FileHeader.Characteristics;
 
 	delete[] headers;
 
-	if (magic != IMAGE_DOS_SIGNATURE || signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
+	if (signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
 	{
 		LOG("Invalid PE header\n");
 
@@ -252,6 +267,9 @@ std::wstring LaunchMethodToString(LAUNCH_METHOD method)
 		case LAUNCH_METHOD::LM_QueueUserAPC:
 			return std::wstring(L"QueueUserAPC");
 
+		case LAUNCH_METHOD::LM_KernelCallback:
+			return std::wstring(L"KernelCallback");
+
 		default:
 			break;
 	}
@@ -340,4 +358,116 @@ float __stdcall GetDownloadProgress(bool bWow64)
 
 	return sym_ntdll_native.GetDownloadProgress();
 #endif
+}
+
+void __stdcall StartDownload()
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	LOG("Beginning download(s)\n");
+
+	sym_ntdll_native.SetDownload(true);
+
+#ifdef _WIN64
+	sym_ntdll_wow64.SetDownload(true);
+#endif
+}
+
+void __stdcall InterruptDownload()
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	LOG("Interupting download thread(s)\n");
+
+	sym_ntdll_native.Interrupt();
+
+#ifdef _WIN64
+	sym_ntdll_wow64.Interrupt();
+#endif
+
+	LOG("Waiting for download thread(s) to exit\n");
+
+	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
+	LOG("ntdll.pdb download thread exited successfully\n");
+
+#ifdef _WIN64
+	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
+	LOG("wntdll.pdb download thread exited successfully\n");
+#endif
+	
+	while (import_handler_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
+	LOG("Import handler thread exited successfully\n");
+}
+
+bool IsWin7OrGreater()
+{
+	return (g_vNTDLL >= g_Win7);
+}
+
+bool IsWin8OrGreater()
+{
+	return (g_vNTDLL >= g_Win8);
+}
+
+bool IsWin10OrGreater()
+{
+	return (g_vNTDLL >= g_Win10);
+}
+
+float GetNTDLLVersion()
+{
+	if (g_vNTDLL != 0.0f)
+	{
+		return g_vNTDLL;
+	}
+
+	DWORD unused = 0;
+	auto fv_size = GetFileVersionInfoSize(TEXT("ntdll.dll"), &unused);
+	if (!fv_size)
+	{
+		return 0.0f;
+	}
+
+	BYTE * v_buffer = new BYTE[fv_size];
+	if (!v_buffer)
+	{
+		return 0.0f;
+	}
+
+	if (!GetFileVersionInfo(TEXT("ntdll.dll"), 0, fv_size, v_buffer))
+	{
+		delete[] v_buffer;
+
+		return 0.0f;
+	}
+
+	UINT size_out = 0;
+	VS_FIXEDFILEINFO * p_info = nullptr;
+	if (!VerQueryValue(v_buffer, TEXT("\\"), ReCa<void **>(&p_info), &size_out))
+	{
+		delete[] v_buffer;
+
+		return 0.0f;
+	}
+
+	if (!p_info || p_info->dwSignature != VS_FFI_SIGNATURE)
+	{
+		delete[] v_buffer;
+
+		return 0.0f;
+	}
+	
+	float v_hi = (float)((p_info->dwFileVersionMS >> 0x10) & 0xffff);
+	float v_lo = (float)((p_info->dwFileVersionMS >> 0x00) & 0xffff);
+
+	delete[] v_buffer;
+
+	while (v_lo > 1.0f)
+	{
+		v_lo /= 10.0f;
+	}
+
+	g_vNTDLL = v_hi + v_lo;
+
+	return g_vNTDLL;
 }

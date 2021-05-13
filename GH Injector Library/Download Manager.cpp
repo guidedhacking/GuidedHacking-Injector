@@ -6,6 +6,7 @@ DownloadManager::DownloadManager()
 {
     m_hInterruptEvent   = nullptr;
     m_fProgress         = 0.0f;
+    m_fOldProgress      = 0.0f;
 }
 
 DownloadManager::~DownloadManager()
@@ -39,6 +40,8 @@ HRESULT __stdcall DownloadManager::OnStartBinding(DWORD dwReserved, IBinding * p
     UNREFERENCED_PARAMETER(dwReserved);
     UNREFERENCED_PARAMETER(pib);
 
+    LOG("  DownloadManager: OnStartBinding\n");
+
     return S_OK;
 }
 
@@ -46,12 +49,16 @@ HRESULT __stdcall DownloadManager::GetPriority(LONG * pnPriority)
 {
     UNREFERENCED_PARAMETER(pnPriority);
 
+    LOG("  DownloadManager: GetPriority\n");
+
     return S_OK;
 }
 
 HRESULT __stdcall DownloadManager::OnLowResource(DWORD reserved)
 {
     UNREFERENCED_PARAMETER(reserved);
+
+    LOG("  DownloadManager: OnLowResource\n");
 
     return S_OK;
 }
@@ -61,13 +68,17 @@ HRESULT __stdcall DownloadManager::OnStopBinding(HRESULT hresult, LPCWSTR szErro
     UNREFERENCED_PARAMETER(hresult);
     UNREFERENCED_PARAMETER(szError);
 
+    LOG("  DownloadManager: OnStopBinding\n");
+
     return S_OK;
 }
 
-HRESULT __stdcall DownloadManager::GetBindInfo(DWORD * grfBINDF, BINDINFO *pbindinfo)
+HRESULT __stdcall DownloadManager::GetBindInfo(DWORD * grfBINDF, BINDINFO * pbindinfo)
 {
     UNREFERENCED_PARAMETER(grfBINDF);
     UNREFERENCED_PARAMETER(pbindinfo);
+
+    LOG("  DownloadManager: GetBindInfo\n");
 
     return S_OK;
 }
@@ -79,6 +90,8 @@ HRESULT __stdcall DownloadManager::OnDataAvailable(DWORD grfBSCF, DWORD dwSize, 
     UNREFERENCED_PARAMETER(pformatetc);
     UNREFERENCED_PARAMETER(pstgmed);
 
+    LOG("  DownloadManager: OnDataAvailable\n");
+
     return S_OK;
 }
 
@@ -86,6 +99,8 @@ HRESULT __stdcall DownloadManager::OnObjectAvailable(const IID & riid, IUnknown 
 {
     UNREFERENCED_PARAMETER(riid);
     UNREFERENCED_PARAMETER(punk);
+
+    LOG("  DownloadManager: OnObjectAvailable\n");
 
     return S_OK;
 }
@@ -97,12 +112,20 @@ HRESULT __stdcall DownloadManager::OnProgress(ULONG ulProgress, ULONG ulProgress
 
     if (m_hInterruptEvent && WaitForSingleObject(m_hInterruptEvent, 0) == WAIT_OBJECT_0)
     {
+        LOG("  DownloadManager: Interrupting download\n");
+
         return E_ABORT;
     }
 
     if (ulProgressMax)
     {
         m_fProgress = (float)ulProgress / ulProgressMax;
+
+        if (m_fProgress - m_fOldProgress >= 0.1f)
+        {
+            LOG("  DownloadManager: %2.0f%%\n", m_fProgress * 100.0f);
+            m_fOldProgress = m_fProgress;
+        }
     }
 
     return S_OK;
@@ -115,7 +138,7 @@ BOOL DownloadManager::SetInterruptEvent(HANDLE hInterrupt)
         CloseHandle(m_hInterruptEvent);
     }
 
-    LOG("New interrupt event specified\n");
+    LOG("  DownloadManager: New interrupt event specified\n");
 
     return DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS);
 }

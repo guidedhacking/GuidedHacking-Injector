@@ -2,7 +2,7 @@
 
 #include "main.h"
 
-BOOL CALLBACK EnumWindowsCallback(HWND hWnd, LPARAM lParam)
+BOOL CALLBACK _SWHEX_EnumWindowsCallback(HWND hWnd, LPARAM lParam)
 {
 	auto * data = reinterpret_cast<EnumWindowsCallback_Data*>(lParam);
 
@@ -93,7 +93,7 @@ DWORD _SetWindowsHookEx()
 	data.m_pHook	= reinterpret_cast<HOOKPROC>(pHook);
 	data.m_hModule	= LoadLibraryW(L"user32.dll");
 
-	if (!EnumWindows(EnumWindowsCallback, reinterpret_cast<LPARAM>(&data)))
+	if (!EnumWindows(_SWHEX_EnumWindowsCallback, reinterpret_cast<LPARAM>(&data)))
 	{
 		return SWHEX_ERR_ENUM_WINDOWS_FAIL;
 	}

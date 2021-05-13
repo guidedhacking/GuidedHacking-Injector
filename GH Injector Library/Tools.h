@@ -2,15 +2,15 @@
 
 #include "Import Handler.h"
 
-//Filenames and errorlog setup
+//Filenames
 
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
-#define GH_INJ_VERSIONW L"4.0"
+#define GH_INJ_VERSIONW L"4.3"
 
 #define GH_INJ_MOD_NAME64A "GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86A "GH Injector - x86.dll"
-#define GH_INJ_VERSIONA "4.0"
+#define GH_INJ_VERSIONA "4.3"
 
 #ifdef _WIN64
 #define GH_INJ_MOD_NAMEW GH_INJ_MOD_NAME64W
@@ -28,12 +28,21 @@
 #define GH_INJ_VERSION GH_INJ_VERSIONA
 #endif
 
+//Command line codes for "GH Injector SM - XX.exe"
+
+#define ID_SWHEX	"0" //use for SetWindowsHookEx
+#define ID_WOW64	"1" //use for wow64 addresses
+#define ID_KC		"2" //use for KernelCallbackTable
+
 //Global variable to store the base address of the current image of the injector. Initialized in DllMain.
 inline HINSTANCE g_hInjMod = NULL;
 
 //Global variables to store the root directory of the module
 inline std::string	g_RootPathA;
 inline std::wstring	g_RootPathW;
+
+//Global macro round up addresses and offsets
+#define ALIGN_UP(X, A) (X + (A - 1)) & (~(A - 1))
 
 struct ERROR_INFO
 	//A structure used to pass information to the error log function.
@@ -112,8 +121,8 @@ ULONG GetSessionId(HANDLE hTargetProc, NTSTATUS & ntRetOut);
 ///			A reference to an NTSTATUS variable which will receive the returnvalue of NtQueryInformationProcess.
 //
 //Returnvalue (ULONG):
-//		On success: The session identifier of the specified process.
-//		On failuer: -1, check ntRetOut for more information.
+///		On success: The session identifier of the specified process.
+///		On failure: -1, check ntRetOut for more information.
 
 bool IsElevatedProcess(HANDLE hTargetProc);
 //A function used to determine whether a process is running elevated or not (administrator vs. user).
@@ -136,9 +145,8 @@ void ErrorLog(ERROR_INFO * info);
 //Returnvalue (void)
 
 #if !defined(_WIN64) && defined(DUMP_SHELLCODE)
-
+//Rad function to dump the injection / mapping shells to paste them into "WOW64 Shells.h"
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname);
-
 #endif
 
 float __stdcall GetDownloadProgress(bool bWow64);
@@ -150,3 +158,43 @@ float __stdcall GetDownloadProgress(bool bWow64);
 //
 //Returnvalue (float):
 ///		A value 0 <= ret <= 1. 1 indicates that the download is finished.
+
+void __stdcall StartDownload();
+//Starts the download(s) of the PDB file(s).
+// 
+//Arguments:
+//		none
+//
+//Returnvalue (void)
+
+void __stdcall InterruptDownload();
+//Interrupts the download(s) of the PDB file(s).
+// 
+//Arguments:
+//		none
+//
+//Returnvalue (void)
+
+bool IsWin7OrGreater();
+bool IsWin8OrGreater();
+bool IsWin10OrGreater();
+//These functions are used to determine the currently running version of windows. GetNTDLLVersion needs to be successfully called before these work.
+//
+//Arguements:
+//		none
+//
+//Returnvalue (bool):
+///		true:	Running OS is equal or newer than specified in the function name.
+///		false:	Running OS is older than specified in the function name.
+
+float GetNTDLLVersion();
+//This function is used to determine the version of the ntdll.
+//Based on this:
+//https://stackoverflow.com/a/940743 by user crashmstr
+// 
+//Arguments:
+//		none
+//
+//Returnvalue (float):
+///		On success:	The version of the ntdll to 1 decimal place.
+///		On failure:	0.0f.

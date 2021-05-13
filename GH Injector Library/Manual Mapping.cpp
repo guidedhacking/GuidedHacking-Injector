@@ -14,7 +14,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	DumpShellcode(ReCa<BYTE *>(ManualMapping_Shell), length, L"ManualMapping_Shell_WOW64");
 #endif
 
-	LOG("Begin ManualMap\n");
+	LOG("  Begin ManualMap\n");
 
 	MANUAL_MAPPING_DATA data{ 0 };
 	data.Flags = Flags;
@@ -25,7 +25,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("StringCbLengthW failed: %08X\n", hr);
+		LOG("   StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -39,7 +39,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("StringCbCopyW failed: %08X\n", hr);
+		LOG("   StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -49,7 +49,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("wcsrchr failed\n");
+		LOG("   wcsrchr failed\n");
 
 		return INJ_ERR_INVALID_PATH_SEPERATOR;
 	}
@@ -63,7 +63,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("StringCbLengthW failed: %08X\n", hr);
+		LOG("   StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -77,67 +77,81 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("StringCbCopyW failed: %08X\n", hr);
+		LOG("   StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
 
-	LOG("Shell data initialized\n");
+	LOG("   Shell data initialized\n");
+
+	if (Flags & INJ_MM_SHIFT_MODULE_BASE && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
+	{
+		auto seed = GetTickCount();
+		std::mt19937 gen(seed);
+		std::uniform_int_distribution<WORD> dis(MIN_SHIFT_OFFSET, MAX_SHIFT_OFFSET);
+
+		WORD shift_offset = dis(gen);
+		shift_offset = ALIGN_UP(shift_offset, BASE_ALIGNMENT);
+
+		data.ShiftOffset = shift_offset;
+
+		LOG("   Shift offset = %04X\n", shift_offset);
+	}
 
 	ULONG_PTR ShellSize = (ULONG_PTR)ManualMapping_Shell_End - (ULONG_PTR)ManualMapping_Shell;
-	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA) + ShellSize + 0x10;
-	BYTE * pAllocBase = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA) + ShellSize + BASE_ALIGNMENT;
+	BYTE * pAllocBase	= ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 
-	BYTE * pArg = pAllocBase;
-	BYTE * pShell = ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA), 0x10));
+	BYTE * pArg		= pAllocBase;
+	BYTE * pShell	= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA), BASE_ALIGNMENT));
 
 	if (!pArg)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
 
-	LOG("Shellsize = %IX\nTotal size = %08X\npArg = %p\npShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(MANUAL_MAPPING_DATA), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("Shelldata written to memory\n");
+	LOG("   Shelldata written to memory\n");
 
 	if (!WriteProcessMemory(hTargetProc, pShell, ManualMapping_Shell, ShellSize, nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("Shell written to memory\n");
+	LOG("   Shell written to memory\n");
 
-	LOG("Entering StartRoutine\n");
+	LOG("   Entering StartRoutine\n");
 
 	DWORD remote_ret = 0;
 	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
 
-	LOG("Return from StartRoutine\n");
+	LOG("   Return from StartRoutine\n");
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
-		LOG("StartRoutine failed: %08X\n", dwRet);
+		LOG("   StartRoutine failed: %08X\n", dwRet);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
@@ -147,13 +161,13 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 		return dwRet;
 	}
 
-	LOG("Fetching routine data\n");
+	LOG("   Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pAllocBase, &data, sizeof(MANUAL_MAPPING_DATA), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG("   ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
@@ -172,7 +186,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)data.ntRet);
 
-		LOG("Shell failed: %08X\n", remote_ret);
+		LOG("   Shell failed: %08X\n", remote_ret);
 
 		return remote_ret;
 	}
@@ -181,18 +195,16 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("Shell failed\n");
+		LOG("   Shell failed\n");
 
 		return INJ_ERR_FAILED_TO_LOAD_DLL;
 	}
 
-	LOG("Shell returned successfully\n");
+	LOG("   Shell returned successfully\n");
 
 	hOut = data.hRet;
 
-	LOG("Imagebase = %p\n", ReCa<void*>(hOut));
-
-	LOG("End ManualMap\n");
+	LOG("   Imagebase = %p\n", ReCa<void*>(hOut));
 
 	return INJ_ERR_SUCCESS;
 }
@@ -243,8 +255,8 @@ __forceinline bool InitAnsiString(MANUAL_MAPPING_FUNCTION_TABLE * f, ANSI_STRING
 		return false;
 	}
 
-	String->Length = Length;
-	String->MaxLength = Length + 1 * sizeof(char);
+	String->Length		= Length;
+	String->MaxLength	= Length + 1 * sizeof(char);
 	f->memmove(String->szBuffer, szString, Length);
 
 	return true;
@@ -257,7 +269,8 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		return INJ_MM_ERR_NO_DATA;
 	}
 
-	BYTE * pBase = nullptr;
+	BYTE * pAllocBase	= nullptr;
+	BYTE * pBase		= nullptr;
 
 	DWORD		Flags = pData->Flags;
 	NTSTATUS	ntRet = STATUS_SUCCESS;
@@ -278,9 +291,9 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 	//convert path to nt path
 	UNICODE_STRING DllNtPath{ 0 };
-	DllNtPath.Length	= pData->DllPath.Length;
+	DllNtPath.Length = pData->DllPath.Length;
 	DllNtPath.MaxLength = sizeof(wchar_t[MAX_PATH + 4]);
-	DllNtPath.szBuffer	= NewObject<wchar_t>(f, DllNtPath.MaxLength / sizeof(wchar_t));
+	DllNtPath.szBuffer = NewObject<wchar_t>(f, DllNtPath.MaxLength / sizeof(wchar_t));
 
 	if (!DllNtPath.szBuffer)
 	{
@@ -327,7 +340,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 	if (NT_FAIL(ntRet))
 	{
 		pData->ntRet = ntRet;
-		
+
 		DeleteObject(f, io_status);
 
 		return INJ_MM_ERR_NT_OPEN_FILE;
@@ -368,7 +381,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 		return INJ_MM_ERR_HEAP_ALLOC;
 	}
-	
+
 	ntRet = f->NtQueryInformationFile(hDllFile, io_status, fsi, sizeof(FILE_STANDARD_INFO), FILE_INFORMATION_CLASS::FileStandardInformation);
 	if (NT_FAIL(ntRet))
 	{
@@ -381,7 +394,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 		return INJ_MM_ERR_CANT_GET_FILE_SIZE;
 	}
-	
+
 	BYTE * pRawData = nullptr;
 	SIZE_T RawSize = fsi->AllocationSize.LowPart;
 
@@ -397,7 +410,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 		return INJ_MM_ERR_MEMORY_ALLOCATION_FAILED;
 	}
-	
+
 	auto * pos = NewObject<FILE_POSITION_INFORMATION>(f);
 	if (!pos)
 	{
@@ -446,13 +459,18 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 	DeleteObject(f, fsi);
 	DeleteObject(f, io_status);
 
-	pDosHeader		= ReCa<IMAGE_DOS_HEADER *>(pRawData);
-	pNtHeaders		= ReCa<IMAGE_NT_HEADERS *>(pRawData + pDosHeader->e_lfanew);
+	pDosHeader = ReCa<IMAGE_DOS_HEADER *>(pRawData);
+	pNtHeaders = ReCa<IMAGE_NT_HEADERS *>(pRawData + pDosHeader->e_lfanew);
 	pOptionalHeader = &pNtHeaders->OptionalHeader;
 	pFileHeader		= &pNtHeaders->FileHeader;
 
 	SIZE_T ImgSize = (SIZE_T)pOptionalHeader->SizeOfImage;
-	ntRet = f->NtAllocateVirtualMemory(hProc, ReCa<void **>(&pBase), 0, &ImgSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+	if (Flags & INJ_MM_SHIFT_MODULE_BASE && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
+	{
+		ImgSize += pData->ShiftOffset;
+	}
+
+	ntRet = f->NtAllocateVirtualMemory(hProc, ReCa<void **>(&pAllocBase), 0, &ImgSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (NT_FAIL(ntRet))
 	{
 		pData->ntRet = ntRet;
@@ -462,6 +480,15 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		f->NtClose(hDllFile);
 
 		return INJ_MM_ERR_MEMORY_ALLOCATION_FAILED;
+	}
+
+	if (Flags & INJ_MM_SHIFT_MODULE_BASE && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
+	{
+		pBase = pAllocBase + pData->ShiftOffset;
+	}
+	else
+	{
+		pBase = pAllocBase;
 	}
 
 	//copy header and sections
@@ -494,7 +521,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		if (!pRelocDir->Size)
 		{
 			ImgSize = 0;
-			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pBase), &ImgSize, MEM_RELEASE);
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
 			f->NtClose(hDllFile);
 
 			return INJ_MM_ERR_IMAGE_CANT_BE_RELOCATED;
@@ -524,7 +551,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			}
 		}
 
-		//pOptionalHeader->ImageBase += ReCa<ULONG_PTR>(LocationDelta);
+		pOptionalHeader->ImageBase += ReCa<ULONG_PTR>(LocationDelta);
 	}
 
 	if (Flags & INJ_MM_INIT_SECURITY_COOKIE && pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG].Size)
@@ -552,12 +579,13 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 #endif
 		auto pLoadConfigData = ReCa<IMAGE_LOAD_CONFIG_DIRECTORY *>(pBase + pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG].VirtualAddress);
 		pLoadConfigData->SecurityCookie = new_cookie;
-	}	
+	}
 
+	//tba: track imports for unloading in case something goes wrong
 	if (Flags & (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RUN_DLL_MAIN))
 	{
-		IMAGE_DATA_DIRECTORY	* pImportDir	= ReCa<IMAGE_DATA_DIRECTORY *>(&pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]);
-		IMAGE_IMPORT_DESCRIPTOR * pImportDescr	= nullptr;
+		IMAGE_DATA_DIRECTORY * pImportDir = ReCa<IMAGE_DATA_DIRECTORY *>(&pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]);
+		IMAGE_IMPORT_DESCRIPTOR * pImportDescr = nullptr;
 
 		if (pImportDir->Size)
 		{
@@ -578,7 +606,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 				ErrorBreak = true;
 				break;
 			}
-			
+
 			if (!InitAnsiString(f, ModNameA, szMod))
 			{
 				ntRet = STATUS_HEAP_CORRUPTION;
@@ -601,7 +629,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 				break;
 			}
 
-			ModNameW->szBuffer	= NewObject<wchar_t>(f, MAX_PATH);
+			ModNameW->szBuffer = NewObject<wchar_t>(f, MAX_PATH);
 			ModNameW->MaxLength = sizeof(wchar_t[MAX_PATH]);
 
 			if (!ModNameW->szBuffer)
@@ -644,7 +672,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			}
 
 			pModPathW->String.MaxLength = sizeof(pModPathW->StaticBuffer);
-			pModPathW->String.szBuffer	= pModPathW->StaticBuffer;
+			pModPathW->String.szBuffer = pModPathW->StaticBuffer;
 
 			LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
 			ntRet = f->LdrpPreprocessDllName(ModNameW, pModPathW, nullptr, &ctx_flags);
@@ -670,6 +698,14 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			{
 				auto * ctx = NewObject<LDRP_PATH_SEARCH_CONTEXT>(f);
 				ctx->OriginalFullDllName = pModPathW->String.szBuffer;
+				
+				if (!ctx)
+				{
+					DeleteObject(f, pModPathW);
+
+					ErrorBreak = true;
+					break;
+				}
 
 				ULONG_PTR unknown = 0;
 				LDR_DATA_TABLE_ENTRY * entry_out = nullptr;
@@ -691,8 +727,8 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 				break;
 			}
 
-			IMAGE_THUNK_DATA * pThunk	= ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->OriginalFirstThunk);
-			IMAGE_THUNK_DATA * pIAT		= ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->FirstThunk);
+			IMAGE_THUNK_DATA * pThunk = ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->OriginalFirstThunk);
+			IMAGE_THUNK_DATA * pIAT = ReCa<IMAGE_THUNK_DATA *>(pBase + pImportDescr->FirstThunk);
 
 			if (!pImportDescr->OriginalFirstThunk)
 			{
@@ -753,17 +789,19 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			pData->ntRet = ntRet;
 
 			ImgSize = 0;
-			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pBase), &ImgSize, MEM_RELEASE);
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
 			f->NtClose(hDllFile);
 
 			return INJ_MM_ERR_IMPORT_FAIL;
 		}
 	}
 
+
+	//tba: track imports for unloading in case something goes wrong
 	if (Flags & INJ_MM_RESOLVE_DELAY_IMPORTS)
-	{		
-		IMAGE_DATA_DIRECTORY		* pDelayImportDir	= ReCa<IMAGE_DATA_DIRECTORY *>(&pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT]);
-		IMAGE_DELAYLOAD_DESCRIPTOR	* pDelayImportDescr = nullptr;
+	{
+		IMAGE_DATA_DIRECTORY * pDelayImportDir = ReCa<IMAGE_DATA_DIRECTORY *>(&pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT]);
+		IMAGE_DELAYLOAD_DESCRIPTOR * pDelayImportDescr = nullptr;
 
 		if (pDelayImportDir->Size)
 		{
@@ -783,7 +821,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 				ErrorBreak = true;
 				break;
 			}
-			
+
 			if (!InitAnsiString(f, ModNameA, szMod))
 			{
 				ntRet = STATUS_HEAP_CORRUPTION;
@@ -806,7 +844,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 				break;
 			}
 
-			ModNameW->szBuffer	= NewObject<wchar_t>(f, MAX_PATH);
+			ModNameW->szBuffer = NewObject<wchar_t>(f, MAX_PATH);
 			ModNameW->MaxLength = sizeof(wchar_t[MAX_PATH]);
 
 			if (!ModNameW->szBuffer)
@@ -849,7 +887,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			}
 
 			pModPathW->String.MaxLength = sizeof(pModPathW->StaticBuffer);
-			pModPathW->String.szBuffer	= pModPathW->StaticBuffer;
+			pModPathW->String.szBuffer = pModPathW->StaticBuffer;
 
 			LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
 			ntRet = f->LdrpPreprocessDllName(ModNameW, pModPathW, nullptr, &ctx_flags);
@@ -875,6 +913,14 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			{
 				auto * ctx = NewObject<LDRP_PATH_SEARCH_CONTEXT>(f);
 				ctx->OriginalFullDllName = pModPathW->String.szBuffer;
+
+				if (!ctx)
+				{
+					DeleteObject(f, pModPathW);
+
+					ErrorBreak = true;
+					break;
+				}
 
 				ULONG_PTR unknown = 0;
 				LDR_DATA_TABLE_ENTRY * entry_out = nullptr;
@@ -953,23 +999,10 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			pData->ntRet = ntRet;
 
 			ImgSize = 0;
-			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pBase), &ImgSize, MEM_RELEASE);
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
 			f->NtClose(hDllFile);
 
 			return INJ_MM_ERR_DELAY_IMPORT_FAIL;
-		}
-	}
-
-	if (Flags & INJ_MM_ENABLE_EXCEPTIONS)
-	{
-		ntRet = f->RtlInsertInvertedFunctionTable(pBase, pOptionalHeader->SizeOfImage);
-		if (NT_FAIL(ntRet))
-		{
-			pData->ntRet = ntRet;
-
-			f->NtClose(hDllFile);
-
-			return INJ_MM_ERR_ENABLING_SEH_FAILED;
 		}
 	}
 
@@ -984,9 +1017,9 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			pCurrentSectionHeader = IMAGE_FIRST_SECTION(pNtHeaders);
 			for (UINT i = 0; i != pFileHeader->NumberOfSections; ++i, ++pCurrentSectionHeader)
 			{
-				void * pSectionBase		= pBase + pCurrentSectionHeader->VirtualAddress;
-				DWORD characteristics	= pCurrentSectionHeader->Characteristics;
-				SIZE_T SectionSize		= pCurrentSectionHeader->SizeOfRawData;
+				void * pSectionBase = pBase + pCurrentSectionHeader->VirtualAddress;
+				DWORD characteristics = pCurrentSectionHeader->Characteristics;
+				SIZE_T SectionSize = pCurrentSectionHeader->SizeOfRawData;
 
 				if (SectionSize)
 				{
@@ -1033,11 +1066,50 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			pData->ntRet = ntRet;
 
 			ImgSize = 0;
-			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pBase), &ImgSize, MEM_RELEASE);
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
 			f->NtClose(hDllFile);
 
 			return INJ_MM_ERR_UPDATE_PAGE_PROTECTION;
 		}
+	}
+
+	if (Flags & INJ_MM_ENABLE_EXCEPTIONS)
+	{
+		ntRet = f->RtlInsertInvertedFunctionTable(pBase, pOptionalHeader->SizeOfImage);
+		if (NT_FAIL(ntRet))
+		{
+			pData->ntRet = ntRet;
+
+			ImgSize = 0;
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
+			f->NtClose(hDllFile);
+
+			return INJ_MM_ERR_ENABLING_SEH_FAILED;
+		}
+
+		bool found = false;
+
+		for (ULONG i = 0; i < f->LdrpInvertedFunctionTable->Count; ++i)
+		{
+			if (f->LdrpInvertedFunctionTable->Entries[i].ImageBase == pBase)
+			{
+				found = true;
+				break;
+			}
+		}
+
+		if (!found)
+		{
+			//Insert seh table manually will be implemented eventually
+
+			ImgSize = 0;
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
+			f->NtClose(hDllFile);
+
+			return INJ_MM_ERR_NOT_IN_LDRP_SEH_TABLE;
+		}
+
+		//SEH is still fucked by DEP even with correct page protections, might be fixed with LdrpCfgProcessLoadConfig and patching dep callbacks?
 	}
 
 	if ((Flags & INJ_MM_EXECUTE_TLS) && pOptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].Size)
@@ -1048,7 +1120,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		if (!pDummyLdr)
 		{
 			ImgSize = 0;
-			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pBase), &ImgSize, MEM_RELEASE);
+			f->NtFreeVirtualMemory(hProc, ReCa<void **>(&pAllocBase), &ImgSize, MEM_RELEASE);
 			f->NtClose(hDllFile);
 
 			return INJ_MM_ERR_HEAP_ALLOC;
@@ -1068,15 +1140,28 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			Callback(pBase, DLL_PROCESS_ATTACH, nullptr);
 		}
 	}
-	
+
 	if (Flags & INJ_MM_RUN_DLL_MAIN && pOptionalHeader->AddressOfEntryPoint)
 	{
-		f->LdrpAcquireLoaderLock();
+		ULONG		State	= 0;
+		ULONG_PTR	Cookie	= 0;
+		bool		locked	= false;
+
+		if (Flags & INJ_MM_RUN_UNDER_LDR_LOCK)
+		{
+			ntRet = f->LdrLockLoaderLock(0, &State, &Cookie);
+			
+			//Don't interrupt only because loader lock wasn't acquired
+			locked = NT_SUCCESS(ntRet);
+		}
 
 		f_DLL_ENTRY_POINT DllMain = ReCa<f_DLL_ENTRY_POINT>(pBase + pOptionalHeader->AddressOfEntryPoint);
 		DllMain(ReCa<HINSTANCE>(pBase), DLL_PROCESS_ATTACH, nullptr);
 
-		f->LdrpReleaseLoaderLock();
+		if ((Flags & INJ_MM_RUN_UNDER_LDR_LOCK) && locked)
+		{
+			f->LdrUnlockLoaderLock(0, Cookie);
+		}
 	}
 
 	if (Flags & INJ_MM_CLEAN_DATA_DIR && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
@@ -1338,8 +1423,8 @@ MANUAL_MAPPING_FUNCTION_TABLE::MANUAL_MAPPING_FUNCTION_TABLE()
 	NT_FUNC_CONSTRUCTOR_INIT(RtlInsertInvertedFunctionTable);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpHandleTlsData);
 
-	NT_FUNC_CONSTRUCTOR_INIT(LdrpAcquireLoaderLock);
-	NT_FUNC_CONSTRUCTOR_INIT(LdrpReleaseLoaderLock);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrLockLoaderLock);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrUnlockLoaderLock);
 
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);

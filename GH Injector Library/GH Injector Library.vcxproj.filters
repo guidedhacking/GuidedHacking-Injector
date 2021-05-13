@@ -84,6 +84,9 @@
     <ClInclude Include="Download Manager.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Handle Hijacking.cpp">
@@ -167,5 +170,16 @@
     <ClCompile Include="Download Manager.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="KernelCallback.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="KernelCallback WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GH Injector Library.rc">
+      <Filter>Ressourcendateien</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
