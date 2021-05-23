@@ -912,7 +912,6 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			if (NT_FAIL(ntRet))
 			{
 				auto * ctx = NewObject<LDRP_PATH_SEARCH_CONTEXT>(f);
-				ctx->OriginalFullDllName = pModPathW->String.szBuffer;
 
 				if (!ctx)
 				{
@@ -921,7 +920,9 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 					ErrorBreak = true;
 					break;
 				}
-
+				
+				ctx->OriginalFullDllName = pModPathW->String.szBuffer;
+				
 				ULONG_PTR unknown = 0;
 				LDR_DATA_TABLE_ENTRY * entry_out = nullptr;
 
