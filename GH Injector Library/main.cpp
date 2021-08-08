@@ -25,22 +25,15 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 
 		g_hInjMod = hDll;
 
-		char	szRootPathA[MAX_PATH]{ 0 };
 		wchar_t szRootPathW[MAX_PATH]{ 0 };
-
-		if (!GetOwnModulePathA(szRootPathA, sizeof(szRootPathA) / sizeof(szRootPathA[0])))
-		{
-			LOG("Couldn't resolve own module path (ansi)\n");
-
-			return FALSE;
-		}
-		
 		if (!GetOwnModulePathW(szRootPathW, sizeof(szRootPathW) / sizeof(szRootPathW[0])))
 		{
 			LOG("Couldn't resolve own module path (unicode)\n");
 
 			return FALSE;
 		}
+
+		LOG("Rootpath is %ls\n", szRootPathW);
 
 		wchar_t * szWindowsDir = nullptr;
 
@@ -56,10 +49,7 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 			return FALSE;
 		}
 
-		g_RootPathA = szRootPathA;
 		g_RootPathW = szRootPathW;
-
-		LOG("Rootpath is %ls\n", szRootPathW);
 
 		std::wstring szNtDllNative = szWindowsDir;
 		szNtDllNative += L"\\System32\\ntdll.dll";

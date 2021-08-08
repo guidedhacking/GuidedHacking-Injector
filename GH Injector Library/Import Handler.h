@@ -1,10 +1,12 @@
 #pragma once
 
-#include "NT Stuff.h"
+#include "NT Funcs.h"
 #include "Symbol Parser.h"
 
 inline ERROR_DATA					import_handler_error_data;
 inline std::shared_future<DWORD>	import_handler_ret;
+
+//Macros for import definitions
 
 #define NT_FUNC(func) inline f_##func func = nullptr
 #define NT_FUNC_LOCAL(func) f_##func func
@@ -18,6 +20,78 @@ inline std::shared_future<DWORD>	import_handler_ret;
 #define WOW64_FUNCTION_POINTER(func) inline DWORD func##_WOW64 = 0
 #define WOW64_FUNCTION_POINTER_LOCAL(func) DWORD func
 #define WOW64_FUNC_CONSTRUCTOR_INIT(func) this->func = WOW64::func##_WOW64
+
+//Command line codes for "GH Injector SM - XX.exe"
+
+#define ID_SWHEX	"0" //use for SetWindowsHookEx
+#define ID_WOW64	"1" //use for wow64 addresses
+#define ID_KC		"2" //use for KernelCallbackTable
+
+//Global variable to store the base address of the current image of the injector. Initialized in DllMain.
+inline HINSTANCE g_hInjMod = NULL;
+
+//Global variable to store the root directory of the module
+inline std::wstring	g_RootPathW;
+
+inline DWORD g_OSVersion		= 0;
+inline DWORD g_OSBuildNumber	= 0;
+
+#define g_Win7	61
+#define g_Win8	62
+#define g_Win81	63
+#define g_Win10	100
+#define g_Win11	100
+
+#define g_Win7_SP1 7601
+#define g_Win8_SP1 9600
+#define g_Win10_1507 10240
+#define g_Win10_1511 10586
+#define g_Win10_1607 14393
+#define g_Win10_1703 15063
+#define g_Win10_1709 16299
+#define g_Win10_1803 17134
+#define g_Win10_1809 17763
+#define g_Win10_1903 18362
+#define g_Win10_1909 18363
+#define g_Win10_2004 19041
+#define g_Win10_20H2 19042
+#define g_Win10_21H1 19043
+#define g_Win11_21H2 22000
+
+bool IsWin7OrGreater();
+bool IsWin8OrGreater();
+bool IsWin81OrGreater();
+bool IsWin10OrGreater();
+bool IsWin11OrGreater();
+//These functions are used to determine the currently running version of windows. GetNTDLLVersion needs to be successfully called before these work.
+//
+//Arguements:
+//		none
+//
+//Returnvalue (bool):
+///		true:	Running OS is equal or newer than specified in the function name.
+///		false:	Running OS is older than specified in the function name.
+
+DWORD GetOSVersion(DWORD * error_code = nullptr);
+//This function is used to determine the version of the operating system.
+// 
+//Arguments:
+//		errode_code (DWORD *):
+///			A reference to a DWORD which will receive an error code if the function fails (optional).
+//
+//Returnvalue (DWORD):
+///		On success:	The version of the operating system to 1 decimal place (multiplied by 10 as an integer)
+///		On failure:	0.
+
+DWORD GetOSBuildVersion();
+//This function is used to determine the build version of the operating system.
+// 
+//Arguments:
+//		none
+//
+//Returnvalue (DWORD):
+///		On success:	The build version of the operating system.
+///		On failure:	0.
 
 namespace NATIVE
 {
@@ -54,6 +128,7 @@ namespace NATIVE
 
 	NT_FUNC(RtlAnsiStringToUnicodeString);
 
+	NT_FUNC(RtlRbInsertNodeEx);
 	NT_FUNC(RtlRbRemoveNode);
 
 	NT_FUNC(NtOpenFile);
@@ -67,10 +142,23 @@ namespace NATIVE
 	NT_FUNC(NtFreeVirtualMemory);
 	NT_FUNC(NtProtectVirtualMemory);
 
+	NT_FUNC(NtCreateSection);
+	NT_FUNC(NtMapViewOfSection);
+
+	NT_FUNC(LdrProtectMrdata);
+
+	NT_FUNC(RtlAddVectoredExceptionHandler);
+	NT_FUNC(RtlRemoveVectoredExceptionHandler);
+
 	NT_FUNC(LdrpModuleBaseAddressIndex);
 	NT_FUNC(LdrpMappingInfoIndex);
 	NT_FUNC(LdrpHeap);
 	NT_FUNC(LdrpInvertedFunctionTable);
+	NT_FUNC(LdrpDefaultPath);
+
+#ifdef _WIN64
+	NT_FUNC(RtlAddFunctionTable);
+#endif
 }
 
 DWORD ResolveImports(ERROR_DATA & error_data);
@@ -134,10 +222,19 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(NtFreeVirtualMemory);
 	WOW64_FUNCTION_POINTER(NtProtectVirtualMemory);
 
+	WOW64_FUNCTION_POINTER(NtCreateSection);
+	WOW64_FUNCTION_POINTER(NtMapViewOfSection);
+
+	WOW64_FUNCTION_POINTER(LdrProtectMrdata);
+
+	WOW64_FUNCTION_POINTER(RtlAddVectoredExceptionHandler);
+	WOW64_FUNCTION_POINTER(RtlRemoveVectoredExceptionHandler);
+
 	WOW64_FUNCTION_POINTER(LdrpModuleBaseAddressIndex);
 	WOW64_FUNCTION_POINTER(LdrpMappingInfoIndex);
 	WOW64_FUNCTION_POINTER(LdrpHeap);
 	WOW64_FUNCTION_POINTER(LdrpInvertedFunctionTable);
+	WOW64_FUNCTION_POINTER(LdrpDefaultPath);
 }
 
 DWORD ResolveImports_WOW64(ERROR_DATA & error_data);
@@ -151,26 +248,13 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data);
 ///		On success: INJ_ERR_SUCCESS (0)
 ///		On failure: An error code. See Error.h.
 
-HINSTANCE GetModuleHandleExW_WOW64(const wchar_t * lpModuleName, DWORD * PidOut = nullptr);
-//Uses CreateToolHelp32Snapshot with Process32FirstW/NextW and IsWow46Process to find a wow64 process and then forwards the call to GetModuleHandleExW_WOW64 with a process handle (see next declaration).
-//
-//Arguments:
-//		szModuleName (const wchar_t*):
-///			The name of the module including the file extension.
-//		PidOut (DWORD*):
-///			The PID of the wow64 process that was used to determine the address of the module. This parameter can be 0.
-//
-//Returnvalue (HINSTANCE):
-///		On success: base address of the image.
-///		On failure: NULL.
-
 HINSTANCE GetModuleHandleExW_WOW64(HANDLE hTargetProc, const wchar_t * lpModuleName);
 //Uses CreateToolHelp32Snapshot and Module32First/Next to retrieve the baseaddress of an image.
 //Only scans WOW64 modules of a process.
 //
 //Arguments:
 //		hTargetProc (HANDLE):
-///			A handle to the target process with either PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
+///			A handle to the target process with PROCESS_VM_READ and PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
 //		szModuleName (const wchar_t*):
 ///			The name of the module including the file extension.
 //
@@ -184,7 +268,7 @@ bool GetProcAddressExW_WOW64(HANDLE hTargetProc, const wchar_t * szModuleName, c
 //
 //Arguments:
 //		hTargetProc (HANDLE):
-///			A handle to the target process with either PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
+///			A handle to the target process with PROCESS_VM_READ and PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
 //		szModuleName (const wchar_t*):
 ///			The name of the module including the file extension.
 //		szProcName (const char*):

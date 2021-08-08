@@ -139,6 +139,15 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData)
 
 		return RetVal;
 	}
+
+	if (pData->Mode == INJECTION_MODE::IM_LdrpLoadDllInternal && !IsWin10OrGreater())
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		LOG(" LdrpLoadDllInternal is only supported on Windows 10\n");
+
+		return InitErrorStruct(nullptr, pData, -1, INJ_ERR_NOT_SUPPORTED, error_data);
+	}
 		
 	if (!pData->szDllPath)
 	{

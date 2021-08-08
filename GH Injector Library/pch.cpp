@@ -88,6 +88,10 @@ void custom_print(const char * format, ...)
 				break;
 			}
 		}
+		else if (result < 0)
+		{
+			break;
+		}
 	} while (result < 0);
 
 	_set_thread_local_invalid_parameter_handler(old);

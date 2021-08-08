@@ -1,0 +1,158 @@
+#pragma once
+#include "pch.h"
+
+#include "VEH Shell.h"
+
+__forceinline UINT_PTR bit_rotate_l(UINT_PTR val, int count)
+{
+	return (val << count) | (val >> (-count));
+}
+
+#pragma optimize( "", off ) //even with volatile this doesn't work, disabling optimizations seems to be the only way
+
+// This code is 100% stolen from DarthTon:
+// https://github.com/DarthTon/Blackbone/blob/master/src/BlackBone/ManualMap/MExcept.cpp
+
+#ifdef _WIN64
+
+LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
+{
+	volatile auto * pData = ReCa<VEH_SHELL_DATA *>(VEHDATASIG_64);
+
+	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EH_EXCEPTION_NUMBER)
+	{
+		if (ExceptionInfo->ExceptionRecord->ExceptionInformation[2] >= pData->ImgBase && ExceptionInfo->ExceptionRecord->ExceptionInformation[2] < pData->ImgBase + pData->ImgSize)
+		{
+			if (ExceptionInfo->ExceptionRecord->ExceptionInformation[0] == EH_PURE_MAGIC_NUMBER1 && ExceptionInfo->ExceptionRecord->ExceptionInformation[3] == 0)
+			{
+				ExceptionInfo->ExceptionRecord->ExceptionInformation[0] = (ULONG_PTR)EH_MAGIC_NUMBER1;
+
+				ExceptionInfo->ExceptionRecord->ExceptionInformation[3] = pData->ImgBase;
+			}
+		}
+	}
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+#else
+
+LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
+{
+	UNREFERENCED_PARAMETER(ExceptionInfo);
+
+	volatile auto * pData = ReCa<VEH_SHELL_DATA *>(VEHDATASIG_32);
+	EXCEPTION_REGISTRATION_RECORD * pERR = nullptr;
+	
+	pERR = ReCa<EXCEPTION_REGISTRATION_RECORD *>(__readfsdword(0x00));
+
+	if (!pERR)
+	{
+		return EXCEPTION_CONTINUE_SEARCH;
+	}	
+
+	RTL_INVERTED_FUNCTION_TABLE_ENTRY * Entries = nullptr;
+	bool UseWin7Table = (pData->OSVersion == g_Win7);
+
+	if (UseWin7Table)
+	{
+		Entries = &(ReCa<RTL_INVERTED_FUNCTION_TABLE_WIN7 *>(pData->_LdrpInvertedFunctionTable))->Entries[0];
+	}
+	else
+	{
+		Entries = &pData->_LdrpInvertedFunctionTable->Entries[0];
+	}
+
+	auto ntRet = STATUS_SUCCESS;
+	if (pData->OSVersion >= g_Win81)
+	{
+		ntRet = pData->_LdrProtectMrdata(FALSE);
+
+		if (NT_FAIL(ntRet))
+		{
+			return EXCEPTION_CONTINUE_SEARCH;
+		}
+	}
+
+	auto cookie = *P_KUSER_SHARED_DATA_COOKIE;
+
+	for (; pERR && pERR != ReCa<EXCEPTION_REGISTRATION_RECORD *>(0xFFFFFFFF) && pERR->Next != ReCa<EXCEPTION_REGISTRATION_RECORD *>(0xFFFFFFFF); pERR = pERR->Next)
+	{
+		for (ULONG idx = 0; idx < pData->_LdrpInvertedFunctionTable->Count; ++idx)
+		{
+			if (!UseWin7Table && idx == 0)
+			{
+				continue;
+			}
+
+			if (Entries[idx].ImageBase != ReCa<void *>(pData->ImgBase))
+			{
+				continue;
+			}
+
+			if (ReCa<ULONG_PTR>(pERR->Handler) < pData->ImgBase || ReCa<ULONG_PTR>(pERR->Handler) >= pData->ImgBase + pData->ImgSize)
+			{
+				continue;
+			}
+
+			bool NewHandler = false;
+
+			//DecodeSystemPointer
+			DWORD ptr_enc = ReCa<DWORD>(Entries[idx].ExceptionDirectory);
+			ptr_enc = bit_rotate_l(ptr_enc, cookie & 0x1F);
+			ptr_enc ^= cookie;
+
+			DWORD * pStart = ReCa<DWORD *>(ptr_enc);
+
+			for (auto * pRVA = pStart; pRVA != nullptr && pRVA < pStart + 0x100; ++pRVA)
+			{
+				if (*pRVA == 0)
+				{
+					*pRVA = ReCa<DWORD>(pERR->Handler) - ReCa<DWORD>(Entries[idx].ImageBase);
+										
+					Entries[idx].ExceptionDirectorySize++;
+					NewHandler = true;					
+
+					break;
+				}
+				else if (ReCa<DWORD>(pERR->Handler) == ReCa<DWORD>(Entries[idx].ImageBase) + *pRVA)
+				{
+					break;
+				}
+			}
+
+			if (NewHandler)
+			{
+				for (ULONG i = 0; i < Entries[idx].ExceptionDirectorySize; ++i)
+				{
+					for (ULONG j = Entries[idx].ExceptionDirectorySize - 1; j > i; --j)
+					{
+						if (pStart[j - 1] > pStart[j])
+						{
+							//high efficient xor-swap to outperform DarthTon's code 5Head
+							pStart[j - 1] ^= pStart[j];
+							pStart[j] ^= pStart[j - 1];
+							pStart[j - 1] ^= pStart[j];
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (pData->OSVersion >= g_Win81)
+	{
+		pData->_LdrProtectMrdata(TRUE);
+	}
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+#endif
+
+LONG __declspec(code_seg(".mmap_sec$4")) VectoredHandlerShell_End()
+{
+	return 2;
+}
+
+#pragma optimize( "", on)

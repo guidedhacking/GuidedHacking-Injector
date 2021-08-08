@@ -2,14 +2,9 @@
 
 #include "Tools.h"
 
-static FLOAT g_vNTDLL = 0.0;
-static const FLOAT g_Win7	= 6.1f;
-static const FLOAT g_Win8	= 6.2f;
-static const FLOAT g_Win81	= 6.3f;
-static const FLOAT g_Win10	= 10.0f;
-
 std::wstring InjectionModeToString(INJECTION_MODE mode);
 std::wstring LaunchMethodToString(LAUNCH_METHOD method);
+std::wstring BuildNumberToVersionString(int OSBuildNumber);
 
 bool FileExists(const wchar_t * szFile)
 {
@@ -167,26 +162,33 @@ void ErrorLog(ERROR_INFO * info)
 	wchar_t szTime[30]{ 0 };
 	wcsftime(szTime, 30, L"%d-%m-%Y %H:%M:%S", &time_info);
 
-	wchar_t szWinProductName	[100]{ 0 };
-	wchar_t szWinReleaseId		[100]{ 0 };
-	wchar_t szWinCurrentBuild	[100]{ 0 };
+	const wchar_t * szWinProductName	= nullptr;
+	auto szWinReleaseId	= BuildNumberToVersionString(GetOSBuildVersion());
+	wchar_t szWinCurrentBuild[10]{ 0 };
 
-	HKEY hKey = nullptr;
-	LSTATUS reg_status = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", NULL, KEY_READ, &hKey);
-	if (reg_status == ERROR_SUCCESS)
+	StringCchPrintfW(szWinCurrentBuild, sizeof(szWinCurrentBuild) / sizeof(wchar_t), L"%d", GetOSBuildVersion());
+
+	switch (GetOSVersion())
 	{
-		DWORD Type = REG_SZ;
+		case g_Win7:
+			szWinProductName = L"Windows 7";
+			break;
+			
+		case g_Win8:
+			szWinProductName = L"Windows 8";
+			break;
 
-		DWORD SizeOut = sizeof(szWinProductName);
-		RegQueryValueExW(hKey, L"ProductName",	nullptr, &Type, ReCa<BYTE*>(szWinProductName),	&SizeOut);
+		case g_Win81:
+			szWinProductName = L"Windows 8.1";
+			break;
 
-		SizeOut = sizeof(szWinReleaseId);
-		RegQueryValueExW(hKey, L"ReleaseId",	nullptr, &Type, ReCa<BYTE*>(szWinReleaseId),	&SizeOut);
+		default:
+			szWinProductName = L"Windows 10";
+	}
 
-		SizeOut = sizeof(szWinCurrentBuild);
-		RegQueryValueExW(hKey, L"CurrentBuild", nullptr, &Type, ReCa<BYTE*>(szWinCurrentBuild), &SizeOut);
-
-		RegCloseKey(hKey);
+	if (GetOSVersion() == g_Win10 && GetOSBuildVersion() == g_Win11_21H2)
+	{
+		szWinProductName = L"Windows 11";	
 	}
 
 	wchar_t szFlags			[9]{ 0 };
@@ -208,7 +210,16 @@ void ErrorLog(ERROR_INFO * info)
 
 	error_log << szTime																															<< std::endl;
 	error_log << L"Version            : "	<< L"GH Injector V" << GH_INJ_VERSION																<< std::endl;
-	error_log << L"OS                 : "	<< szWinProductName << L" " << szWinReleaseId << L" (Build " << szWinCurrentBuild << L")"			<< std::endl;
+
+	if (szWinReleaseId.length() > 1)
+	{
+		error_log << L"OS                 : " << szWinProductName << L" " << szWinReleaseId.c_str() << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+	}
+	else
+	{
+		error_log << L"OS                 : " << szWinProductName << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+	}
+
 	error_log << L"File               : "	<< (info->szDllFileName ? info->szDllFileName : L"(nullptr)")										<< std::endl;
 	error_log << L"Target             : "	<< (info->szTargetProcessExeFileName[0] ? info->szTargetProcessExeFileName : L"(undetermined)")		<< std::endl;
 	error_log << L"Target PID         : "	<< info->TargetProcessId																			<< std::endl;
@@ -275,6 +286,58 @@ std::wstring LaunchMethodToString(LAUNCH_METHOD method)
 	}
 
 	return std::wstring(L"bruh moment");
+}
+
+std::wstring BuildNumberToVersionString(int OSBuildNumber)
+{
+	switch (OSBuildNumber)
+	{
+		case g_Win7_SP1:
+		case g_Win8_SP1:
+			return std::wstring(L"SP1");
+
+		case g_Win10_1507:
+			return std::wstring(L"1507");
+
+		case g_Win10_1511:
+			return std::wstring(L"1511");
+
+		case g_Win10_1607:
+			return std::wstring(L"1607");
+
+		case g_Win10_1703:
+			return std::wstring(L"1703");
+
+		case g_Win10_1709:
+			return std::wstring(L"1709");
+
+		case g_Win10_1803:
+			return std::wstring(L"1803");
+
+		case g_Win10_1809:
+			return std::wstring(L"1809");
+
+		case g_Win10_1903:
+			return std::wstring(L"1903");
+
+		case g_Win10_1909:
+			return std::wstring(L"1909");
+
+		case g_Win10_2004:
+			return std::wstring(L"2004");
+
+		case g_Win10_20H2:
+			return std::wstring(L"20H2");
+
+		case g_Win10_21H1:
+			return std::wstring(L"21H1");
+
+		case g_Win11_21H2:
+			return std::wstring(L"21H2");
+
+		default:
+			return std::wstring(L"");
+	}
 }
 
 #if !defined(_WIN64) && defined(DUMP_SHELLCODE)
@@ -397,77 +460,4 @@ void __stdcall InterruptDownload()
 	
 	while (import_handler_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
 	LOG("Import handler thread exited successfully\n");
-}
-
-bool IsWin7OrGreater()
-{
-	return (g_vNTDLL >= g_Win7);
-}
-
-bool IsWin8OrGreater()
-{
-	return (g_vNTDLL >= g_Win8);
-}
-
-bool IsWin10OrGreater()
-{
-	return (g_vNTDLL >= g_Win10);
-}
-
-float GetNTDLLVersion()
-{
-	if (g_vNTDLL != 0.0f)
-	{
-		return g_vNTDLL;
-	}
-
-	DWORD unused = 0;
-	auto fv_size = GetFileVersionInfoSize(TEXT("ntdll.dll"), &unused);
-	if (!fv_size)
-	{
-		return 0.0f;
-	}
-
-	BYTE * v_buffer = new BYTE[fv_size];
-	if (!v_buffer)
-	{
-		return 0.0f;
-	}
-
-	if (!GetFileVersionInfo(TEXT("ntdll.dll"), 0, fv_size, v_buffer))
-	{
-		delete[] v_buffer;
-
-		return 0.0f;
-	}
-
-	UINT size_out = 0;
-	VS_FIXEDFILEINFO * p_info = nullptr;
-	if (!VerQueryValue(v_buffer, TEXT("\\"), ReCa<void **>(&p_info), &size_out))
-	{
-		delete[] v_buffer;
-
-		return 0.0f;
-	}
-
-	if (!p_info || p_info->dwSignature != VS_FFI_SIGNATURE)
-	{
-		delete[] v_buffer;
-
-		return 0.0f;
-	}
-	
-	float v_hi = (float)((p_info->dwFileVersionMS >> 0x10) & 0xffff);
-	float v_lo = (float)((p_info->dwFileVersionMS >> 0x00) & 0xffff);
-
-	delete[] v_buffer;
-
-	while (v_lo > 1.0f)
-	{
-		v_lo /= 10.0f;
-	}
-
-	g_vNTDLL = v_hi + v_lo;
-
-	return g_vNTDLL;
 }

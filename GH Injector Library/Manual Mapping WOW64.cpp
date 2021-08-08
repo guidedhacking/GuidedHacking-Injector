@@ -13,7 +13,9 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	LOG("  Begin ManualMap_WOW64\n");
 
 	MANUAL_MAPPING_DATA_WOW64 data{ 0 };
-	data.Flags = Flags;
+	data.Flags			= Flags;
+	data.OSVersion		= GetOSVersion();
+	data.OSBuildNumber	= GetOSBuildVersion();
 
 	size_t len = 0;
 	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.szPathBuffer), &len);
@@ -92,12 +94,26 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 		LOG("   Shift offset = %04X\n", shift_offset);
 	}
 
-	ULONG_PTR ShellSize = sizeof(ManualMapping_Shell_WOW64);
-	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA_WOW64) + ShellSize + BASE_ALIGNMENT;
+	ULONG_PTR ShellSize		= sizeof(ManualMapping_Shell_WOW64);
+	ULONG_PTR VEHShellSize	= sizeof(VectoredHandlerShell_WOW64);
+
+	if ((Flags & INJ_MM_ENABLE_EXCEPTIONS) == 0)
+	{
+		VEHShellSize = 0;
+	}
+
+	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA_WOW64) + ShellSize + VEHShellSize + BASE_ALIGNMENT * 2;
 	BYTE * pAllocBase	= ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 
-	BYTE * pArg		= pAllocBase;
-	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), 0x10));
+	BYTE * pArg			= pAllocBase;
+	BYTE * pShell		= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), BASE_ALIGNMENT));
+	BYTE * pVEHShell	= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pShell) + ShellSize, BASE_ALIGNMENT));
+
+	if (VEHShellSize)
+	{
+		data.pVEHShell		= MDWD(pVEHShell);
+		data.VEHShellSize	= MDWD(VEHShellSize);
+	}
 
 	if (!pArg)
 	{
@@ -110,6 +126,11 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
 
+	if (VEHShellSize)
+	{
+		LOG("   pVEHShell = %p\n", pVEHShell);
+	}
+
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(MANUAL_MAPPING_DATA_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
@@ -120,6 +141,8 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 		return INJ_ERR_WPM_FAIL;
 	}
+
+	LOG("   Shelldata written to memory\n");
 
 	if (!WriteProcessMemory(hTargetProc, pShell, ManualMapping_Shell_WOW64, ShellSize, nullptr))
 	{
@@ -133,6 +156,22 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	}
 
 	LOG("   Shell written to memory\n");
+
+	if (VEHShellSize)
+	{
+		if (!WriteProcessMemory(hTargetProc, pVEHShell, VectoredHandlerShell_WOW64, VEHShellSize, nullptr))
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
+
+			return INJ_ERR_WPM_FAIL;
+		}
+
+		LOG("   VEHShell written to memory\n");
+	}
 
 	LOG("   Entering StartRoutine_WOW64\n");
 
@@ -214,14 +253,19 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtFreeVirtualMemory);
 
+	WOW64_FUNC_CONSTRUCTOR_INIT(NtCreateSection);
+	WOW64_FUNC_CONSTRUCTOR_INIT(NtMapViewOfSection);
+
 	WOW64_FUNC_CONSTRUCTOR_INIT(memmove);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlZeroMemory);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAllocateHeap);
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlFreeHeap);
 
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrGetDllHandleEx);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpLoadDll);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpLoadDllInternal);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrGetProcedureAddress);
+
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrUnloadDll);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAnsiStringToUnicodeString);
 
@@ -232,10 +276,18 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrLockLoaderLock);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrUnlockLoaderLock);
 
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrProtectMrdata);
+
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAddVectoredExceptionHandler);
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlRemoveVectoredExceptionHandler);
+
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable); 
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpDefaultPath);
+
+	pLdrpHeap = 0;
 }
 
 #endif

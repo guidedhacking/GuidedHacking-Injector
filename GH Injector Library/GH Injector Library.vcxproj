@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{AC732425-E265-40FF-842F-C59CECE9A96C}</ProjectGuid>
     <RootNamespace>GHInjectorLibrary</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -174,13 +174,20 @@
     <ClInclude Include="Injection Internal.h" />
     <ClInclude Include="Injection.h" />
     <ClInclude Include="Manual Mapping.h" />
-    <ClInclude Include="NT Stuff.h" />
+    <ClInclude Include="NT Defs.h" />
+    <ClInclude Include="NT Funcs.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Process Info.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Start Routine.h" />
     <ClInclude Include="Symbol Parser.h" />
     <ClInclude Include="Tools.h" />
+    <ClInclude Include="VEH Shell.h" />
+    <ClInclude Include="Win10.h" />
+    <ClInclude Include="Win11.h" />
+    <ClInclude Include="Win7.h" />
+    <ClInclude Include="Win8.h" />
+    <ClInclude Include="Win81.h" />
     <ClInclude Include="WOW64 Shells.h" />
   </ItemGroup>
   <ItemGroup>
@@ -222,6 +229,7 @@
     <ClCompile Include="Thread Hijacking WOW64.cpp" />
     <ClCompile Include="Thread Hijacking.cpp" />
     <ClCompile Include="Tools.cpp" />
+    <ClCompile Include="VEH Shell.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GH Injector Library.rc" />

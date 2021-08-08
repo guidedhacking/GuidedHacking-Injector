@@ -8,17 +8,20 @@
 
 //Honestly, too lazy to document
 
-#define NT_RET_OFFSET_64 0x14
-#define NT_RET_OFFSET_86 0x0C
+#define NT_RET_OFFSET_64_WIN7		0x0A //Win7 - Win10 1507
+#define NT_RET_OFFSET_64_WIN10_1511 0x14 //Win10 1511+
+
+#define NT_RET_OFFSET_86_WIN7							0x15 //Win7 only
+#define NT_RET_OFFSET_86_WIN8							0x0C //Win8+
 
 #define TEB_SAMETEBFLAGS_64 0x17EE
 #define TEB_SAMETEBFLAGS_86 0xFCA
 
+#define TEB_SAMETEB_FLAGS_LoaderWorker 0x2000
+
 #ifdef _WIN64
-#define NT_RET_OFFSET NT_RET_OFFSET_64
 #define TEB_SAMETEBFLAGS TEB_SAMETEBFLAGS_64
 #else
-#define NT_RET_OFFSET NT_RET_OFFSET_86
 #define TEB_SAMETEBFLAGS TEB_SAMETEBFLAGS_86
 #endif
 
@@ -41,12 +44,13 @@ class ProcessInfo
 	PEB						* GetPEB_Native();
 	LDR_DATA_TABLE_ENTRY	* GetLdrEntry_Native(HINSTANCE hMod);
 
-	UINT_PTR m_WaitFunctionReturnAddress[6] = { 0 };
+	UINT_PTR m_WaitFunctionReturnAddress[5] = { 0 };
 
-	HINSTANCE m_hWin32U;
+	HINSTANCE m_hWin32U = NULL;
 
 #ifdef _WIN64
-	DWORD m_WaitFunctionReturnAddress_WOW64[6] = { 0 };
+	DWORD	m_WaitFunctionReturnAddress_WOW64[5]	= { 0 };
+	bool	m_IsWow64								= false;
 #endif
 
 public:
@@ -87,8 +91,8 @@ public:
 
 #ifdef _WIN64
 
-	PEB32					* GetPEB_WOW64();
-	LDR_DATA_TABLE_ENTRY32	* GetLdrEntry_WOW64(HINSTANCE hMod);
+	PEB_32					* GetPEB_WOW64();
+	LDR_DATA_TABLE_ENTRY_32	* GetLdrEntry_WOW64(HINSTANCE hMod);
 
 	bool IsThreadInAlertableState_WOW64();
 

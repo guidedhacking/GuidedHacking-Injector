@@ -1,7 +1,13 @@
 #include "pch.h"
 
 #include "Injection Internal.h"
-#include "Manual Mapping.h"
+
+#define UNLINK_IF(e)			\
+if (e.Flink && e.Blink)			\
+{								\
+	e.Flink->Blink = e.Blink;	\
+	e.Blink->Flink = e.Flink;	\
+}
 
 using namespace NATIVE;
 
@@ -25,8 +31,10 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	}
 
 	INJECTION_DATA_INTERNAL data{ 0 };
-	data.Flags	= Flags;
-	data.Mode	= Mode;
+	data.Flags			= Flags;
+	data.Mode			= Mode;
+	data.OSVersion		= GetOSVersion();
+	data.OSBuildNumber	= GetOSBuildVersion();
 
 	size_t len = 0;
 	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.Path), &len);
@@ -54,13 +62,21 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 	LOG("   Shell data initialized\n");
 
-	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(InjectionShell_End) - ReCa<ULONG_PTR>(InjectionShell);
-	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL) + ShellSize + 0x10;
+	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(InjectionShell_End)		- ReCa<ULONG_PTR>(InjectionShell);
+	ULONG_PTR VEHShellSize	= ReCa<ULONG_PTR>(VectoredHandlerShell_End) - ReCa<ULONG_PTR>(VectoredHandlerShell);
 
-	BYTE * pAllocBase = ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-	BYTE * pArg		= pAllocBase;
-	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_INTERNAL), 0x10));
+	if (!(Flags & INJ_UNLINK_FROM_PEB))
+	{
+		VEHShellSize = 0;
+	}
 
+	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL) + ShellSize + BASE_ALIGNMENT;
+	BYTE * pAllocBase		= ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+
+	BYTE * pArg			= pAllocBase;
+	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_INTERNAL), BASE_ALIGNMENT));
+	BYTE * pVEHShell	= nullptr;
+	
 	if (!pArg)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
@@ -70,13 +86,42 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
 
+	if(VEHShellSize)
+	{
+		pVEHShell = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, VEHShellSize + sizeof(VEH_SHELL_DATA) + BASE_ALIGNMENT, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+
+		if (!pVEHShell)
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+
+			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
+
+			return INJ_ERR_OUT_OF_MEMORY_EXT;
+		}
+
+		data.pVEHShell		= pVEHShell;
+		data.VEHShellSize	= MDWD(VEHShellSize);
+	}	
+
 	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+
+	if (VEHShellSize)
+	{
+		LOG("   pVEHShell = %p\n", pVEHShell);
+	}
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
 		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+		if (pVEHShell)
+		{
+			VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+		}
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
@@ -89,12 +134,38 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
+		if (pVEHShell)
+		{
+			VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+		}
+
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
 	LOG("   Shell written to memory\n");
+
+	if (VEHShellSize)
+	{
+		if (!WriteProcessMemory(hTargetProc, pVEHShell, VectoredHandlerShell, VEHShellSize, nullptr))
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
+			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
+
+			return INJ_ERR_WPM_FAIL;
+		}
+
+		LOG("   VEHShell written to memory\n");
+	}
 
 	LOG("   Entering StartRoutine\n");
 
@@ -109,6 +180,11 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 		}
 
@@ -125,6 +201,11 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 		}
 
@@ -170,11 +251,9 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		return INJ_ERR_NO_DATA;
 	}
 
-	DWORD dwRet = INJ_ERR_SUCCESS;
+	INJECTION_FUNCTION_TABLE * f = &pData->f;
+	pData->ModuleFileName.szBuffer = pData->Path;
 
-	INJECTION_FUNCTION_TABLE * f	= &pData->f;
-	pData->ModuleFileName.szBuffer	= pData->Path;
-	
 	if (pData->Mode == INJECTION_MODE::IM_LoadLibraryExW)
 	{
 		pData->hRet = f->pLoadLibraryExW(pData->ModuleFileName.szBuffer, nullptr, NULL);
@@ -183,48 +262,79 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		{
 			pData->LastError = f->pGetLastError();
 
-			dwRet = INJ_ERR_LLEXW_FAILED;
+			return INJ_ERR_LLEXW_FAILED;
 		}
 	}
 	else if (pData->Mode == INJECTION_MODE::IM_LdrLoadDll)
 	{
-		pData->LastError = (DWORD)f->LdrLoadDll(nullptr, NULL, &pData->ModuleFileName, ReCa<HANDLE *>(&pData->hRet));
+		ULONG Flags = NULL;
+
+		LDR_SEARCH_PATH optPath{ 0 };
+		if (pData->OSVersion == g_Win7)
+		{
+			optPath.szSearchPath = f->LdrpDefaultPath->szBuffer;
+		}
+		else
+		{
+			optPath.NoPath = TRUE;
+		}
+
+		pData->LastError = (DWORD)f->LdrLoadDll(optPath, &Flags, &pData->ModuleFileName, ReCa<HANDLE *>(&pData->hRet));
 
 		if (NT_FAIL(pData->LastError))
 		{
 			return INJ_ERR_LDRLDLL_FAILED;
 		}
 	}
-	else if (pData->Mode == INJECTION_MODE::IM_LdrpLoadDll || pData->Mode == INJECTION_MODE::IM_LdrpLoadDllInternal)
+	else if (pData->OSVersion >= g_Win10)
 	{
-		pData->ModuleFileNameBundle.String.MaxLength	= sizeof(pData->ModuleFileNameBundle.StaticBuffer);
-		pData->ModuleFileNameBundle.String.szBuffer		= pData->ModuleFileNameBundle.StaticBuffer;
-
-		LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
-		pData->LastError = (DWORD)f->LdrpPreprocessDllName(&pData->ModuleFileName, &pData->ModuleFileNameBundle, nullptr, &ctx_flags);
-
-		if (NT_FAIL(pData->LastError))
-		{
-			return INJ_ERR_LDRP_PREPROCESS_FAILED;
-		}
-
-		pData->SearchPathContext.OriginalFullDllName = pData->ModuleFileNameBundle.String.szBuffer;
-
 		LDR_DATA_TABLE_ENTRY * entry_out = nullptr;
+		LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
+
+		LDRP_PATH_SEARCH_CONTEXT * ctx = &pData->SearchPathContext;
+		ctx->OriginalFullDllName = pData->Path;
 
 		if (pData->Mode == INJECTION_MODE::IM_LdrpLoadDll)
 		{
-			pData->LastError = (DWORD)f->LdrpLoadDll(&pData->ModuleFileNameBundle.String, &pData->SearchPathContext, ctx_flags, &entry_out);
-
-			if (NT_FAIL(pData->LastError))
+			if (pData->OSBuildNumber <= g_Win10_1803)
 			{
-				return INJ_ERR_LDRPLDLL_FAILED;
+				auto _LdrpLoadDll = ReCa<f_LdrpLoadDll_1507>(f->LdrpLoadDll);
+
+				if (pData->OSBuildNumber <= g_Win10_1511)
+				{
+					ReCa<LDRP_PATH_SEARCH_CONTEXT_1507 *>(ctx)->OriginalFullDllName = pData->Path;
+					ctx->OriginalFullDllName = nullptr;
+				}
+
+				pData->LastError = _LdrpLoadDll(&pData->ModuleFileName, ctx, ctx_flags, TRUE, &entry_out);
+			}
+			else
+			{
+				pData->LastError = f->LdrpLoadDll(&pData->ModuleFileName, ctx, ctx_flags, &entry_out);
 			}
 		}
 		else
 		{
+			pData->ModuleFileNameBundle.String.szBuffer = pData->ModuleFileNameBundle.StaticBuffer;
+
+			pData->LastError = (DWORD)f->LdrpPreprocessDllName(&pData->ModuleFileName, &pData->ModuleFileNameBundle, nullptr, &ctx_flags);
+
+			if (NT_FAIL(pData->LastError))
+			{
+				return INJ_ERR_LDRP_PREPROCESS_FAILED;
+			}
+
 			ULONG_PTR unknown = 0;
-			pData->LastError = (DWORD)f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, &pData->SearchPathContext, ctx_flags, 4, nullptr, nullptr, &entry_out, &unknown);
+
+			if (pData->OSBuildNumber > g_Win10_21H1)
+			{
+				auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_21H2>(f->LdrpLoadDllInternal);
+				pData->LastError = _LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, &entry_out, &unknown, 0);
+			}
+			else
+			{
+				pData->LastError = f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, &entry_out, &unknown);
+			}
 
 			if (NT_FAIL(pData->LastError))
 			{
@@ -239,16 +349,86 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 
 		pData->hRet = ReCa<HINSTANCE>(entry_out->DllBase);
 	}
+	else if (pData->OSVersion == g_Win81 && pData->Mode == INJECTION_MODE::IM_LdrpLoadDll)
+	{
+		auto _LdrpLoadDll = ReCa<f_LdrpLoadDll_WIN81>(f->LdrpLoadDll);
+
+		LDRP_PATH_SEARCH_CONTEXT_WIN81 ctx{ 0 };
+		ctx.OriginalFullDllName = pData->ModuleFileName.szBuffer;
+
+		LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
+
+		LDR_DATA_TABLE_ENTRY_WIN81	* entry_out = nullptr;
+		LDR_DDAG_NODE_WIN81			* ddag_out	= nullptr;
+
+		pData->LastError = (DWORD)_LdrpLoadDll(&pData->ModuleFileName, &ctx, ctx_flags, TRUE, &entry_out, &ddag_out);
+
+		if (NT_FAIL(pData->LastError))
+		{
+			return INJ_ERR_LDRPLDLL_FAILED;
+		}
+
+		if (!entry_out)
+		{
+			return INJ_ERR_LDR_ENTRY_IS_NULL;
+		}
+
+		pData->hRet = ReCa<HINSTANCE>(entry_out->DllBase);
+	}
+	else if (pData->OSVersion == g_Win8 && pData->Mode == INJECTION_MODE::IM_LdrpLoadDll)
+	{
+		auto _LdrpLoadDll = ReCa<f_LdrpLoadDll_WIN8>(f->LdrpLoadDll);
+
+		LDRP_PATH_SEARCH_CONTEXT_WIN8 ctx{ 0 };
+		ctx.OriginalFullDllName = pData->ModuleFileName.szBuffer;
+		ctx.unknown2 = TRUE;
+
+		LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
+
+		LDR_DATA_TABLE_ENTRY_WIN8	* entry_out = nullptr;
+		LDR_DDAG_NODE_WIN8			* ddag_out	= nullptr;
+
+		pData->LastError = (DWORD)_LdrpLoadDll(&pData->ModuleFileName, &ctx, ctx_flags, TRUE, &entry_out, &ddag_out);
+
+		if (NT_FAIL(pData->LastError))
+		{
+			return INJ_ERR_LDRPLDLL_FAILED;
+		}
+
+		if (!entry_out)
+		{
+			return INJ_ERR_LDR_ENTRY_IS_NULL;
+		}
+
+		pData->hRet = ReCa<HINSTANCE>(entry_out->DllBase);
+	}
+	else if (pData->OSVersion == g_Win7 && pData->Mode == INJECTION_MODE::IM_LdrpLoadDll)
+	{
+		auto _LdrpLoadDll = ReCa<f_LdrpLoadDll_WIN7>(f->LdrpLoadDll);
+
+		LDRP_LOAD_CONTEXT_FLAGS ctx_flags{ 0 };
+
+		LDR_DATA_TABLE_ENTRY_WIN7 * entry_out = nullptr;
+
+		pData->LastError = (DWORD)_LdrpLoadDll(&pData->ModuleFileName, f->LdrpDefaultPath, ctx_flags, TRUE, nullptr, &entry_out);
+
+		if (NT_FAIL(pData->LastError))
+		{
+			return INJ_ERR_LDRPLDLL_FAILED;
+		}
+
+		if (!entry_out)
+		{
+			return INJ_ERR_LDR_ENTRY_IS_NULL;
+		}
+
+		pData->hRet = ReCa<HINSTANCE>(entry_out->DllBase);
+	}
 	else
 	{
 		return INJ_ERR_INVALID_INJ_METHOD;
 	}
-
-	if (dwRet != INJ_ERR_SUCCESS)
-	{
-		return dwRet;
-	}
-
+	
 	if (!(pData->Flags & (INJ_UNLINK_FROM_PEB | INJ_FAKE_HEADER | INJ_ERASE_HEADER)))
 	{
 		return INJ_ERR_SUCCESS;
@@ -279,7 +459,7 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		auto * nt_headers	= ReCa<IMAGE_NT_HEADERS*>(ReCa<BYTE*>(pData->hRet) + dos_header->e_lfanew);
 		SIZE_T header_size	= nt_headers->OptionalHeader.SizeOfHeaders;
 
-		HANDLE hProc = MPTR(-1);
+		HANDLE hProc = NtCurrentProcess();
 
 		ULONG old_access	= NULL;
 		void * base			= ReCa<void*>(pData->hRet);
@@ -336,26 +516,89 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		{
 			return INJ_ERR_CANT_FIND_MOD_PEB;
 		}
+		
+		auto * veh_shell_data = ReCa<VEH_SHELL_DATA *>(ALIGN_UP(pData->pVEHShell + pData->VEHShellSize, BASE_ALIGNMENT));
+		
+		veh_shell_data->ImgBase		= ReCa<ULONG_PTR>(pEntry->DllBase);
+		veh_shell_data->ImgSize		= pEntry->SizeOfImage;
+		veh_shell_data->OSVersion	= pData->OSVersion;
+		veh_shell_data->_LdrpInvertedFunctionTable	= f->LdrpInvertedFunctionTable;
+		veh_shell_data->_LdrProtectMrdata			= f->LdrProtectMrdata;
 
-		pEntry->InLoadOrderLinks.Flink->Blink			= pEntry->InLoadOrderLinks.Blink;
-		pEntry->InLoadOrderLinks.Blink->Flink			= pEntry->InLoadOrderLinks.Flink;
-		pEntry->InInitializationOrderLinks.Flink->Blink = pEntry->InInitializationOrderLinks.Blink;
-		pEntry->InInitializationOrderLinks.Blink->Flink = pEntry->InInitializationOrderLinks.Flink;
-		pEntry->InMemoryOrderLinks.Flink->Blink			= pEntry->InMemoryOrderLinks.Blink;
-		pEntry->InMemoryOrderLinks.Blink->Flink			= pEntry->InMemoryOrderLinks.Flink;
-		pEntry->HashLinks.Flink->Blink					= pEntry->HashLinks.Blink;
-		pEntry->HashLinks.Blink->Flink					= pEntry->HashLinks.Flink;
+		bool veh_shell_fixed = FindAndReplacePtr(pData->pVEHShell, pData->VEHShellSize, VEHDATASIG, ReCa<UINT_PTR>(veh_shell_data));
 
-		f->RtlRbRemoveNode(f->LdrpModuleBaseAddressIndex,	&pEntry->BaseAddressIndexNode);
-		f->RtlRbRemoveNode(f->LdrpMappingInfoIndex,			&pEntry->MappingInfoIndexNode);
+		if (veh_shell_fixed)
+		{
+			f->RtlAddVectoredExceptionHandler(0, ReCa<PVECTORED_EXCEPTION_HANDLER>(pData->pVEHShell));
+		}
+
+		UNLINK_IF(pEntry->InLoadOrderLinks);
+		UNLINK_IF(pEntry->InInitializationOrderLinks);
+		UNLINK_IF(pEntry->InMemoryOrderLinks);	
+		UNLINK_IF(pEntry->HashLinks);
+
+		size_t ldr_size		= sizeof(LDR_DATA_TABLE_ENTRY);
+		size_t ddag_size	= sizeof(LDR_DDAG_NODE);
+		void * pDDag		= nullptr;
+
+		if (pData->OSVersion == g_Win7)
+		{
+			auto * pEntry7 = ReCa<LDR_DATA_TABLE_ENTRY_WIN7 *>(pEntry);
+			UNLINK_IF(pEntry7->ForwarderLinks);
+			UNLINK_IF(pEntry7->ServiceTagLinks);
+			UNLINK_IF(pEntry7->StaticLinks);
+
+			ldr_size = sizeof(LDR_DATA_TABLE_ENTRY_WIN7);
+		}
+		else
+		{
+			f->RtlRbRemoveNode(f->LdrpModuleBaseAddressIndex,	&pEntry->BaseAddressIndexNode);
+			f->RtlRbRemoveNode(f->LdrpMappingInfoIndex,			&pEntry->MappingInfoIndexNode);
+
+			if (pData->OSVersion == g_Win8)
+			{
+				ldr_size	= sizeof(LDR_DATA_TABLE_ENTRY_WIN8);
+				ddag_size	= sizeof(LDR_DDAG_NODE_WIN8);
+			}
+			else if (pData->OSVersion == g_Win81)
+			{
+				ldr_size	= sizeof(LDR_DATA_TABLE_ENTRY_WIN81);
+				ddag_size	= sizeof(LDR_DDAG_NODE_WIN81);
+			}
+			else if (pData->OSVersion >= g_Win10) //Win10 or Win11, same OSVersion...
+			{
+				if (pData->OSBuildNumber <= g_Win10_1511) //1507 - 1511
+				{
+					ldr_size = offsetof(LDR_DATA_TABLE_ENTRY_WIN10, DependentLoadFlags);
+				}
+				else if (pData->OSBuildNumber <= g_Win10_1607) //1607
+				{
+					ldr_size = offsetof(LDR_DATA_TABLE_ENTRY_WIN10, SigningLevel);
+				}
+				else if (pData->OSBuildNumber <= g_Win10_21H1) //1703 - 21H1
+				{
+					ldr_size	= sizeof(LDR_DATA_TABLE_ENTRY_WIN10);
+					ddag_size	= sizeof(LDR_DDAG_NODE_WIN10);
+				}
+				else //21H2+ (Win11)
+				{
+					ldr_size	= sizeof(LDR_DATA_TABLE_ENTRY_WIN11);
+					ddag_size	= sizeof(LDR_DDAG_NODE_WIN11);
+				}
+			}			
+
+			pDDag = pEntry->DdagNode;
+		}
 
 		f->RtlZeroMemory(pEntry->BaseDllName.szBuffer, pEntry->BaseDllName.MaxLength);
 		f->RtlZeroMemory(pEntry->FullDllName.szBuffer, pEntry->FullDllName.MaxLength);
 
-		LDR_DDAG_NODE * pDDagNode = pEntry->DdagNode;
+		f->RtlZeroMemory(pEntry, ldr_size);
 
-		f->RtlZeroMemory(pEntry, sizeof(LDR_DATA_TABLE_ENTRY));
-		f->RtlZeroMemory(pDDagNode, sizeof(LDR_DDAG_NODE));
+		if (pDDag)
+		{
+			f->RtlZeroMemory(pDDag, ddag_size);
+		}
 	}
 
 	return INJ_ERR_SUCCESS;
@@ -384,6 +627,11 @@ INJECTION_FUNCTION_TABLE::INJECTION_FUNCTION_TABLE()
 	
 	NT_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
 
+	NT_FUNC_CONSTRUCTOR_INIT(RtlAddVectoredExceptionHandler);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrProtectMrdata);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable);
+
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrpDefaultPath);
 }

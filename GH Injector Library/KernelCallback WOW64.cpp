@@ -53,8 +53,8 @@ DWORD SR_KernelCallback_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWOR
 		return SR_KC_ERR_CANT_GET_PEB;
 	}
 
-	PEB32 peb;
-	if (!ReadProcessMemory(hTargetProc, pPEB, &peb, sizeof(PEB32), nullptr))
+	PEB_32 peb;
+	if (!ReadProcessMemory(hTargetProc, pPEB, &peb, sizeof(PEB_32), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 

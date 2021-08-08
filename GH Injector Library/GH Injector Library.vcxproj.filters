@@ -34,6 +34,9 @@
     <Filter Include="Headerdateien\Injection Methods">
       <UniqueIdentifier>{d3c5e067-fa7b-4ff9-9579-418c449c7978}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headerdateien\NT">
+      <UniqueIdentifier>{844b590b-6d34-422e-8d4f-d27e3e5defb5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Handle Hijacking.h">
@@ -43,9 +46,6 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="Injection.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="NT Stuff.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="Process Info.h">
@@ -86,6 +86,30 @@
     </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="NT Funcs.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="Win7.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="Win8.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="Win81.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="Win10.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="NT Defs.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="Win11.h">
+      <Filter>Headerdateien\NT</Filter>
+    </ClInclude>
+    <ClInclude Include="VEH Shell.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -175,6 +199,9 @@
     </ClCompile>
     <ClCompile Include="KernelCallback WOW64.cpp">
       <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="VEH Shell.cpp">
+      <Filter>Quelldateien\native\Injection Methods</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

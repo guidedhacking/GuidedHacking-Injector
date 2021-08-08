@@ -395,7 +395,7 @@ DWORD SYMBOL_PARSER::Initialize(const std::wstring szModulePath, const std::wstr
 				guid_filtered += w_GUID[i];
 			}
 		}
-
+		
 		std::wstring url = L"https://msdl.microsoft.com/download/symbols/";
 		url += szPdbFileName;
 		url += '/';
@@ -412,6 +412,17 @@ DWORD SYMBOL_PARSER::Initialize(const std::wstring szModulePath, const std::wstr
 
 			while (InternetCheckConnectionW(L"https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 			{
+				if (GetLastError() == ERROR_INTERNET_CANNOT_CONNECT)
+				{
+					VirtualFree(pLocalImageBase, 0, MEM_RELEASE);
+
+					delete[] pRawData;
+
+					LOG(" Symbol Parser: cannot connect to Microsoft Symbol Server\n");
+
+					return SYMBOL_ERR_CANNOT_CONNECT;
+				}
+
 				Sleep(25);
 
 				if (m_bInterruptEvent)

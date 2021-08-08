@@ -3,7 +3,6 @@
 #ifdef _WIN64
 
 #include "Injection Internal.h"
-#include "Manual Mapping.h"
 #include "WOW64 Shells.h"
 
 using namespace WOW64;
@@ -20,8 +19,10 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 	}
 
 	INJECTION_DATA_INTERNAL_WOW64 data{ 0 };
-	data.Flags	= Flags;
-	data.Mode	= Mode;
+	data.Flags			= Flags;
+	data.Mode			= Mode;
+	data.OSVersion		= GetOSVersion();
+	data.OSBuildNumber	= GetOSBuildVersion();
 
 	size_t len = 0;
 	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.Path), &len);
@@ -50,11 +51,19 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 	LOG("   Shell data initialized\n");
 
 	ULONG_PTR ShellSize		= sizeof(InjectionShell_WOW64);
-	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL_WOW64) + ShellSize + 0x10;
+	ULONG_PTR VEHShellSize	= sizeof(VectoredHandlerShell_WOW64);
 
+	if (!(Flags & INJ_UNLINK_FROM_PEB))
+	{
+		VEHShellSize = 0;
+	}
+
+	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL_WOW64) + ShellSize + BASE_ALIGNMENT;
 	BYTE * pAllocBase = ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-	BYTE * pArg		= pAllocBase;
-	BYTE * pShell	= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_INTERNAL_WOW64)), 0x10));
+	
+	BYTE * pArg			= pAllocBase;
+	BYTE * pShell		= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_INTERNAL_WOW64)), BASE_ALIGNMENT));
+	BYTE * pVEHShell	= nullptr;
 
 	if (!pArg)
 	{
@@ -65,13 +74,43 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
 
+	if (VEHShellSize)
+	{
+		pVEHShell = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, VEHShellSize + sizeof(VEH_SHELL_DATA) + BASE_ALIGNMENT, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+		//VEH_SHELL_DATA is bigger than the wow64 version of it, no need to define it
+
+		if (!pVEHShell)
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+
+			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
+
+			return INJ_ERR_OUT_OF_MEMORY_EXT;
+		}
+
+		data.pVEHShell		= MDWD(pVEHShell);
+		data.VEHShellSize	= MDWD(VEHShellSize);
+	}
+
 	LOG("   Shellsize = %IX\nTotal size = %08X\npArg = %p\npShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+
+	if (VEHShellSize)
+	{
+		LOG("   pVEHShell = %p\n", pVEHShell);
+	}
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
 		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+		if (pVEHShell)
+		{
+			VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+		}
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
@@ -84,12 +123,38 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
+		if (pVEHShell)
+		{
+			VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+		}
+
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
 	LOG("   Shell written to memory\n");
+
+	if (VEHShellSize)
+	{
+		if (!WriteProcessMemory(hTargetProc, pVEHShell, VectoredHandlerShell, VEHShellSize, nullptr))
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
+			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
+
+			return INJ_ERR_WPM_FAIL;
+		}
+
+		LOG("   VEHShell written to memory\n");
+	}
 
 	LOG("   Entering StartRoutine_WOW64\n");
 
@@ -104,6 +169,11 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 		}
 
@@ -120,6 +190,11 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
+			if (pVEHShell)
+			{
+				VirtualFreeEx(hTargetProc, pVEHShell, 0, MEM_RELEASE);
+			}
+
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 		}
 
@@ -176,8 +251,13 @@ INJECTION_FUNCTION_TABLE_WOW64::INJECTION_FUNCTION_TABLE_WOW64()
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(NtProtectVirtualMemory);
 
+	WOW64_FUNC_CONSTRUCTOR_INIT(RtlAddVectoredExceptionHandler);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrProtectMrdata);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable);
+
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpDefaultPath);
 }
 
 #endif

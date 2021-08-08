@@ -135,7 +135,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, b
 	}
 	
 	LOG("      Creating thread with\n       pRoutine = %p\n       pArg = %p\n", pRemoteFunc, pMem);
-		
+	
 	NTSTATUS ntRet = NATIVE::NtCreateThreadEx(&hThread, THREAD_ALL_ACCESS, nullptr, hTargetProc, CloakThread ? pEntrypoint : pRemoteFunc, pMem, CloakThread ? Flags : NULL, 0, 0, 0, nullptr);
 	if (NT_FAIL(ntRet) || !hThread)
 	{

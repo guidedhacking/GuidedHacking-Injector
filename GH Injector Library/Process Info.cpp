@@ -2,7 +2,81 @@
 
 #include "Process Info.h"
 
-#define NEXT_SYSTEM_PROCESS_ENTRY(pCurrent) ReCa<SYSTEM_PROCESS_INFORMATION*>(ReCa<BYTE*>(pCurrent) + pCurrent->NextEntryOffset)
+#define NEXT_SYSTEM_PROCESS_ENTRY(pCurrent) ReCa<SYSTEM_PROCESS_INFORMATION *>(ReCa<BYTE *>(pCurrent) + pCurrent->NextEntryOffset)
+
+ProcessInfo::ProcessInfo()
+{
+	HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
+	if (!hNTDLL)
+	{
+		return;
+	}
+
+	LOG("Creating ProcessInfo\n");
+
+	m_pNtQueryInformationProcess	= ReCa<f_NtQueryInformationProcess>	(GetProcAddress(hNTDLL, "NtQueryInformationProcess"));
+	m_pNtQuerySystemInformation		= ReCa<f_NtQuerySystemInformation>	(GetProcAddress(hNTDLL, "NtQuerySystemInformation"));
+	m_pNtQueryInformationThread		= ReCa<f_NtQueryInformationThread>	(GetProcAddress(hNTDLL, "NtQueryInformationThread"));
+
+	if (!m_pNtQueryInformationProcess || !m_pNtQuerySystemInformation || !m_pNtQueryInformationThread)
+	{
+		return;
+	}
+
+	m_BufferSize	= 0x10000;
+	m_pFirstProcess = nullptr;
+
+	ULONG nt_ret_offset = 0;
+
+#ifdef _WIN64
+	if (GetOSBuildVersion() <= g_Win10_1507)
+	{
+		nt_ret_offset = NT_RET_OFFSET_64_WIN7;
+	}
+	else
+	{
+		nt_ret_offset = NT_RET_OFFSET_64_WIN10_1511;
+	}
+#else
+	if (GetOSVersion() == g_Win7)
+	{
+		nt_ret_offset = NT_RET_OFFSET_86_WIN7;
+	}
+	else
+	{
+		nt_ret_offset = NT_RET_OFFSET_86_WIN8;
+	}
+#endif
+
+	m_WaitFunctionReturnAddress[0] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtDelayExecution"				)) + nt_ret_offset;
+	m_WaitFunctionReturnAddress[1] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtWaitForSingleObject"			)) + nt_ret_offset;
+	m_WaitFunctionReturnAddress[2] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtWaitForMultipleObjects"		)) + nt_ret_offset;
+	m_WaitFunctionReturnAddress[3] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtSignalAndWaitForSingleObject"	)) + nt_ret_offset;
+
+	if (GetOSBuildVersion() >= g_Win10_1607)
+	{
+		m_hWin32U = LoadLibrary(TEXT("win32u.dll"));
+		if (m_hWin32U)
+		{
+			m_WaitFunctionReturnAddress[4] = ReCa<UINT_PTR>(GetProcAddress(m_hWin32U, "NtUserMsgWaitForMultipleObjectsEx")) + nt_ret_offset;
+		}
+	}
+
+	LOG("ProcessInfo initialized\n");
+}
+
+ProcessInfo::~ProcessInfo()
+{
+	if (m_hWin32U)
+	{
+		FreeLibrary(m_hWin32U);
+	}
+
+	if (m_pFirstProcess)
+	{
+		delete[] m_pFirstProcess;
+	}
+}
 
 PEB * ProcessInfo::GetPEB_Native()
 {
@@ -58,7 +132,7 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
 
 		if (CurrentEntry.DllBase == hMod)
 		{
-			return ReCa<LDR_DATA_TABLE_ENTRY*>(pCurrentEntry);
+			return ReCa<LDR_DATA_TABLE_ENTRY *>(pCurrentEntry);
 		}
 		else if (pCurrentEntry == pLastEntry)
 		{
@@ -69,52 +143,6 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
 	}
 
 	return nullptr;
-}
-
-ProcessInfo::ProcessInfo()
-{
-	HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
-	if (!hNTDLL)
-	{
-		return;
-	}
-
-	m_pNtQueryInformationProcess	= ReCa<f_NtQueryInformationProcess>	(GetProcAddress(hNTDLL, "NtQueryInformationProcess"));
-	m_pNtQuerySystemInformation		= ReCa<f_NtQuerySystemInformation>	(GetProcAddress(hNTDLL, "NtQuerySystemInformation"));
-	m_pNtQueryInformationThread		= ReCa<f_NtQueryInformationThread>	(GetProcAddress(hNTDLL, "NtQueryInformationThread"));
-
-	if (!m_pNtQueryInformationProcess || !m_pNtQuerySystemInformation || !m_pNtQueryInformationThread)
-	{
-		return;
-	}
-
-	m_BufferSize	= 0x10000;
-	m_pFirstProcess = nullptr;
-
-	m_WaitFunctionReturnAddress[0] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtDelayExecution"				)) + NT_RET_OFFSET;
-	m_WaitFunctionReturnAddress[1] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtWaitForSingleObject"			)) + NT_RET_OFFSET;
-	m_WaitFunctionReturnAddress[2] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtWaitForMultipleObjects"		)) + NT_RET_OFFSET;
-	m_WaitFunctionReturnAddress[3] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtSignalAndWaitForSingleObject"	)) + NT_RET_OFFSET;
-	m_WaitFunctionReturnAddress[4] = ReCa<UINT_PTR>(GetProcAddress(hNTDLL, "NtRemoveIoCompletionEx"			)) + NT_RET_OFFSET;
-
-	m_hWin32U = LoadLibrary(TEXT("win32u.dll"));
-	if (m_hWin32U)
-	{
-		m_WaitFunctionReturnAddress[5] = ReCa<UINT_PTR>(GetProcAddress(m_hWin32U, "NtUserMsgWaitForMultipleObjectsEx")) + NT_RET_OFFSET;
-	}
-}
-
-ProcessInfo::~ProcessInfo()
-{
-	if (m_hWin32U)
-	{
-		FreeLibrary(m_hWin32U);
-	}
-
-	if (m_pFirstProcess)
-	{
-		delete[] m_pFirstProcess;
-	}
 }
 
 bool ProcessInfo::SetProcess(HANDLE hTargetProc)
@@ -135,11 +163,15 @@ bool ProcessInfo::SetProcess(HANDLE hTargetProc)
 
 	m_hCurrentProcess = hTargetProc;
 
+#ifdef _WIN64
+	m_IsWow64 = IsNative() ? false : true;
+#endif
+
 	ULONG_PTR PID = GetProcessId(m_hCurrentProcess);
 
 	while (NEXT_SYSTEM_PROCESS_ENTRY(m_pCurrentProcess) != m_pCurrentProcess)
 	{
-		if (m_pCurrentProcess->UniqueProcessId == ReCa<void*>(PID))
+		if (m_pCurrentProcess->UniqueProcessId == ReCa<void *>(PID))
 		{
 			break;
 		}
@@ -147,7 +179,7 @@ bool ProcessInfo::SetProcess(HANDLE hTargetProc)
 		m_pCurrentProcess = NEXT_SYSTEM_PROCESS_ENTRY(m_pCurrentProcess);
 	}
 
-	if (m_pCurrentProcess->UniqueProcessId != ReCa<void*>(PID))
+	if (m_pCurrentProcess->UniqueProcessId != ReCa<void *>(PID))
 	{
 		m_pCurrentProcess = m_pFirstProcess;
 		return false;
@@ -170,7 +202,7 @@ bool ProcessInfo::SetThread(DWORD TID)
 
 	for (UINT i = 0; i != m_pCurrentProcess->NumberOfThreads; ++i)
 	{
-		if (m_pCurrentProcess->Threads[i].ClientId.UniqueThread == ReCa<void*>(ULONG_PTR(TID)))
+		if (m_pCurrentProcess->Threads[i].ClientId.UniqueThread == ReCa<void *>(ULONG_PTR(TID)))
 		{
 			m_CurrentThreadIndex = i;
 			m_pCurrentThread = &m_pCurrentProcess->Threads[i];
@@ -222,7 +254,7 @@ bool ProcessInfo::RefreshInformation()
 {
 	if (!m_pFirstProcess)
 	{
-		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION*>(new BYTE[m_BufferSize]);
+		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new BYTE[m_BufferSize]);
 		if (!m_pFirstProcess)
 		{
 			return false;
@@ -244,7 +276,7 @@ bool ProcessInfo::RefreshInformation()
 		delete[] m_pFirstProcess;
 
 		m_BufferSize	= size_out + 0x1000;
-		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION*>(new BYTE[m_BufferSize]);
+		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new BYTE[m_BufferSize]);
 		if (!m_pFirstProcess)
 		{
 			return false;
@@ -447,6 +479,15 @@ bool ProcessInfo::IsThreadInAlertableState()
 		return false;
 	}
 
+#ifdef _WIN64
+
+	if (m_IsWow64)
+	{
+		return IsThreadInAlertableState_WOW64();
+	}
+
+#endif
+
 	HANDLE hThread = OpenThread(THREAD_GET_CONTEXT, FALSE, MDWD(m_pCurrentThread->ClientId.UniqueThread));
 	if (!hThread)
 	{
@@ -472,38 +513,37 @@ bool ProcessInfo::IsThreadInAlertableState()
 		return false;
 	}
 
-	if (ctx.Rip == m_WaitFunctionReturnAddress[0])
+	if (ctx.Rip == m_WaitFunctionReturnAddress[0]) //NtDelayExecution
 	{
-		return (ctx.Rcx == TRUE);
-	} 
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[1])
-	{
-		return (ctx.Rdx == TRUE);
-	} 
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[2])
-	{
-		return (ctx.Rsi == TRUE);
-	} 
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[3])
-	{
-		return (ctx.Rsi == TRUE);
-	} 
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[4])
-	{
-		BOOLEAN Alertable = FALSE;
-		if (ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Rsp + 0x30), &Alertable, sizeof(Alertable), nullptr))
+		if (GetOSVersion() == g_Win7)
 		{
-			return (Alertable == TRUE);
+			return (ctx.Rdi == TRUE);
+		}
+		else if (GetOSBuildVersion() <= g_Win10_1709)
+		{
+			return (ctx.Rbx == TRUE);
+		}
+		else
+		{
+			return (ctx.Rcx == TRUE);
 		}
 	}
-	else if (ctx.Rip == m_WaitFunctionReturnAddress[5])
+	else if (ctx.Rip == m_WaitFunctionReturnAddress[1]) //NtWaitForSingleObject
+	{
+		return (ctx.Rbx == TRUE);
+	}
+	else if (ctx.Rip == m_WaitFunctionReturnAddress[2] || ctx.Rip == m_WaitFunctionReturnAddress[3]) //NtWaitForMultipleObjects & NtSignalAndWaitForSingleObject
+	{
+		return (ctx.Rsi == TRUE);
+	}
+	else if (ctx.Rip == m_WaitFunctionReturnAddress[4]) //NtUserMsgWaitForMultipleObjectsEx
 	{
 		DWORD Flags = FALSE;
-		if (ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Rsp + 0x28), &Flags, sizeof(Flags), nullptr))
+		if (ReadProcessMemory(m_hCurrentProcess, ReCa<void *>(ctx.Rsp + 0x28), &Flags, sizeof(Flags), nullptr))
 		{
 			return ((Flags & MWMO_ALERTABLE) != 0);
 		}
-	} 
+	}
 
 #else
 
@@ -512,33 +552,57 @@ bool ProcessInfo::IsThreadInAlertableState()
 		return false;
 	}
 
-	DWORD stack_buffer[7] = { 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, ReCa<void*>(ctx.Esp), stack_buffer, sizeof(stack_buffer), nullptr))
+	DWORD stack_buffer[6] = { 0 };
+	if (!ReadProcessMemory(m_hCurrentProcess, ReCa<void *>(ctx.Esp), stack_buffer, sizeof(stack_buffer), nullptr))
 	{
 		return false;
 	}
 
-	if (ctx.Eip == m_WaitFunctionReturnAddress[0])
+	if (ctx.Eip == m_WaitFunctionReturnAddress[0]) //NtDelayExecution
 	{
-		return (stack_buffer[1] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[2] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[1] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress[1])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress[1]) //NtWaitForSingleObject
 	{
-		return (stack_buffer[2] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[3] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[2] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress[2])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress[2]) //NtWaitForMultipleObjects
 	{
-		return (stack_buffer[4] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[5] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[4] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress[3])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress[3]) //NtSignalAndWaitForSingleObject
 	{
-		return (stack_buffer[3] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[4] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[3] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress[4])
-	{
-		return ((stack_buffer[6] & 0xFF) == TRUE);
-	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress[5])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress[4]) //NtUserMsgWaitForMultipleObjectsEx
 	{
 		return ((stack_buffer[5] & MWMO_ALERTABLE) != 0);
 	}
@@ -550,6 +614,13 @@ bool ProcessInfo::IsThreadInAlertableState()
 
 bool ProcessInfo::IsThreadWorkerThread()
 {
+	if (GetOSVersion() < g_Win10)
+	{
+		//TEB_SAMETEB_FLAGS::LoaderWorker is Win10+ only
+
+		return false;
+	}
+
 	if (!m_pCurrentThread)
 	{
 		return false;
@@ -570,9 +641,9 @@ bool ProcessInfo::IsThreadWorkerThread()
 	CloseHandle(hThread);
 
 	USHORT TebInfo = NULL;
-	if (ReadProcessMemory(m_hCurrentProcess, ReCa<BYTE*>(tbi.TebBaseAddress) + TEB_SAMETEBFLAGS, &TebInfo, sizeof(TebInfo), nullptr))
+	if (ReadProcessMemory(m_hCurrentProcess, ReCa<BYTE *>(tbi.TebBaseAddress) + TEB_SAMETEBFLAGS, &TebInfo, sizeof(TebInfo), nullptr))
 	{
-		return ((TebInfo & 0x2000) != 0);
+		return ((TebInfo & TEB_SAMETEB_FLAGS_LoaderWorker) != 0);
 	}
 
 	return false;
@@ -590,7 +661,7 @@ const SYSTEM_THREAD_INFORMATION * ProcessInfo::GetThreadInfo()
 
 #ifdef _WIN64
 
-PEB32 * ProcessInfo::GetPEB_WOW64()
+PEB_32 * ProcessInfo::GetPEB_WOW64()
 {
 	if (!m_pFirstProcess)
 	{
@@ -606,52 +677,52 @@ PEB32 * ProcessInfo::GetPEB_WOW64()
 		return nullptr;
 	}
 
-	return ReCa<PEB32*>(pPEB);
+	return ReCa<PEB_32 *>(pPEB);
 }
 
-LDR_DATA_TABLE_ENTRY32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
+LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 {
 	if (!m_pFirstProcess)
 	{
 		return nullptr;
 	}
 	
-	PEB32 * ppeb = GetPEB_WOW64();
+	PEB_32 * ppeb = GetPEB_WOW64();
 	if (!ppeb)
 	{
 		return nullptr;
 	}
 
-	PEB32 peb{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(PEB32), nullptr))
+	PEB_32 peb{ 0 };
+	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(PEB_32), nullptr))
 	{
 		return nullptr;
 	}
 	
-	PEB_LDR_DATA32 ldrdata{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(PEB_LDR_DATA32), nullptr))
+	PEB_LDR_DATA_32 ldrdata{ 0 };
+	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(PEB_LDR_DATA_32), nullptr))
 	{
 		return nullptr;
 	}
 		
-	LIST_ENTRY32 * pCurrentEntry	= ReCa<LIST_ENTRY32*>((ULONG_PTR)ldrdata.InLoadOrderModuleListHead.Flink);
-	LIST_ENTRY32 * pLastEntry		= ReCa<LIST_ENTRY32*>((ULONG_PTR)ldrdata.InLoadOrderModuleListHead.Blink);
+	LIST_ENTRY32 * pCurrentEntry	= ReCa<LIST_ENTRY32 *>((ULONG_PTR)ldrdata.InLoadOrderModuleListHead.Flink);
+	LIST_ENTRY32 * pLastEntry		= ReCa<LIST_ENTRY32 *>((ULONG_PTR)ldrdata.InLoadOrderModuleListHead.Blink);
 
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY32 CurrentEntry{ 0 };
-		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(LDR_DATA_TABLE_ENTRY32), nullptr);
+		LDR_DATA_TABLE_ENTRY_32 CurrentEntry{ 0 };
+		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(LDR_DATA_TABLE_ENTRY_32), nullptr);
 
 		if (CurrentEntry.DllBase == MDWD(hMod))
 		{
-			return ReCa<LDR_DATA_TABLE_ENTRY32*>(pCurrentEntry);
+			return ReCa<LDR_DATA_TABLE_ENTRY_32 *>(pCurrentEntry);
 		}
 		else if (pCurrentEntry == pLastEntry)			
 		{
 			break;
 		}
 
-		pCurrentEntry = ReCa<LIST_ENTRY32*>((ULONG_PTR)CurrentEntry.InLoadOrderLinks.Flink);
+		pCurrentEntry = ReCa<LIST_ENTRY32 *>((ULONG_PTR)CurrentEntry.InLoadOrderLinks.Flink);
 	}
 
 	return nullptr;
@@ -674,26 +745,37 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 		
 		DWORD Address = 0;
 
+		ULONG nt_ret_offset = 0;
+
+		if (GetOSVersion() > g_Win7)
+		{
+			nt_ret_offset = NT_RET_OFFSET_86_WIN8;
+		}
+		else
+		{
+			nt_ret_offset = NT_RET_OFFSET_86_WIN7;
+		}
+
 		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtDelayExecution", Address);
-		m_WaitFunctionReturnAddress_WOW64[0] = Address + NT_RET_OFFSET_86;
+		m_WaitFunctionReturnAddress_WOW64[0] = Address + nt_ret_offset;
 
 		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForSingleObject", Address);
-		m_WaitFunctionReturnAddress_WOW64[1] = Address + NT_RET_OFFSET_86;
+		m_WaitFunctionReturnAddress_WOW64[1] = Address + nt_ret_offset;
 
 		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtWaitForMultipleObjects", Address);
-		m_WaitFunctionReturnAddress_WOW64[2] = Address + NT_RET_OFFSET_86;
+		m_WaitFunctionReturnAddress_WOW64[2] = Address + nt_ret_offset;
 
 		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtSignalAndWaitForSingleObject", Address);
-		m_WaitFunctionReturnAddress_WOW64[3] = Address + NT_RET_OFFSET_86;
+		m_WaitFunctionReturnAddress_WOW64[3] = Address + nt_ret_offset;
 
-		GetProcAddressEx_WOW64(m_hCurrentProcess, hNTDLL, "NtRemoveIoCompletionEx", Address);
-		m_WaitFunctionReturnAddress_WOW64[4] = Address + NT_RET_OFFSET_86;
-
-		HINSTANCE hWIN32U = GetModuleHandleExW_WOW64(m_hCurrentProcess, L"win32u.dll");
-		if (hWIN32U)
+		if (GetOSBuildVersion() >= g_Win10_1607)
 		{
-			GetProcAddressEx_WOW64(m_hCurrentProcess, hWIN32U, "NtUserMsgWaitForMultipleObjectsEx", Address);
-			m_WaitFunctionReturnAddress_WOW64[5] = Address + NT_RET_OFFSET_86;
+			HINSTANCE hWIN32U = GetModuleHandleExW_WOW64(m_hCurrentProcess, L"win32u.dll");
+			if (hWIN32U)
+			{
+				GetProcAddressEx_WOW64(m_hCurrentProcess, hWIN32U, "NtUserMsgWaitForMultipleObjectsEx", Address);
+				m_WaitFunctionReturnAddress_WOW64[4] = Address + nt_ret_offset;
+			}
 		}
 	}
 
@@ -715,33 +797,57 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 	
 	CloseHandle(hThread);
 	
-	DWORD stack_buffer[7] = { 0 };
+	DWORD stack_buffer[6] = { 0 };
 	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(ctx.Esp), stack_buffer, sizeof(stack_buffer), nullptr))
 	{
 		return false;
 	}
 
-	if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[0])
+	if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[0]) //NtDelayExecution
 	{
-		return (stack_buffer[1] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[2] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[1] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[1])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[1]) //NtWaitForSingleObject
 	{
-		return (stack_buffer[2] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[3] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[2] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[2])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[2]) //NtWaitForMultipleObjects
 	{
-		return (stack_buffer[4] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[5] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[4] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[3])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[3]) //NtSignalAndWaitForSingleObject
 	{
-		return (stack_buffer[3] == TRUE);
+		if (GetOSVersion() == g_Win7)
+		{
+			return (stack_buffer[4] == TRUE);
+		}
+		else
+		{
+			return (stack_buffer[3] == TRUE);
+		}
 	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[4])
-	{
-		return ((stack_buffer[6] & 0xFF) == TRUE);
-	}
-	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[5])
+	else if (ctx.Eip == m_WaitFunctionReturnAddress_WOW64[4]) //NtUserMsgWaitForMultipleObjectsEx
 	{
 		return ((stack_buffer[5] & MWMO_ALERTABLE) != 0);
 	}

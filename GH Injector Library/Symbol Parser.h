@@ -63,7 +63,7 @@ struct PDBHeader7
 struct RootStream7
 {
 	int num_streams;
-	int stream_sizes[1]; //num_streams
+	int stream_sizes[ANYSIZE_ARRAY]; //num_streams
 };
 
 struct GUID_StreamData

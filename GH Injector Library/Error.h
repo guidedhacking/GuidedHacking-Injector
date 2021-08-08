@@ -77,6 +77,13 @@
 #define INJ_ERR_WCSRCHR_FAILED				0x00000038	//wcsrchr							: -						: wcsrchr failed to find a character in a string (usually '\\' in a path)
 #define INJ_ERR_TARGET_EXE_NAME_IS_NULL		0x00000039	//internal error					: -						: the length of the name of the specified process is 0
 #define INJ_ERR_LDR_ENTRY_IS_NULL			0x0000003A	//internal error					: -						: LdrpLoadDll(Internal) didn't return a valid LDR_DATA_TABLE_ENTRY pointer
+#define INJ_ERR_NOT_SUPPORTED				0x0000003B	//internal error					: -						: the requested operation is not supported on the current operating system
+#define INJ_ERR_CREATE_EVENT_FAILED			0x0000003C	//CreateEventEx						: win32 error			: failed to create an event for wow64 process
+#define INJ_ERR_CREATE_PROCESS_FAILED		0x0000003D	//CreateProcessW					: win32 error			: failed to create process for wow64 module addresses
+#define INJ_ERR_WAIT_FAILED					0x0000003E	//WaitForSingleObject				: win32 error			: failed to wait for an event to trigger
+#define INJ_ERR_WAIT_TIMEOUT				0x0000003F	//WaitForSingleObject				: -						: event timed out
+#define INJ_ERR_WINDOWS_VERSION				0x00000040	//internal error					: -						: failed to resolve the version number of the operating system
+#define INJ_ERR_WINDOWS_TOO_OLD				0x00000041	//internal error					: -						: the injection library only runs on Windows 7 or higher
 
 
 ///////////////////
@@ -298,7 +305,7 @@
 #define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess				:	can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
 #define SYMBOL_ERR_COPYFILE_FAILED				0x40000015	//CopyFileA					:	copying the file from the cache directory failed
 #define SYMBOL_ERR_INTERRUPT					0x40000016	//internal error			:	download has been interrupted
-
+#define SYMBOL_ERR_CANNOT_CONNECT				0x40000017	//InternetCheckConnectionW	:	GetLastError returned ERROR_INTERNET_CANNOT_CONNECT which might be caused by a firewall rule
 
 
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

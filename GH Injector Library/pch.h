@@ -30,17 +30,17 @@
 //symbol shit
 #include <DbgHelp.h>
 #include <future>
-#include <urlmon.h>
 
 //internet shit
 #include <WinInet.h>
+#include <Urlmon.h>
 
 //warning shit
-#pragma warning(disable: 4201) //unnamed union (nt strucutres like unnamed unions)
+#pragma warning(disable: 4201) //unnamed union (nt structures)
 #pragma warning(disable: 4324) //structure member alignment resulting in additional bytes being added as padding
 #pragma warning(disable: 6001) //uninitialized memory & handles (false positive in for loops with continue statements)
 #pragma warning(disable: 6258) //TerminateThread warning
-#pragma warning(disable: 28159) //I want to used GetTickCount, suck it Bill
+#pragma warning(disable: 28159) //I want to use GetTickCount, suck it Bill
 
 //reinterpret_cast = too long to type
 #define ReCa reinterpret_cast
