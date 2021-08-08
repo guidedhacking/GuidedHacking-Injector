@@ -68,11 +68,11 @@ BEGIN
         BLOCK "000904b0"
         BEGIN
             VALUE "CompanyName", "Guided Hacking"
-            VALUE "FileDescription", "Injection library for the GH Injector"
-            VALUE "FileVersion", "4.3.0.2"
+            VALUE "FileDescription", "Injection library of the GH Injector"
+            VALUE "FileVersion", "4.4.0.0"
             VALUE "LegalCopyright", "Broihon (C) 1987 - 2035"
             VALUE "ProductName", "GH Injection Library"
-            VALUE "ProductVersion", "4.3.0.2"
+            VALUE "ProductVersion", "4.4.0.0"
         END
     END
     BLOCK "VarFileInfo"
