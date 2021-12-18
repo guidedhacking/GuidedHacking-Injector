@@ -59,7 +59,8 @@ enum class LAUNCH_METHOD
 	LM_HijackThread,
 	LM_SetWindowsHookEx,
 	LM_QueueUserAPC,
-	LM_KernelCallback
+	LM_KernelCallback,
+	LM_FakeVEH
 };
 
 //ansi version of the info structure:
@@ -154,7 +155,7 @@ using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
 using f_GetSymbolState = DWORD(__stdcall *)();
 using f_GetImportState = DWORD(__stdcall *)();
 
-using f_GetDownloadProgress = float(__stdcall *)(bool bWoW64);
+using f_GetDownloadProgressEx = float(__stdcall *)(int index, bool bWow64);
 using f_StartDownload = void(__stdcall *)();
 using f_InterruptDownload = void(__stdcall *)();
 

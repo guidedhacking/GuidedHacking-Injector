@@ -21,6 +21,7 @@ Session separation can be bypassed with all methods.
 - SetWindowsHookEx
 - QueueUserAPC
 - KernelCallback
+- FakeVEH
 
 ### Manual mapping features:
 
