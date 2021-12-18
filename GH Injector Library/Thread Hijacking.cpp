@@ -4,14 +4,14 @@
 
 DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
-	LOG("     Begin SR_HijackThread\n");
+	LOG(2, "Begin SR_HijackThread\n");
 
 	ProcessInfo PI;
 	if (!PI.SetProcess(hTargetProc))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("      Can't initialize ProcessInfo class\n");
+		LOG(2, "Can't initialize ProcessInfo class\n");
 
 		return SR_HT_ERR_PROC_INFO_FAIL;
 	}
@@ -40,19 +40,19 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("      No compatible thread found\n");
+		LOG(2, "No compatible thread found\n");
 
 		return SR_HT_ERR_NO_THREADS;
 	}
 
-	LOG("      Target thread %06X\n", ThreadID);
+	LOG(2, "Target thread %06X\n", ThreadID);
 
 	HANDLE hThread = OpenThread(THREAD_SET_CONTEXT | THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, ThreadID);
 	if (!hThread)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      OpenThread failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "OpenThread failed: %08X\n", error_data.AdvErrorCode);
 
 		return SR_HT_ERR_OPEN_THREAD_FAIL;
 	}
@@ -61,12 +61,14 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      SuspendThread failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "SuspendThread failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
 		return SR_HT_ERR_SUSPEND_FAIL;
 	}
+
+	LOG(2, "Target thread suspended\n");
 
 	CONTEXT OldContext{ 0 };
 	OldContext.ContextFlags = CONTEXT_CONTROL;
@@ -75,7 +77,7 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "GetThreadContext failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -88,18 +90,38 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hThread);
 
 		return SR_HT_ERR_CANT_ALLOC_MEM;
 	}
 	
-#ifdef _WIN64
+	/*
+		__declspec(naked) void ThreadHijack_Shell()
+		{
+			//Stack setup
+			//Save registers
 
+			SR_REMOTE_DATA * data = ReCa<SR_REMOTE_DATA *>(ReCa<BYTE *>(ThreadHijack_Shell) - sizeof(SR_REMOTE_DATA));
+			data->State = SR_REMOTE_STATE::SR_RS_Executing;
+
+			data->Ret = data->pRoutine(data->pArg);
+			data->LastWin32Error = GetLastError();
+			data->State = SR_REMOTE_STATE::SR_RS_ExecutionFinished;
+
+			//Restore stack
+			//Restore registers
+
+			//Return to hijacked code
+		}
+	*/
+
+#ifdef _WIN64
+	
 	BYTE Shellcode[] =
 	{
-		SR_REMOTE_DATA_BUFFER_64
+		SR_REMOTE_DATA_BUFFER
 
 		0x48, 0x83, 0xEC, 0x08,													// + 0x00			-> sub	rsp, 0x08				; prepare stack for ret
 		0xC7, 0x04, 0x24, 0x00, 0x00, 0x00, 0x00,								// + 0x04 (+ 0x07)	-> mov	[rsp + 0x00], RipLo		; store old rip as return address
@@ -126,38 +148,35 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		0x48, 0x8B, 0xE5,														// + 0x45			-> mov	rsp, rbp				; restore rsp
 		0x5D,																	// + 0x48			-> pop	rbp						; restore rbp
 
-		0x48, 0x85, 0xC0,														// + 0x49			-> test rax, rax				; check if rax is 0 (SUCCESS)
-		0x74, 0x0F,																// + 0x4C			-> je	0x51					; jmp if equal/zero
+		0x65, 0x48, 0x8B, 0x04, 0x25, 0x30, 0x00, 0x00, 0x00,					// + 0x49			-> mov	rax, gs:[0x30]			; GetLastError
+		0x8B, 0x40, 0x68,														// + 0x52			-> mov	eax, [rax + 0x68]
+		0x89, 0x43, 0x10,														// + 0x55			-> mov	[rbx + 0x10], eax		; store in SR_REMOTE_DATA::LastWin32Error
 
-		0x65, 0x48, 0x8B, 0x04, 0x25, 0x30, 0x00, 0x00, 0x00,					// + 0x4E			-> mov	rax, gs:[0x30]			; GetLastError
-		0x8B, 0x40, 0x68,														// + 0x57			-> mov	eax, [rax + 0x68]
-		0x89, 0x43, 0x10,														// + 0x5A			-> mov	[rbx + 0x10], eax		; store in SR_REMOTE_DATA::LastWin32Error
+		0xC6, 0x03, 0x02,														// + 0x58			-> mov	byte ptr [rbx], 2		; set SR_REMOTE_DATA::State to SR_RS_ExecutionFinished
 
-		0xC6, 0x03, 0x02,														// + 0x5D			-> mov	byte ptr [rbx], 2		; set SR_REMOTE_DATA::State to SR_RS_ExecutionFinished
+		0x5B,																	// + 0x5B			-> pop rbx						; restore rbx
 
-		0x5B,																	// + 0x60			-> pop rbx						; restore rbx
+		0x9D,																	// + 0x5C			-> popfq						; restore flags register
+		0x41, 0x5B, 0x41, 0x5A, 0x41, 0x59, 0x41, 0x58, 0x5A, 0x59, 0x58,		// + 0x5D			-> pop r(11-8) / r(d/c/a)x		; restore volatile registers
 
-		0x9D,																	// + 0x61			-> popfq						; restore flags register
-		0x41, 0x5B, 0x41, 0x5A, 0x41, 0x59, 0x41, 0x58, 0x5A, 0x59, 0x58,		// + 0x62			-> pop r(11-8) / r(d/c/a)x		; restore volatile registers
-
-		0xC3																	// + 0x6D			-> ret							; return to old rip and continue execution
-	}; // SIZE = 0x6E (+ sizeof(SR_REMOTE_DATA))
+		0xC3																	// + 0x68			-> ret							; return to old rip and continue execution
+	}; // SIZE = 0x69 (+ sizeof(SR_REMOTE_DATA))
 
 	auto OldRIP = OldContext.Rip;
 	DWORD dwLoRIP = (DWORD)((OldRIP		   ) & 0xFFFFFFFF);
 	DWORD dwHiRIP = (DWORD)((OldRIP >> 0x20) & 0xFFFFFFFF);
 
-	*ReCa<DWORD*>(Shellcode + 0x07 + sizeof(SR_REMOTE_DATA)) = dwLoRIP;
-	*ReCa<DWORD*>(Shellcode + 0x0F + sizeof(SR_REMOTE_DATA)) = dwHiRIP;
+	*ReCa<DWORD *>(Shellcode + 0x07 + sizeof(SR_REMOTE_DATA)) = dwLoRIP;
+	*ReCa<DWORD *>(Shellcode + 0x0F + sizeof(SR_REMOTE_DATA)) = dwHiRIP;
 
-	void * pRemoteFunc	= ReCa<BYTE*>(pMem) + sizeof(SR_REMOTE_DATA);
+	void * pRemoteFunc	= ReCa<BYTE *>(pMem) + sizeof(SR_REMOTE_DATA);
 	OldContext.Rip		= ReCa<ULONG_PTR>(pRemoteFunc);
 
 #else
 
 	BYTE Shellcode[] =
 	{
-		SR_REMOTE_DATA_BUFFER_86
+		SR_REMOTE_DATA_BUFFER
 
 		0x83, 0xEC, 0x04,							// + 0x00				-> sub	esp, 0x04							; prepare stack for ret
 		0xC7, 0x04, 0x24, 0x00, 0x00, 0x00, 0x00,	// + 0x03 (+ 0x06)		-> mov	[esp], OldEip						; store old eip as return address
@@ -173,43 +192,42 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		0xFF, 0x53, 0x10,							// + 0x1A				-> call dword ptr [ebx + 0x10]				; call pRoutine
 		0x89, 0x43, 0x04,							// + 0x1D				-> mov	[ebx + 0x04], eax					; store returned value
 
-		0x85, 0xC0,									// + 0x20				-> test eax, eax							; check if eax is 0 (SUCCESS)
-		0x74, 0x0C,									// + 0x22				-> je	0x30								; jmp if equal/zero
+		0x64, 0xA1, 0x18, 0x00, 0x00, 0x00,			// + 0x20				-> mov	eax, fs:[0x18]						; GetLastError
+		0x8B, 0x40, 0x34,							// + 0x26				-> mov	eax, [eax + 0x34]
+		0x89, 0x43, 0x08,							// + 0x29				-> mov	[ebx + 0x08], eax					; store in SR_REMOTE_DATA::LastWin32Error
 
-		0x6A, 0xA1, 0x18, 0x00, 0x00, 0x00,			// + 0x24				-> mov	eax, fs:[0x18]						; GetLastError
-		0x8B, 0x40, 0x34,							// + 0x2A				-> mov	eax, [eax + 0x34]
-		0x89, 0x43, 0x08,							// + 0x2D				-> mov	[ebx + 0x08], eax					; store in SR_REMOTE_DATA::LastWin32Error
-
-		0xC7, 0x03, 0x02, 0x00, 0x00, 0x00,			// + 0x30				-> mov	byte ptr [ebx], 2					; set SR_REMOTE_DATA::State to SR_RS_ExecutionFinished
+		0xC7, 0x03, 0x02, 0x00, 0x00, 0x00,			// + 0x2C				-> mov	byte ptr [ebx], 2					; set SR_REMOTE_DATA::State to SR_RS_ExecutionFinished
 		
-		0x9D,										// + 0x36				-> popfd									; restore flags register
-		0x5B, 0x5A, 0x59, 0x58,						// + 0x37				-> pop e(d/c/a)								; restore e(b/d/c/a)x
+		0x9D,										// + 0x32				-> popfd									; restore flags register
+		0x5B, 0x5A, 0x59, 0x58,						// + 0x33				-> pop e(d/c/a)								; restore e(b/d/c/a)x
 		
-		0xC3										// + 0x3B				-> ret										; return to OldEip
-	}; // SIZE = 0x3C (+ 0x04)
+		0xC3										// + 0x37				-> ret										; return to OldEip
+	}; // SIZE = 0x38 (+ sizeof(SR_REMOTE_DATA))
 
 	auto OldEIP = OldContext.Eip;
-	*ReCa<DWORD*>(Shellcode + 0x06 + sizeof(SR_REMOTE_DATA)) = OldEIP;
-	*ReCa<void**>(Shellcode + 0x10 + sizeof(SR_REMOTE_DATA)) = pMem;
+	*ReCa<DWORD *>(Shellcode + 0x06 + sizeof(SR_REMOTE_DATA)) = OldEIP;
+	*ReCa<void **>(Shellcode + 0x10 + sizeof(SR_REMOTE_DATA)) = pMem;
 
-	void * pRemoteFunc	= ReCa<BYTE*>(pMem) + sizeof(SR_REMOTE_DATA);
+	void * pRemoteFunc	= ReCa<BYTE *>(pMem) + sizeof(SR_REMOTE_DATA);
 	OldContext.Eip		= ReCa<DWORD>(pRemoteFunc);
 
 #endif
 
-	LOG("      Shellcode prepared\n");
+	LOG(2, "Shellcode prepared\n");
 
-	auto * sr_data = ReCa<SR_REMOTE_DATA*>(Shellcode);
+	auto * sr_data = ReCa<SR_REMOTE_DATA *>(Shellcode);
 	sr_data->pArg		= pArg;
 	sr_data->pRoutine	= pRoutine;
 
-	LOG("      Hijacking thread with\n       pRoutine = %p\n       pArg = %p\n", pRemoteFunc, pMem);
+	LOG(2, "Hijacking thread with:\n");
+	LOG(3, "pRoutine = %p\n", pRemoteFunc);
+	LOG(3, "pArg     = %p\n", pMem);
 
 	if (!WriteProcessMemory(hTargetProc, pMem, Shellcode, sizeof(Shellcode), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -222,7 +240,7 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "SetThreadContext failed: %08X\n", error_data.AdvErrorCode);
 
 		ResumeThread(hThread);
 		CloseHandle(hThread);
@@ -232,16 +250,16 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	}
 
 #ifdef _WIN64
-	LOG("      RIP replaced\n");
+	LOG(2, "RIP replaced\n");
 #else
-	LOG("      EIP replaced\n");
+	LOG(2, "EIP replaced\n");
 #endif
 
 	if (ResumeThread(hThread) == (DWORD)-1)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("      ResumeThread failed: %08X\n", error_data.AdvErrorCode);
+		LOG(2, "ResumeThread failed: %08X\n", error_data.AdvErrorCode);
 
 #ifdef _WIN64
 		OldContext.Rip = OldRIP;
@@ -257,39 +275,45 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		return SR_HT_ERR_RESUME_FAIL;
 	}
 
-	LOG("      Thread resumed\n");
+	LOG(2, "Thread resumed\n");
 
 	PostThreadMessageW(ThreadID, WM_NULL, 0, 0);
 
 	Sleep(SR_REMOTE_DELAY);
 
-	SR_REMOTE_DATA data;
+	SR_REMOTE_DATA data{ };
 	data.State			= SR_REMOTE_STATE::SR_RS_ExecutionPending;
 	data.Ret			= ERROR_SUCCESS;
 	data.LastWin32Error = ERROR_SUCCESS;
 
-	LOG("      Entering wait state\n");
+	LOG(2, "Entering wait state\n");
 
 	auto Timer = GetTickCount64();
 	while (GetTickCount64() - Timer < Timeout)
 	{
-		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
-		if (bRet)
-		{
-			if (data.State == SR_REMOTE_STATE::SR_RS_ExecutionFinished)
-			{
-				LOG("      Shelldata retrieved\n");
+		auto dwWaitRet = WaitForSingleObject(g_hInterruptEvent, 10);
 
-				break;
-			}
+		BOOL bRet = ReadProcessMemory(hTargetProc, pMem, &data, sizeof(data), nullptr);
+		if (bRet && data.State == SR_REMOTE_STATE::SR_RS_ExecutionFinished)
+		{
+			LOG(2, "Shelldata retrieved\n");
+
+			break;
 		}
-		else
+		else if (!bRet || dwWaitRet == WAIT_OBJECT_0)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("      ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			if (dwWaitRet == WAIT_OBJECT_0)
+			{
+				LOG(2, "Interrupt!\n");
+			}
+			else
+			{
+				LOG(2, "ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			}
 
-			if (SuspendThread(hThread) != (DWORD)-1)
+			if (bRet && data.State == SR_REMOTE_STATE::SR_RS_ExecutionPending && SuspendThread(hThread) != (DWORD)-1)
 			{
 #ifdef _WIN64
 				OldContext.Rip = OldRIP;
@@ -298,16 +322,23 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 #endif
 				if (SetThreadContext(hThread, &OldContext) && ResumeThread(hThread) != (DWORD)-1)
 				{
-					CloseHandle(hThread);
+					ResumeThread(hThread);
 
+					CloseHandle(hThread);
+					
 					VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 				}
 			}
 
+			if (dwWaitRet == WAIT_OBJECT_0)
+			{
+				SetEvent(g_hInterruptedEvent);
+
+				return SR_ERR_INTERRUPT;
+			}
+
 			return SR_HT_ERR_RPM_FAIL;
 		}
-
-		Sleep(10);
 	}
 
 	if (data.State != SR_REMOTE_STATE::SR_RS_ExecutionFinished)
@@ -318,7 +349,7 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 		{
 			if (SuspendThread(hThread) != (DWORD)-1)
 			{
-				LOG("      Shell timed out\n");
+				LOG(2, "Shell timed out\n");
 
 #ifdef _WIN64
 				OldContext.Rip = OldRIP;
@@ -336,7 +367,7 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 			}
 		}
 
-		LOG("      pRoutine timed out\n");
+		LOG(2, "pRoutine timed out\n");
 
 		CloseHandle(hThread);
 
@@ -347,7 +378,7 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 
 	VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
 
-	LOG("      pRoutine returned: %08X\n", data.Ret);
+	LOG(2, "pRoutine returned: %08X\n", data.Ret);
 
 	Out	= data.Ret;
 

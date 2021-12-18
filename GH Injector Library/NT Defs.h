@@ -46,7 +46,7 @@
 typedef LONG KPRIORITY;
 
 #define KUSER_SHARED_DATA (DWORD)0x7FFE0000
-#define P_KUSER_SHARED_DATA_COOKIE ReCa<DWORD*>(KUSER_SHARED_DATA + 0x0330)
+#define P_KUSER_SHARED_DATA_COOKIE ReCa<DWORD *>(KUSER_SHARED_DATA + 0x0330)
 
 #define NtCurrentProcess() ( (HANDLE)(LONG_PTR) -1 ) 
 
@@ -59,6 +59,7 @@ typedef enum class _PROCESSINFOCLASS
 	ProcessBasicInformation			= 0,
 	ProcessSessionInformation		= 24,
 	ProcessWow64Information			= 26,
+	ProcessCookie					= 36,
 	ProcessProtectionInformation	= 61
 } PROCESSINFOCLASS;
 
@@ -491,17 +492,17 @@ typedef union _LDR_SEARCH_PATH
 	wchar_t * szSearchPath;
 } LDR_SEARCH_PATH, * PLDR_SEARCH_PATH;
 
-//1507 - 1511
-typedef struct _LDRP_PATH_SEARCH_CONTEXT_1507
+//Win10 1511
+typedef struct _LDRP_PATH_SEARCH_CONTEXT_1511
 {
 	wchar_t *	DllSearchPathOut;
 	void	*	Unknown_0[2];
 	wchar_t *	OriginalFullDllName;
 	void	*	unknown_1[7];
 	ULONG64		unknown_2[4];
-} LDRP_PATH_SEARCH_CONTEXT_1507, * PLDRP_PATH_SEARCH_CONTEXT_1507; //x86 size <= 0x50, x64 size <= 0x80
+} LDRP_PATH_SEARCH_CONTEXT_1511, * PLDRP_PATH_SEARCH_CONTEXT_1511; //x86 size = 0x4C, x64 size = 0x78
 
-//1607+
+//Win10 1507, 1607+
 typedef struct _LDRP_PATH_SEARCH_CONTEXT
 {
 	wchar_t *	DllSearchPathOut;
@@ -530,6 +531,36 @@ typedef union _LDRP_LOAD_CONTEXT_FLAGS
 		ULONG32 RedirectedByAPISet			: 1;
 	};
 } LDRP_LOAD_CONTEXT_FLAGS, * PLDRP_LOAD_CONTEXT_FLAGS;
+
+typedef struct _RTL_VECTORED_HANDLER_LIST
+{
+	SRWLOCK     Lock;
+	LIST_ENTRY  List;
+} RTL_VECTORED_HANDLER_LIST, * PRTL_VECTORED_HANDLER_LIST;
+
+typedef struct _RTL_VECTORED_EXCEPTION_ENTRY //Win7 till Win10 1909
+{
+	LIST_ENTRY					List;
+	DWORD						Flag;
+	PVECTORED_EXCEPTION_HANDLER	VectoredHandler;
+} RTL_VECTORED_EXCEPTION_ENTRY, * PRTL_VECTORED_EXCEPTION_ENTRY;
+
+typedef struct _RTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004 //Win10 2004+
+{
+	LIST_ENTRY                  List;
+	PULONG_PTR                  pFlag; //points to Flag
+	ULONG                       RefCount;
+	PVECTORED_EXCEPTION_HANDLER VectoredHandler;
+	ULONG_PTR					Flag; //normally allocated somewhere else on LdrpMrdataHeap, just for convenience
+} RTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004, * PRTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004;
+
+typedef struct _TLS_ENTRY
+{
+	LIST_ENTRY				TlsEntryLinks;
+	IMAGE_TLS_DIRECTORY		TlsDirectory;
+	PVOID 					ModuleEntry; //LdrDataTableEntry
+	SIZE_T					TlsIndex;
+} TLS_ENTRY, * PTLS_ENTRY;
 
 #ifdef _WIN64
 
@@ -769,5 +800,27 @@ typedef ALIGN_86 union _LDRP_LOAD_CONTEXT_FLAGS_32
 		ULONG32 RedirectedByAPISet			: 1;
 	};
 } LDRP_LOAD_CONTEXT_FLAGS_32, * PLDRP_LOAD_CONTEXT_FLAGS_32;
+
+typedef struct _RTL_VECTORED_HANDLER_LIST_32
+{
+	DWORD			Lock;
+	LIST_ENTRY32	List;
+} RTL_VECTORED_HANDLER_LIST_32, * PRTL_VECTORED_HANDLER_LIST_32;
+
+typedef struct _RTL_VECTORED_EXCEPTION_ENTRY_32 //Win7 till Win10 1909
+{
+	LIST_ENTRY32	List;
+	DWORD			Flag;
+	DWORD			VectoredHandler;
+} RTL_VECTORED_EXCEPTION_ENTRY_32, * PRTL_VECTORED_EXCEPTION_ENTRY_32;
+
+typedef struct _RTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004_32 //Win10 2004+
+{
+	LIST_ENTRY32	List;
+	DWORD			pFlag; //DWORD *
+	ULONG			RefCount;
+	DWORD			VectoredHandler; //PVECTORED_EXCEPTION_HANDLER
+	DWORD			Flag;
+} RTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004_32, * PRTL_VECTORED_EXCEPTION_ENTRY_WIN10_2004_32;
 
 #endif

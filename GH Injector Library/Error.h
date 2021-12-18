@@ -20,10 +20,10 @@
 														//Source							: advanced error type	: error description
 
 #define INJ_ERR_NO_DATA						0x00000001	//internal error					: -						: nullptr passed to InjectA/InjectW
-#define INJ_ERR_INVALID_FILEPATH			0x00000002	//internal error					: -						: INJECTIONDATA::szDllPath is a nullptr
+#define INJ_ERR_INVALID_FILEPATH			0x00000002	//internal error					: -						: INJECTIONDATA/W::szDllPath is a nullptr
 #define INJ_ERR_STR_CONVERSION_TO_W_FAILED	0x00000003	//mbstowcs_s						: errno_t				: conversion to unicode of an ansi string failed
 #define INJ_ERR_STRINGC_XXX_FAIL			0x00000004	//StringCXXX failed					: HRESULT				: string operation failed
-#define INJ_ERR_FILE_DOESNT_EXIST			0x00000005	//GetFileAttributesW				: win32 error			: INJECTIONDATA::szDllPath doesn't exist
+#define INJ_ERR_FILE_DOESNT_EXIST			0x00000005	//GetFileAttributesW				: win32 error			: INJECTIONDATAW::szDllPath doesn't exist
 #define INJ_ERR_INVALID_PID					0x00000006	//internal error					: -						: provided process id is 0
 #define INJ_ERR_CANT_OPEN_PROCESS			0x00000007	//OpenProcess						: win32 error			: opening the specified target process failed
 #define INJ_ERR_INVALID_PROC_HANDLE			0x00000008	//GetHandleInformation				: win32 error			: the provided handle value is not a valid handle
@@ -46,9 +46,9 @@
 #define INJ_ERR_GET_SYMBOL_ADDRESS_FAILED	0x00000019	//internal error					: -						: can't resolve the address of a required symbol
 #define INJ_ERR_GET_PROC_ADDRESS_FAIL		0x0000001A	//GetProcAddress					: -						: resolving the address of a required function failed
 #define INJ_ERR_VERIFY_RESULT_FAIL			0x0000001B	//ReadProcessMemory					: win32 error			: reading the result data of the injection failed
-#define INJ_ERR_SYMBOL_INIT_NOT_DONE		0x0000001C	//SYMBOL_PARSER::Initialize			: -						: initializations process of the symbol parser isn't finished
-#define INJ_ERR_SYMBOL_INIT_FAIL			0x0000001D	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - 0x40000014)
-#define INJ_ERR_SYMBOL_GET_FAIL				0x0000001E	//SYMBOL_PARSER::GetSymbolAddress	: symbol error			: couldn't get address of required symbol (symbol error 0x40000001 - 0x40000014)
+#define INJ_ERR_SYMBOL_INIT_NOT_DONE		0x0000001C	//SYMBOL_LOADER::Initialize			: -						: initializations process of the symbol loader isn't finished
+#define INJ_ERR_SYMBOL_LOAD_FAIL			0x0000001D	//SYMBOL_LOADER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - ...)
+#define INJ_ERR_SYMBOL_GET_FAIL				0x0000001E	//SYMBOL_PARSER::GetSymbolAddress	: symbol error			: couldn't get address of required symbol (symbol error 0x40000001 - ...)
 #define INJ_ERR_CANT_GET_MODULE_PATH		0x0000001F	//internal error					: -						: can't resolve the path of this instance of the injection library
 #define INJ_ERR_FAILED_TO_LOAD_DLL			0x00000020	//internal error					: -						: the injection failed for unknown reasons
 #define INJ_ERR_HIJACK_NO_HANDLES			0x00000021	//internal error					: -						: can't find a process handle to the target process
@@ -84,7 +84,11 @@
 #define INJ_ERR_WAIT_TIMEOUT				0x0000003F	//WaitForSingleObject				: -						: event timed out
 #define INJ_ERR_WINDOWS_VERSION				0x00000040	//internal error					: -						: failed to resolve the version number of the operating system
 #define INJ_ERR_WINDOWS_TOO_OLD				0x00000041	//internal error					: -						: the injection library only runs on Windows 7 or higher
-
+#define INJ_ERR_ALREADY_RUNNING				0x00000042	//internal error					: -						: there's already an injection running
+#define INJ_ERR_IMPORT_INTERRUPT			0x00000043	//internal error					: -						: the import handler was interrupted with InterruptDownload()
+#define INJ_ERR_INVALID_SYMBOL_INDEX		0x00000044	//internal error					: -						: an invalid index was passed to the symbol loader
+#define INJ_ERR_INTERRUPT					0x00000045	//internal error					: -						: the injection was interrupted because the interrupt event was set
+#define INJ_ERR_SYMBOL_PARSE_FAIL			0x00000046	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - ...)
 
 ///////////////////
 ///ManualMap
@@ -125,14 +129,14 @@
 #define SR_ERR_CANT_QUERY_SESSION_ID	0x10000001	//NtQueryInformationProcess	: NTSTATUS				: querying the session id of the target process failed
 #define SR_ERR_INVALID_LAUNCH_METHOD	0x10000002	//bruh moment				: bruh moment			: bruh moment
 #define SR_ERR_NOT_LOCAL_SYSTEM			0x10000003	//internal error			: -						: SetWindowsHookEx with handle hijacking only works within the same session or from session 0 (LocalSystem account) because of the WtsAPIs
-
+#define SR_ERR_INTERRUPT				0x10000004	//internal error			: -						: execution of the injection was interrupted by InterruptInjection()
 
 ///////////////////
 ///NtCreateThreadEx
 														//Source					: advanced error type	: error description
 
-#define SR_NTCTE_ERR_NTCTE_MISSING			0x10100001	//internal error			: -						: can't resolve address of NtCreateThreadEx
-#define SR_NTCTE_ERR_PROC_INFO_FAIL			0x10100002	//internal error			: -						: can't grab process information
+#define SR_NTCTE_ERR_PROC_INFO_FAIL			0x10100001	//internal error			: -						: can't grab process information
+#define SR_NTCTE_ERR_GET_ENTRYPOINT			0x10100002	//internal error			: -						: failed to resolve the entrypoint of the target process
 #define SR_NTCTE_ERR_CANT_ALLOC_MEM			0x10100003	//VirtualAllocEx			: win32 error			: memory allocation for the shellcode failed
 #define SR_NTCTE_ERR_WPM_FAIL				0x10100004	//WriteProcessMemory		: win32 error			: writing the shellcode into the target process' memory failed
 #define SR_NTCTE_ERR_NTCTE_FAIL				0x10100005	//NtCreateThreadEx			: NTSTATUS				: thread creation using NtCreateThreadEx failed
@@ -143,6 +147,8 @@
 #define SR_NTCTE_ERR_GECT_FAIL				0x1010000A	//GetExitCodeThread			: win32 error			: can't retrieve the exit code of the thread
 #define SR_NTCTE_ERR_SHELLCODE_SETUP_FAIL	0x1010000B	//shellcode					: - 					: argument passed to the shellcode is 0
 #define SR_NTCTE_ERR_RPM_FAIL				0x1010000C	//ReadProcessMemory			: win32 error			: reading the results of the shellcode failed
+#define SR_NTCTE_ERR_CANT_FIND_THREAD		0x1010000D	//internal error			: -						: ProcessInfo class failed to resolve information about the new thread
+
 
 ///////////////
 ///HijackThread
@@ -183,7 +189,6 @@
 ///QueueUserAPC
 														//Source					: advanced error type	: error description
 
-#define SR_QUAPC_ERR_RTLQAW64_MISSING		0x10400001	//internal error			: -						: can't resolve address of RtlQueueApcWow64Thread
 #define SR_QUAPC_ERR_CANT_ALLOC_MEM			0x10400002	//VirtualAllocEx			: win32 error			: memory allocation for the shellcode failed
 #define SR_QUAPC_ERR_WPM_FAIL				0x10400003	//WriteProcessMemory		: win32 error			: writing the shellcode into the target process' memory failed
 #define SR_QUAPC_ERR_PROC_INFO_FAIL			0x10400004	//internal error			: -						: can't grab process information
@@ -212,6 +217,19 @@
 
 #define SR_KC_ERR_KC_EXT_ERROR			0x1050000E	//SM_EXE_FILENAME.exe	: "GH Injector SM - XX.exe" error code, 0x50100001 - 0x50100006 (see below) or win32 exception
 
+///////////////
+///FakeVEH
+												//Source				: advanced error type	: error description
+
+#define SR_VEH_ERR_CANT_ALLOC_MEM	0x10600001	//VirtualAllocEx			: win32 error			: memory allocation for the shellcode failed
+#define SR_VEH_ERR_WPM_FAIL			0x10600002	//WriteProcessMemory		: win32 error			: writing the shellcode into the target process' memory failed
+#define SR_VEH_ERR_RPM_FAIL			0x10600003	//ReadProcessMemory			: win32 error			: failed to read memory from the target process
+#define SR_VEH_ERR_PROCESS_COOKIE	0x10600004	//internal error			: -						: failed to get the process cookie
+#define SR_VEH_ERR_PROC_INFO_FAIL	0x10600005	//internal error			: -						: can't grab process information
+#define SR_VEH_ERR_CANT_GET_PEB		0x10600006	//internal error			: -						: failed to retrieve pointer to the (wow64) peb
+#define SR_VEH_ERR_PROTECT_FAIL		0x10600007	//VirtualProtectEx			: win32 error			: failed to update page protection
+#define SR_VEH_ERR_REMOTE_TIMEOUT	0x10600008	//internal error			: -						: execution time exceeded SR_REMOTE_TIMEOUT
+
 
 
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,12 +240,13 @@
 
 
 //File errors:
-#define FILE_ERR_SUCCESS			0x00000000
+#define FILE_ERR_SUCCESS					0x00000000
 
-												//Source				:	error description
-#define FILE_ERR_CANT_OPEN_FILE		0x20000001	//std::ifstream::good	:	openening the file failed
-#define FILE_ERR_INVALID_FILE_SIZE	0x20000002	//internal error		:	file isn't a valid PE
-#define FILE_ERR_INVALID_FILE		0x20000003	//internal error		:	PE isn't compatible with the injection settings
+														//Source				: error description
+#define FILE_ERR_CANT_OPEN_FILE				0x20000001	//std::ifstream::good	: opening the file failed
+#define FILE_ERR_INVALID_FILE_SIZE			0x20000002	//internal error		: file isn't a valid PE
+#define FILE_ERR_INVALID_FILE				0x20000003	//internal error		: PE isn't compatible with the injection settings
+#define FILE_ERR_MEMORY_ALLOCATION_FAILED	0x20000004	//operator new			: failed to allocate data buffer
 
 
 
@@ -249,25 +268,25 @@
 
 ///SetWindowHookEx:
 #define SWHEX_ERR_SUCCESS 0x00000000
-												//Source				:	error description
+												//Source				: error description
 
-#define SWHEX_ERR_INVALID_PATH		0x30100001	//StringCchLengthW		:	path exceeds MAX_PATH * 2 chars
-#define SWHEX_ERR_CANT_OPEN_FILE	0x30100002	//std::ifstream::good	:	openening the SMXX.txt failed
-#define SWHEX_ERR_EMPTY_FILE		0x30100003	//internal error		:	SMXX.txt is empty
-#define SWHEX_ERR_INVALID_INFO		0x30100004	//internal error		:	provided info is wrong / invalid
-#define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005	//EnumWindows			:	API fail
-#define SWHEX_ERR_NO_WINDOWS		0x30100006	//internal error		:	no compatible window found
+#define SWHEX_ERR_INVALID_PATH		0x30100001	//StringCchLengthW		: path exceeds MAX_PATH * 2 chars
+#define SWHEX_ERR_CANT_OPEN_FILE	0x30100002	//std::ifstream::good	: openening the SMXX.txt failed
+#define SWHEX_ERR_EMPTY_FILE		0x30100003	//internal error		: SMXX.txt is empty
+#define SWHEX_ERR_INVALID_INFO		0x30100004	//internal error		: provided info is wrong / invalid
+#define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005	//EnumWindows			: API fail
+#define SWHEX_ERR_NO_WINDOWS		0x30100006	//internal error		: no compatible window found
 
 ///KernelCallbackTable
 #define KC_ERR_SUCCESS 0x00000000
-												//Source				:	error description
+												//Source				: error description
 
-#define KC_ERR_INVALID_PATH			0x50100001	//StringCchLengthW		:	path exceeds MAX_PATH * 2 chars
-#define KC_ERR_CANT_OPEN_FILE		0x50100002	//std::ifstream::good	:	openening the SMXX.txt failed
-#define KC_ERR_EMPTY_FILE			0x50100003	//internal error		:	SMXX.txt is empty
-#define KC_ERR_INVALID_INFO			0x50100004	//internal error		:	provided info is wrong / invalid
-#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005	//EnumWindows			:	API fail
-#define KC_ERR_NO_WINDOWS			0x50100006	//internal error		:	no compatible window found
+#define KC_ERR_INVALID_PATH			0x50100001	//StringCchLengthW		: path exceeds MAX_PATH * 2 chars
+#define KC_ERR_CANT_OPEN_FILE		0x50100002	//std::ifstream::good	: opening the SMXX.txt failed
+#define KC_ERR_EMPTY_FILE			0x50100003	//internal error		: SMXX.txt is empty
+#define KC_ERR_INVALID_INFO			0x50100004	//internal error		: provided info is wrong / invalid
+#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005	//EnumWindows			: API fail
+#define KC_ERR_NO_WINDOWS			0x50100006	//internal error		: no compatible window found
 
 
 
@@ -281,31 +300,33 @@
 //Symbol errors:
 #define SYMBOL_ERR_SUCCESS						0x00000000
 
-															//Source					:	error description
-#define SYMBOL_ERR_CANT_OPEN_MODULE				0x40000001	//std::ifstream::good		:	can't open the specified module
-#define SYMBOL_ERR_FILE_SIZE_IS_NULL			0x40000002	//std::ifstream::tellg		:	file size of the specified module is 0
-#define SYMBOL_ERR_CANT_ALLOC_MEMORY_NEW		0x40000003	//operator new				:	can't allocate memory
-#define SYMBOL_ERR_INVALID_FILE_ARCHITECTURE	0x40000004	//internal error			:	the architecture of the specified file doesn't match AMD64 or I386
-#define SYMBOL_ERR_CANT_ALLOC_MEMORY			0x40000005	//VirtualAlloc				:	can't allocate memory
-#define SYMBOL_ERR_NO_PDB_DEBUG_DATA			0x40000006	//internal error			:	debuge directory is emtpy or wrong type
-#define SYMBOL_ERR_PATH_DOESNT_EXIST			0x40000007	//CreateDirectoryA			:	path doesn't exit and can't be created
-#define SYMBOL_ERR_CANT_CREATE_DIRECTORY		0x40000008	//CreateDirectoryA			:	path doesn't exit and can't be created (x86/x64 subdirectory)
-#define SYMBOL_ERR_CANT_CONVERT_PDB_GUID		0x40000008	//StringFromGUID2			:	conversion of the GUID to string failed
-#define SYMBOL_ERR_GUID_TO_ANSI_FAILED			0x40000009	//wcstombs_s				:	conversion of GUID to ANSI string failed
-#define SYMBOL_ERR_DOWNLOAD_FAILED				0x4000000A	//URLDownloadToCacheFileA	:	downloading the pdb file failed
-#define SYMBOL_ERR_CANT_ACCESS_PDB_FILE			0x4000000B	//GetFileAttributesExA		:	can't access the pdb file
-#define SYMBOL_ERR_CANT_OPEN_PDB_FILE			0x4000000C	//CreateFileA				:	can't open the pdb file
-#define SYMBOL_ERR_CANT_OPEN_PROCESS			0x4000000D	//OpenProcess				:	can't open handle to current process
-#define SYMBOL_ERR_SYM_INIT_FAIL				0x4000000E	//SymInitialize				:	couldn't initialize pdb symbol stuff
-#define SYMBOL_ERR_SYM_LOAD_TABLE				0x4000000F	//SymLoadModule64			:	couldn't load symbol table
-#define SYMBOL_ERR_ALREADY_INITIALIZED			0x40000010	//internal error			:	this instance of the SYMBOL_PARSER has already been initialized
-#define SYMBOL_ERR_NOT_INITIALIZED				0x40000011	//internal error			:	this isntance of the SYMBOL_PARSER hasn't benen initialized
-#define SYMBOL_ERR_IVNALID_SYMBOL_NAME			0x40000012	//internal error			:	szSymbolName is NULL
-#define SYMBOL_ERR_SYMBOL_SEARCH_FAILED			0x40000013	//SymFromName				:	couldn't find szSymbolName in the specified pdb
-#define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess				:	can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
-#define SYMBOL_ERR_COPYFILE_FAILED				0x40000015	//CopyFileA					:	copying the file from the cache directory failed
-#define SYMBOL_ERR_INTERRUPT					0x40000016	//internal error			:	download has been interrupted
-#define SYMBOL_ERR_CANNOT_CONNECT				0x40000017	//InternetCheckConnectionW	:	GetLastError returned ERROR_INTERNET_CANNOT_CONNECT which might be caused by a firewall rule
+															//Source					: error description
+#define SYMBOL_ERR_CANT_OPEN_MODULE				0x40000001	//std::ifstream::good		: can't open the specified module
+#define SYMBOL_ERR_FILE_SIZE_IS_NULL			0x40000002	//std::ifstream::tellg		: file size of the specified module is 0
+#define SYMBOL_ERR_CANT_ALLOC_MEMORY_NEW		0x40000003	//operator new				: can't allocate memory
+#define SYMBOL_ERR_INVALID_FILE_ARCHITECTURE	0x40000004	//internal error			: the architecture of the specified file doesn't match AMD64 or I386
+#define SYMBOL_ERR_CANT_ALLOC_MEMORY			0x40000005	//VirtualAlloc				: can't allocate memory
+#define SYMBOL_ERR_NO_PDB_DEBUG_DATA			0x40000006	//internal error			: debug directory is empty or wrong type
+#define SYMBOL_ERR_PATH_DOESNT_EXIST			0x40000007	//CreateDirectoryA			: path doesn't exit and can't be created
+#define SYMBOL_ERR_CANT_CREATE_DIRECTORY		0x40000008	//CreateDirectoryA			: path doesn't exit and can't be created (x86/x64 subdirectory)
+#define SYMBOL_ERR_CANT_CONVERT_PDB_GUID		0x40000008	//StringFromGUID2			: conversion of the GUID to string failed
+#define SYMBOL_ERR_GUID_TO_ANSI_FAILED			0x40000009	//wcstombs_s				: conversion of GUID to ANSI string failed
+#define SYMBOL_ERR_DOWNLOAD_FAILED				0x4000000A	//URLDownloadToCacheFileA	: downloading the pdb file failed
+#define SYMBOL_ERR_CANT_ACCESS_PDB_FILE			0x4000000B	//GetFileAttributesExA		: can't access the pdb file
+#define SYMBOL_ERR_CANT_OPEN_PDB_FILE			0x4000000C	//CreateFileA				: can't open the pdb file
+#define SYMBOL_ERR_CANT_OPEN_PROCESS			0x4000000D	//OpenProcess				: can't open handle to current process
+#define SYMBOL_ERR_SYM_INIT_FAIL				0x4000000E	//SymInitialize				: couldn't initialize pdb symbol stuff
+#define SYMBOL_ERR_SYM_LOAD_TABLE				0x4000000F	//SymLoadModule64			: couldn't load symbol table
+#define SYMBOL_ERR_ALREADY_INITIALIZED			0x40000010	//internal error			: this instance of the SYMBOL_PARSER has already been initialized
+#define SYMBOL_ERR_NOT_INITIALIZED				0x40000011	//internal error			: this isntance of the SYMBOL_PARSER hasn't benen initialized
+#define SYMBOL_ERR_IVNALID_SYMBOL_NAME			0x40000012	//internal error			: szSymbolName is NULL
+#define SYMBOL_ERR_SYMBOL_SEARCH_FAILED			0x40000013	//SymFromName				: couldn't find szSymbolName in the specified pdb
+#define SYMBOL_CANT_OPEN_PROCESS				0x40000014	//OpenProcess				: can't get PROCESS_QUERY_LIMITED_INFORMATION handle to current process
+#define SYMBOL_ERR_COPYFILE_FAILED				0x40000015	//CopyFileA					: copying the file from the cache directory failed
+#define SYMBOL_ERR_INTERRUPT					0x40000016	//internal error			: download has been interrupted
+#define SYMBOL_ERR_CANNOT_CONNECT				0x40000017	//InternetCheckConnectionW	: GetLastError returned ERROR_INTERNET_CANNOT_CONNECT which might be caused by a firewall rule
+#define SYMBOL_ERR_OBJECT_IS_NULL				0x40000018	//internal error			: the provided SYMBOL_LOADER object pointer is a nullptr
+#define SYMBOL_ERR_OBJECT_NOT_READY				0x40000019	//internal error			: the provided SYMBOL_LOADER object is not in the ready state
 
 
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,18 +339,18 @@
 //Symbol errors:
 #define HOOK_SCAN_ERR_SUCCESS						0x00000000
 
-																//Source				:	error description
-#define HOOK_SCAN_ERR_INVALID_PROCESS_ID			0x50000001	//internal error		:	target process identifier is 0
-#define HOOK_SCAN_ERR_CANT_OPEN_PROCESS				0x50000002	//OpenProcess			:	target process identifier is 0
-#define HOOK_SCAN_ERR_PLATFORM_MISMATCH				0x50000003	//internal error		:	wow64 injector can't scan x64 process
-#define HOOK_SCAN_ERR_GETPROCADDRESS_FAILED			0x50000004	//GetProcAddress		:	GetProcAddress failed internally
-#define HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED	0x50000005	//ReadProcessMemory		:	ReadProcessMemory failed while reading the bytes of the target function
-#define HOOK_SCAN_ERR_CANT_GET_OWN_MODULE_PATH		0x50000006	//GetOwnModulePath		:	unable to obtain path to the GH Injector directory
-#define HOOK_SCAN_ERR_CREATE_EVENT_FAILED			0x50000007	//CreateEventEx			:	win32 error
-#define HOOK_SCAN_ERR_CREATE_PROCESS_FAILED			0x50000008	//CreateProcessW		:	win32 error
-#define HOOK_SCAN_ERR_WAIT_FAILED					0x50000009	//WaitForSingleObject	:	win32 error
-#define HOOK_SCAN_ERR_WAIT_TIMEOUT					0x5000000A	//WaitForSingleObject	:	waiting timed out
-#define HOOK_SCAN_ERR_BUFFER_TOO_SMALL				0x5000000B	//internal error		:	the buffer passed to ValidateInjectionFunctions is too small
+																//Source				: error description
+#define HOOK_SCAN_ERR_INVALID_PROCESS_ID			0x50000001	//internal error		: target process identifier is 0
+#define HOOK_SCAN_ERR_CANT_OPEN_PROCESS				0x50000002	//OpenProcess			: target process identifier is 0
+#define HOOK_SCAN_ERR_PLATFORM_MISMATCH				0x50000003	//internal error		: wow64 injector can't scan x64 process
+#define HOOK_SCAN_ERR_GETPROCADDRESS_FAILED			0x50000004	//GetProcAddress		: GetProcAddress failed internally
+#define HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED	0x50000005	//ReadProcessMemory		: ReadProcessMemory failed while reading the bytes of the target function
+#define HOOK_SCAN_ERR_CANT_GET_OWN_MODULE_PATH		0x50000006	//GetOwnModulePath		: unable to obtain path to the GH Injector directory
+#define HOOK_SCAN_ERR_CREATE_EVENT_FAILED			0x50000007	//CreateEventEx			: win32 error
+#define HOOK_SCAN_ERR_CREATE_PROCESS_FAILED			0x50000008	//CreateProcessW		: win32 error
+#define HOOK_SCAN_ERR_WAIT_FAILED					0x50000009	//WaitForSingleObject	: win32 error
+#define HOOK_SCAN_ERR_WAIT_TIMEOUT					0x5000000A	//WaitForSingleObject	: waiting timed out
+#define HOOK_SCAN_ERR_BUFFER_TOO_SMALL				0x5000000B	//internal error		: the buffer passed to ValidateInjectionFunctions is too small
 
 
 

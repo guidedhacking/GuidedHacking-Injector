@@ -8,7 +8,7 @@
 #define INJ_ERASE_HEADER				0x0001	//replaces the first 0x1000 bytes of the dll with 0's (takes priority over INJ_FAKE_HEADER if both are specified)
 #define INJ_FAKE_HEADER					0x0002	//replaces the dlls header with the header of the ntdll.dll (superseded by INJ_ERASE_HEADER if both are specified)
 #define INJ_UNLINK_FROM_PEB				0x0004	//unlinks the module from the process enviroment block (1)
-#define INJ_THREAD_CREATE_CLOAKED		0x0008	//passes certain flags to NtCreateThreadEx to make the thread creation more stealthy (2)
+#define INJ_THREAD_CREATE_CLOAKED		0x0008	//induces INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER (2), see "Start Routine.h" for all options
 #define INJ_SCRAMBLE_DLL_NAME			0x0010	//randomizes the dll name on disk before injecting it
 #define INJ_LOAD_DLL_COPY				0x0020	//loads a copy of the dll from %temp% directory
 #define INJ_HIJACK_HANDLE				0x0040	//tries to a hijack a handle from another process instead of using OpenProcess
@@ -79,6 +79,7 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData);
 #define MAXPATH_IN_BYTE_A	MAX_PATH * sizeof(char)
 #define MAXPATH_IN_BYTE_W	MAX_PATH * sizeof(wchar_t)
 #define MAXPATH_IN_BYTE		MAX_PATH * sizeof(TCHAR)
+#define INJ_HIJACK_TIMEOUT	250
 
 //Returns the version string of the current instance
 HRESULT __stdcall GetVersionA(char		* out, size_t cb_size);

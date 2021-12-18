@@ -18,7 +18,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	DumpShellcode(ReCa<BYTE *>(VectoredHandlerShell), length, L"VectoredHandlerShell_WOW64");
 #endif
 
-	LOG("  Begin ManualMap\n");
+	LOG(1, "Begin ManualMap\n");
 
 	MANUAL_MAPPING_DATA data{ 0 };
 	data.Flags			= Flags;
@@ -31,7 +31,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -45,7 +45,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbCopyW failed: %08X\n", hr);
+		LOG(1, "StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -55,7 +55,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   wcsrchr failed\n");
+		LOG(1, "wcsrchr failed\n");
 
 		return INJ_ERR_INVALID_PATH_SEPERATOR;
 	}
@@ -69,7 +69,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -83,12 +83,12 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbCopyW failed: %08X\n", hr);
+		LOG(1, "StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
 
-	LOG("   Shell data initialized\n");
+	LOG(1, "Shell data initialized\n");
 
 	if (Flags & INJ_MM_SHIFT_MODULE_BASE && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
 	{
@@ -101,7 +101,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 
 		data.ShiftOffset = shift_offset;
 
-		LOG("   Shift offset = %04X\n", shift_offset);
+		LOG(1, "Shift offset = %04X\n", shift_offset);
 	}
 
 	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(ManualMapping_Shell_End)	- ReCa<ULONG_PTR>(ManualMapping_Shell);
@@ -129,43 +129,46 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
 
-	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+	LOG(2, "Shellsize  = %08X\n", MDWD(ShellSize));
+	LOG(2, "Total size = %08X\n", MDWD(AllocationSize));
+	LOG(2, "pArg       = %p\n", pArg);
+	LOG(2, "pShell     = %p\n", pShell);
 
 	if (VEHShellSize)
 	{
-		LOG("   pVEHShell = %p\n", pVEHShell);
+		LOG(2, "pVEHShell   = %p\n", pVEHShell);
 	}
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(MANUAL_MAPPING_DATA), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("   Shelldata written to memory\n");
+	LOG(1, "Shelldata written to memory\n");
 
 	if (!WriteProcessMemory(hTargetProc, pShell, ManualMapping_Shell, ShellSize, nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("   Shell written to memory\n");
+	LOG(1, "Shell written to memory\n");
 
 	if (VEHShellSize)
 	{
@@ -173,26 +176,31 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 			return INJ_ERR_WPM_FAIL;
 		}
 
-		LOG("   VEHShell written to memory\n");
+		LOG(1, "VEHShell written to memory\n");
 	}
 
-	LOG("   Entering StartRoutine\n");
+	if (Flags & INJ_THREAD_CREATE_CLOAKED)
+	{
+		Flags |= (INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER);
+	}
+
+	LOG(1, "Entering StartRoutine\n");
 
 	DWORD remote_ret = 0;
-	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
+	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, Flags, remote_ret, Timeout, error_data);
 
-	LOG("   Return from StartRoutine\n");
+	LOG(1, "Return from StartRoutine\n");
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
-		LOG("   StartRoutine failed: %08X\n", dwRet);
+		LOG(1, "StartRoutine failed: %08X\n", dwRet);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
@@ -202,13 +210,13 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 		return dwRet;
 	}
 
-	LOG("   Fetching routine data\n");
+	LOG(1, "Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pAllocBase, &data, sizeof(MANUAL_MAPPING_DATA), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
@@ -227,7 +235,7 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)data.ntRet);
 
-		LOG("   Shell failed: %08X\n", remote_ret);
+		LOG(1, "Shell failed: %08X\n", remote_ret);
 
 		return remote_ret;
 	}
@@ -236,16 +244,16 @@ DWORD MMAP_NATIVE::ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUN
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("   Shell failed\n");
+		LOG(1, "Shell failed\n");
 
 		return INJ_ERR_FAILED_TO_LOAD_DLL;
 	}
 
-	LOG("   Shell returned successfully\n");
+	LOG(1, "Shell returned successfully\n");
 
 	hOut = data.hRet;
 
-	LOG("   Imagebase = %p\n", ReCa<void*>(hOut));
+	LOG(1, "Imagebase = %p\n", ReCa<void *>(hOut));
 
 	return INJ_ERR_SUCCESS;
 }
@@ -453,9 +461,9 @@ __forceinline NTSTATUS LoadModule(MANUAL_MAPPING_DATA * pData, MANUAL_MAPPING_FU
 			return STATUS_NO_MEMORY;
 		}
 
-		if (pData->OSBuildNumber <= g_Win10_1511)
+		if (pData->OSBuildNumber == g_Win10_1511)
 		{
-			ReCa<LDRP_PATH_SEARCH_CONTEXT_1507 *>(ctx)->OriginalFullDllName = ModNameW->szBuffer;
+			ReCa<LDRP_PATH_SEARCH_CONTEXT_1511 *>(ctx)->OriginalFullDllName = ModNameW->szBuffer;
 		}
 		else
 		{
@@ -464,14 +472,14 @@ __forceinline NTSTATUS LoadModule(MANUAL_MAPPING_DATA * pData, MANUAL_MAPPING_FU
 
 		ULONG_PTR unknown3 = 0;
 
-		if (pData->OSBuildNumber > g_Win10_21H1)
+		if (pData->OSBuildNumber >= g_Win11_21H2)
 		{
-			auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_21H2>(f->LdrpLoadDllInternal);
-			ntRet = _LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY **>(&entry_out), &unknown3, 0);
+			auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_WIN11>(f->LdrpLoadDllInternal);
+			ntRet = _LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &unknown3, 0);
 		}
 		else
 		{
-			ntRet = f->LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY **>(&entry_out), &unknown3);
+			ntRet = f->LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &unknown3);
 		}
 
 		DeleteObject(f, ctx);
@@ -1257,6 +1265,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			//EncodeSystemPointer
 			UINT_PTR pRaw	= ReCa<UINT_PTR>(pFakeExceptionDir);
 			auto cookie		= *P_KUSER_SHARED_DATA_COOKIE;
+
 #ifdef _WIN64
 			UINT_PTR pEncoded = bit_rotate_r(cookie ^ pRaw, cookie & 0x3F);
 #else
@@ -1265,14 +1274,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			
 			if (pData->OSVersion >= g_Win81)
 			{
-				ntRet = f->LdrProtectMrdata(FALSE);
-			}
-
-			if (NT_FAIL(ntRet))
-			{
-				f->NtFreeVirtualMemory(hProc, &pFakeExceptionDir, &FakeDirSize, MEM_RELEASE);
-
-				break;
+				f->LdrProtectMrdata(FALSE);
 			}
 
 			entry->ExceptionDirectory = ReCa<IMAGE_RUNTIME_FUNCTION_ENTRY *>(pEncoded);
@@ -1358,7 +1360,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 		if (pData->OSVersion <= g_Win8)
 		{
-			//Win7/Win8 __stdcall
+			//Win7 & Win8 __stdcall
 			auto _LdrpHandleTlsData = ReCa<f_LdrpHandleTlsData_WIN8>(f->LdrpHandleTlsData);
 			_LdrpHandleTlsData(ReCa<LDR_DATA_TABLE_ENTRY_WIN8 *>(pDummyLdr));
 		}
@@ -1366,9 +1368,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		{
 			//Win8.1+ __fastcall
 			f->LdrpHandleTlsData(pDummyLdr);
-		}
-
-		DeleteObject(f, pDummyLdr);
+		}		
 
 		auto * pCallback = ReCa<PIMAGE_TLS_CALLBACK *>(pTLS->AddressOfCallBacks);
 		for (; pCallback && (*pCallback); ++pCallback)
@@ -1376,6 +1376,22 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			auto Callback = *pCallback;
 			Callback(pBase, DLL_PROCESS_ATTACH, nullptr);
 		}
+
+		auto current = f->LdrpTlsList->Flink;
+		while (current != f->LdrpTlsList)
+		{
+			auto entry = ReCa<TLS_ENTRY *>(current);
+			if (entry->ModuleEntry == pDummyLdr)
+			{
+				entry->ModuleEntry = nullptr;
+
+				break;
+			}
+
+			current = current->Flink;
+		}
+		
+		DeleteObject(f, pDummyLdr);
 	}
 
 	//run DllMain
@@ -1692,6 +1708,7 @@ MANUAL_MAPPING_FUNCTION_TABLE::MANUAL_MAPPING_FUNCTION_TABLE()
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable);
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpDefaultPath);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrpTlsList);
 
 	pLdrpHeap = nullptr;
 }

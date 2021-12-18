@@ -46,9 +46,9 @@
 #define ReCa reinterpret_cast
 
 //Macro to convert 32-bit DWORD into void*
-#define MPTR(d) (void*)(ULONG_PTR)d
+#define MPTR(d) (void *)(ULONG_PTR)d
 
-//Macro to convert dumb 64-types into a DWORD without triggereing C4302 or C4311
+//Macro to convert dumb 64-types into a DWORD without triggereing C4302 or C4311 (also works on 32-bit sized pointers)
 #define MDWD(p) (DWORD)((ULONG_PTR)p & 0xFFFFFFFF)
 
 //Macro used to export the functions with a proper name
@@ -88,7 +88,8 @@ enum class LAUNCH_METHOD
 	LM_HijackThread,
 	LM_SetWindowsHookEx,
 	LM_QueueUserAPC,
-	LM_KernelCallback
+	LM_KernelCallback,
+	LM_FakeVEH
 };
 
 //macro to avoid compiler and shellcode related alignment issues (unlikely but just to be sure)
@@ -111,22 +112,19 @@ enum class LAUNCH_METHOD
 #define CUSTOM_PRINT
 //#define DUMP_SHELLCODE
 
-#ifdef CUSTOM_PRINT
+#ifdef DEBUG_INFO
 using f_raw_print_callback = void(__stdcall *)(const char * szText);
 inline f_raw_print_callback g_print_raw_callback = nullptr;
-void custom_print(const char * format, ...);
+
+void custom_print(int indention_offset, const char * format, ...);
 #else
-using f_raw_print_callback = void*;
+using f_raw_print_callback = void *;
 #endif
 
 DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print);
 
 #ifdef DEBUG_INFO
-	#ifdef CUSTOM_PRINT
-		#define LOG custom_print
-	#else
-		#define LOG printf
-	#endif
+#define LOG custom_print
 #else
 	#define LOG
 #endif

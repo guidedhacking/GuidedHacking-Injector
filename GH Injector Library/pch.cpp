@@ -12,7 +12,7 @@
 #pragma comment(lib, "Psapi.lib")
 #endif
 
-#ifdef CUSTOM_PRINT
+#ifdef DEBUG_INFO
 
 DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print)
 {
@@ -22,14 +22,14 @@ DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print)
 	{
 		g_print_raw_callback = nullptr;
 
-		LOG("Removed print callback\n");
+		LOG(0, "Removed print callback\n");
 
 		return INJ_ERR_INVALID_POINTER;
 	}
 
 	g_print_raw_callback = print;
 
-	LOG("Set print callback: %p\n", g_print_raw_callback);
+	LOG(0, "Set print callback: %p\n", g_print_raw_callback);
 
 	return INJ_ERR_SUCCESS;
 }
@@ -48,18 +48,21 @@ void ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const w
 	//probably both
 }
 
-void custom_print(const char * format, ...)
+void custom_print(int indention_offset, const char * format, ...)
 {
-	int result = 0;
-	int size = 1024;
-	char * buffer = new char[size]();
+	size_t size = 1024;
+	char * buffer = new(std::nothrow) char[size + indention_offset]();
 
 	if (!buffer)
 	{
 		return;
 	}
 
+	memset(buffer, '\x20', indention_offset);
+
 	auto old = _set_thread_local_invalid_parameter_handler(ImTheTrashMan);
+
+	int result = 0;
 
 	do
 	{
@@ -67,7 +70,7 @@ void custom_print(const char * format, ...)
 		va_start(args, format);
 
 		int err = 0;
-		result = vsprintf_s(buffer, size, format, args);
+		result = vsprintf_s(buffer + indention_offset, size, format, args);
 
 		if (result <= 0)
 		{
@@ -81,12 +84,14 @@ void custom_print(const char * format, ...)
 			delete[] buffer;
 
 			size += 1024;
-			buffer = new char[size]();
+			buffer = new(std::nothrow) char[size + indention_offset]();
 
 			if (!buffer)
 			{
 				break;
 			}
+
+			memset(buffer, '\x20', indention_offset);
 		}
 		else if (result < 0)
 		{
@@ -98,6 +103,8 @@ void custom_print(const char * format, ...)
 
 	if (result > 0)
 	{
+
+#ifdef CUSTOM_PRINT
 		if (g_print_raw_callback)
 		{
 			g_print_raw_callback(buffer);
@@ -116,6 +123,20 @@ void custom_print(const char * format, ...)
 				puts(buffer);
 			}
 		}
+#else
+		auto len = strlen(buffer);
+
+		if (len > 0)
+		{
+			if (buffer[len - 1] == '\n')
+			{
+				buffer[len - 1] = '\0';
+			}
+
+			puts(buffer);
+		}
+#endif
+
 	}
 
 	if (buffer)

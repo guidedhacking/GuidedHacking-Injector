@@ -11,7 +11,7 @@ bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc, HANDLE hRefProcess)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_GETPROCADDRESS_FAILED;
 
-		LOG("   GetProcAddressEx_WOW64 failed on %s\n", Info.FunctionName);
+		LOG(1, "GetProcAddressEx_WOW64 failed on %s\n", Info.FunctionName);
 
 		return false;
 	}
@@ -22,7 +22,7 @@ bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc, HANDLE hRefProcess)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED;
 
-		LOG("   ReadProcessMemory (reference process) failed on %s with error %08X\n", Info.FunctionName, GetLastError());
+		LOG(1, "ReadProcessMemory (reference process) failed on %s with error %08X\n", Info.FunctionName, GetLastError());
 
 		return false;
 	}
@@ -32,7 +32,7 @@ bool ScanForHook_WOW64(HookInfo & Info, HANDLE hTargetProc, HANDLE hRefProcess)
 	{
 		Info.ErrorCode = HOOK_SCAN_ERR_READ_PROCESS_MEMORY_FAILED;
 
-		LOG("   ReadProcessMemory (target process) failed on %s with error %08X\n", Info.FunctionName, GetLastError());
+		LOG(1, "ReadProcessMemory (target process) failed on %s with error %08X\n", Info.FunctionName, GetLastError());
 
 		return false;
 	}

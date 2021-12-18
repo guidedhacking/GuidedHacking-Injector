@@ -3,8 +3,18 @@
 #include "NT Funcs.h"
 #include "Symbol Parser.h"
 
+inline HANDLE g_hRunningEvent		= nullptr;
+inline HANDLE g_hInterruptEvent		= nullptr;
+inline HANDLE g_hInterruptedEvent	= nullptr;
+inline HANDLE g_hInterruptImport	= nullptr;
+
 inline ERROR_DATA					import_handler_error_data;
 inline std::shared_future<DWORD>	import_handler_ret;
+
+#ifdef _WIN64
+inline ERROR_DATA					import_handler_wow64_error_data;
+inline std::shared_future<DWORD>	import_handler_wow64_ret;
+#endif
 
 //Macros for import definitions
 
@@ -17,9 +27,16 @@ inline std::shared_future<DWORD>	import_handler_ret;
 #define WIN32_FUNC_INIT(func, lib) NATIVE::p##func = ReCa<decltype(func)*>(GetProcAddress(lib, #func));
 #define WIN32_FUNC_CONSTRUCTOR_INIT(func) this->p##func = NATIVE::p##func
 
+#define K32_FUNC(func) inline f_##func func = nullptr
+#define K32_FUNC_LOCAL(func) f_##func func
+#define K32_FUNC_CONSTRUCTOR_INIT(func) this->func = NATIVE::func
+
 #define WOW64_FUNCTION_POINTER(func) inline DWORD func##_WOW64 = 0
 #define WOW64_FUNCTION_POINTER_LOCAL(func) DWORD func
 #define WOW64_FUNC_CONSTRUCTOR_INIT(func) this->func = WOW64::func##_WOW64
+
+#define IDX_NTDLL		0
+#define IDX_KERNEL32	1
 
 //Command line codes for "GH Injector SM - XX.exe"
 
@@ -56,6 +73,7 @@ inline DWORD g_OSBuildNumber	= 0;
 #define g_Win10_2004 19041
 #define g_Win10_20H2 19042
 #define g_Win10_21H1 19043
+#define g_Win10_21H2 19044
 #define g_Win11_21H2 22000
 
 bool IsWin7OrGreater();
@@ -150,11 +168,20 @@ namespace NATIVE
 	NT_FUNC(RtlAddVectoredExceptionHandler);
 	NT_FUNC(RtlRemoveVectoredExceptionHandler);
 
+	NT_FUNC(NtDelayExecution);
+
 	NT_FUNC(LdrpModuleBaseAddressIndex);
 	NT_FUNC(LdrpMappingInfoIndex);
 	NT_FUNC(LdrpHeap);
 	NT_FUNC(LdrpInvertedFunctionTable);
 	NT_FUNC(LdrpDefaultPath);
+	NT_FUNC(LdrpVectorHandlerList);
+	NT_FUNC(LdrpTlsList);
+
+	NT_FUNC(RtlpUnhandledExceptionFilter);
+	K32_FUNC(UnhandledExceptionFilter);
+	K32_FUNC(SingleHandler);
+	K32_FUNC(DefaultHandler);
 
 #ifdef _WIN64
 	NT_FUNC(RtlAddFunctionTable);
@@ -230,11 +257,20 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(RtlAddVectoredExceptionHandler);
 	WOW64_FUNCTION_POINTER(RtlRemoveVectoredExceptionHandler);
 
+	WOW64_FUNCTION_POINTER(NtDelayExecution);
+
 	WOW64_FUNCTION_POINTER(LdrpModuleBaseAddressIndex);
 	WOW64_FUNCTION_POINTER(LdrpMappingInfoIndex);
 	WOW64_FUNCTION_POINTER(LdrpHeap);
 	WOW64_FUNCTION_POINTER(LdrpInvertedFunctionTable);
 	WOW64_FUNCTION_POINTER(LdrpDefaultPath);
+	WOW64_FUNCTION_POINTER(LdrpVectorHandlerList);
+	WOW64_FUNCTION_POINTER(LdrpTlsList);
+
+	WOW64_FUNCTION_POINTER(RtlpUnhandledExceptionFilter);
+	WOW64_FUNCTION_POINTER(UnhandledExceptionFilter);
+	WOW64_FUNCTION_POINTER(SingleHandler);
+	WOW64_FUNCTION_POINTER(DefaultHandler);
 }
 
 DWORD ResolveImports_WOW64(ERROR_DATA & error_data);
@@ -255,7 +291,7 @@ HINSTANCE GetModuleHandleExW_WOW64(HANDLE hTargetProc, const wchar_t * lpModuleN
 //Arguments:
 //		hTargetProc (HANDLE):
 ///			A handle to the target process with PROCESS_VM_READ and PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
-//		szModuleName (const wchar_t*):
+//		szModuleName (const wchar_t *):
 ///			The name of the module including the file extension.
 //
 //Returnvalue (HINSTANCE):
@@ -269,11 +305,11 @@ bool GetProcAddressExW_WOW64(HANDLE hTargetProc, const wchar_t * szModuleName, c
 //Arguments:
 //		hTargetProc (HANDLE):
 ///			A handle to the target process with PROCESS_VM_READ and PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION.
-//		szModuleName (const wchar_t*):
+//		szModuleName (const wchar_t *):
 ///			The name of the module including the file extension.
-//		szProcName (const char*):
+//		szProcName (const char *):
 ///			The name of the function as an ansi string.
-//		pOut (DWORD&):
+//		pOut (DWORD &):
 ///			A reference to a wow64 pointer that (on success) will contain the pointer to the function in the specified target process.
 //
 //Returnvalue (bool):
@@ -283,4 +319,12 @@ bool GetProcAddressExW_WOW64(HANDLE hTargetProc, const wchar_t * szModuleName, c
 bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * szProcName, DWORD &pOut);
 //Same as other GetProcAddressExW_WOW64 overload but modulebase provided instead of modulename. For performance boost only.
 
+#endif
+
+//For internal usage only:
+#ifdef __cplusplus
+extern "C"
+{
+	__declspec(dllexport) inline extern bool g_LibraryState = false;
+}
 #endif

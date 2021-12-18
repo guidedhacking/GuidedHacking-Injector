@@ -12,7 +12,7 @@ ProcessInfo::ProcessInfo()
 		return;
 	}
 
-	LOG("Creating ProcessInfo\n");
+	LOG(3, "Creating ProcessInfo\n");
 
 	m_pNtQueryInformationProcess	= ReCa<f_NtQueryInformationProcess>	(GetProcAddress(hNTDLL, "NtQueryInformationProcess"));
 	m_pNtQuerySystemInformation		= ReCa<f_NtQuerySystemInformation>	(GetProcAddress(hNTDLL, "NtQuerySystemInformation"));
@@ -62,7 +62,7 @@ ProcessInfo::ProcessInfo()
 		}
 	}
 
-	LOG("ProcessInfo initialized\n");
+	LOG(3, "ProcessInfo initialized\n");
 }
 
 ProcessInfo::~ProcessInfo()
@@ -76,73 +76,6 @@ ProcessInfo::~ProcessInfo()
 	{
 		delete[] m_pFirstProcess;
 	}
-}
-
-PEB * ProcessInfo::GetPEB_Native()
-{
-	if (!m_pFirstProcess)
-	{
-		return nullptr;
-	}
-
-	PROCESS_BASIC_INFORMATION PBI{ 0 };
-	ULONG size_out = 0;
-	NTSTATUS ntRet = m_pNtQueryInformationProcess(m_hCurrentProcess, PROCESSINFOCLASS::ProcessBasicInformation, &PBI, sizeof(PROCESS_BASIC_INFORMATION), &size_out);
-
-	if (NT_FAIL(ntRet))
-	{
-		return nullptr;
-	}
-
-	return PBI.pPEB;
-}
-
-LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
-{
-	if (!m_pFirstProcess)
-	{
-		return nullptr;
-	}
-
-	PEB * ppeb = GetPEB();
-	if (!ppeb)
-	{
-		return nullptr;
-	}
-
-	PEB	peb{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(PEB), nullptr))
-	{
-		return nullptr;
-	}
-
-	PEB_LDR_DATA ldrdata{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, peb.Ldr, &ldrdata, sizeof(PEB_LDR_DATA), nullptr))
-	{
-		return nullptr;
-	}
-
-	LIST_ENTRY * pCurrentEntry	= ldrdata.InLoadOrderModuleListHead.Flink;
-	LIST_ENTRY * pLastEntry		= ldrdata.InLoadOrderModuleListHead.Blink;
-
-	while (true)
-	{
-		LDR_DATA_TABLE_ENTRY CurrentEntry{ 0 };
-		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(LDR_DATA_TABLE_ENTRY), nullptr);
-
-		if (CurrentEntry.DllBase == hMod)
-		{
-			return ReCa<LDR_DATA_TABLE_ENTRY *>(pCurrentEntry);
-		}
-		else if (pCurrentEntry == pLastEntry)
-		{
-			break;
-		}
-
-		pCurrentEntry = CurrentEntry.InLoadOrderLinks.Flink;
-	}
-
-	return nullptr;
 }
 
 bool ProcessInfo::SetProcess(HANDLE hTargetProc)
@@ -206,6 +139,7 @@ bool ProcessInfo::SetThread(DWORD TID)
 		{
 			m_CurrentThreadIndex = i;
 			m_pCurrentThread = &m_pCurrentProcess->Threads[i];
+
 			break;
 		}
 	}
@@ -214,6 +148,7 @@ bool ProcessInfo::SetThread(DWORD TID)
 	{
 		m_CurrentThreadIndex = 0;
 		m_pCurrentThread = &m_pCurrentProcess->Threads[0];
+
 		return false;
 	}
 
@@ -254,7 +189,7 @@ bool ProcessInfo::RefreshInformation()
 {
 	if (!m_pFirstProcess)
 	{
-		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new BYTE[m_BufferSize]);
+		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new(std::nothrow) BYTE[m_BufferSize]);
 		if (!m_pFirstProcess)
 		{
 			return false;
@@ -276,7 +211,7 @@ bool ProcessInfo::RefreshInformation()
 		delete[] m_pFirstProcess;
 
 		m_BufferSize	= size_out + 0x1000;
-		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new BYTE[m_BufferSize]);
+		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new(std::nothrow) BYTE[m_BufferSize]);
 		if (!m_pFirstProcess)
 		{
 			return false;
@@ -309,6 +244,73 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry(HINSTANCE hMod)
 	return GetLdrEntry_Native(hMod);
 }
 
+PEB * ProcessInfo::GetPEB_Native()
+{
+	if (!m_pFirstProcess)
+	{
+		return nullptr;
+	}
+
+	PROCESS_BASIC_INFORMATION PBI{ 0 };
+	ULONG size_out = 0;
+	NTSTATUS ntRet = m_pNtQueryInformationProcess(m_hCurrentProcess, PROCESSINFOCLASS::ProcessBasicInformation, &PBI, sizeof(PROCESS_BASIC_INFORMATION), &size_out);
+
+	if (NT_FAIL(ntRet))
+	{
+		return nullptr;
+	}
+
+	return PBI.pPEB;
+}
+
+LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
+{
+	if (!m_pFirstProcess)
+	{
+		return nullptr;
+	}
+
+	PEB * ppeb = GetPEB();
+	if (!ppeb)
+	{
+		return nullptr;
+	}
+
+	PEB	peb{ 0 };
+	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
+	{
+		return nullptr;
+	}
+
+	PEB_LDR_DATA ldrdata{ 0 };
+	if (!ReadProcessMemory(m_hCurrentProcess, peb.Ldr, &ldrdata, sizeof(ldrdata), nullptr))
+	{
+		return nullptr;
+	}
+
+	LIST_ENTRY * pCurrentEntry = ldrdata.InLoadOrderModuleListHead.Flink;
+	LIST_ENTRY * pLastEntry = ldrdata.InLoadOrderModuleListHead.Blink;
+
+	while (true)
+	{
+		LDR_DATA_TABLE_ENTRY CurrentEntry;
+		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr);
+
+		if (CurrentEntry.DllBase == hMod)
+		{
+			return ReCa<LDR_DATA_TABLE_ENTRY *>(pCurrentEntry);
+		}
+		else if (pCurrentEntry == pLastEntry)
+		{
+			break;
+		}
+
+		pCurrentEntry = CurrentEntry.InLoadOrderLinks.Flink;
+	}
+
+	return nullptr;
+}
+
 void * ProcessInfo::GetEntrypoint()
 {
 	if (!m_pFirstProcess)
@@ -323,25 +325,25 @@ void * ProcessInfo::GetEntrypoint()
 	}
 
 	PEB	peb;
-	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(PEB), nullptr))
+	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
 	{
 		return nullptr;
 	}
 
 	PEB_LDR_DATA ldrdata;
-	if (!ReadProcessMemory(m_hCurrentProcess, peb.Ldr, &ldrdata, sizeof(PEB_LDR_DATA), nullptr))
+	if (!ReadProcessMemory(m_hCurrentProcess, peb.Ldr, &ldrdata, sizeof(ldrdata), nullptr))
 	{
 		return nullptr;
 	}
 
-	LIST_ENTRY * pCurrentEntry = ldrdata.InLoadOrderModuleListHead.Flink;
-	LIST_ENTRY * pLastEntry = ldrdata.InLoadOrderModuleListHead.Blink;
+	LIST_ENTRY * pCurrentEntry	= ldrdata.InLoadOrderModuleListHead.Flink;
+	LIST_ENTRY * pLastEntry		= ldrdata.InLoadOrderModuleListHead.Blink;
 
 	wchar_t NameBuffer[MAX_PATH]{ 0 };
 	while (true)
 	{
 		LDR_DATA_TABLE_ENTRY CurrentEntry;
-		if (ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(LDR_DATA_TABLE_ENTRY), nullptr))
+		if (ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr))
 		{
 			if (ReadProcessMemory(m_hCurrentProcess, CurrentEntry.BaseDllName.szBuffer, NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
 			{
@@ -417,6 +419,114 @@ DWORD ProcessInfo::GetThreadId()
 	return DWORD(ReCa<ULONG_PTR>(m_pCurrentThread->ClientId.UniqueThread) & 0xFFFFFFFF);
 }
 
+//Stolen from here:
+//https://github.com/changeofpace/Remote-Process-Cookie-for-Windows-7/blob/master/Remote%20Process%20Cookie%20for%20Windows%207/main.cpp
+//Thanks, changeofpace!
+ULONG ProcessInfo::GetProcessCookie()
+{
+	if (!m_pFirstProcess)
+	{
+		return 0;
+	}
+
+	ULONG cookie = 0;
+	if (GetOSVersion() == g_Win7)
+	{
+#ifdef _WIN64
+		if (m_IsWow64)
+		{
+			DWORD ctrl1 = WOW64::UnhandledExceptionFilter_WOW64;
+			DWORD ctrl2 = WOW64::DefaultHandler_WOW64;
+
+			DWORD ptr1 = 0;
+			DWORD ptr2 = 0;
+
+			BOOL bRet = TRUE;
+			bRet &= ReadProcessMemory(m_hCurrentProcess, MPTR(WOW64::RtlpUnhandledExceptionFilter_WOW64), &ptr1, sizeof(ptr1), nullptr);
+			bRet &= ReadProcessMemory(m_hCurrentProcess, MPTR(WOW64::SingleHandler_WOW64), &ptr2, sizeof(ptr2), nullptr);
+
+			if (!bRet)
+			{
+				return 0;
+			}
+
+			for (int i = 0; i < 0x20; ++i)
+			{
+				ULONG guess = _rotr(ptr1, i) ^ ctrl1;
+				DWORD test	= _rotl(ptr2, guess & 0x1F) ^ guess;
+
+				if (test == ctrl2)
+				{
+					cookie = guess;
+					break;
+				}
+			}
+		}
+		else
+		{
+			ULONG_PTR ctrl1 = ReCa<ULONG_PTR>(NATIVE::UnhandledExceptionFilter);
+			ULONG_PTR ctrl2 = ReCa<ULONG_PTR>(NATIVE::DefaultHandler);
+		
+			ULONG_PTR ptr1 = 0;
+			ULONG_PTR ptr2 = 0;
+
+			BOOL bRet = TRUE;
+			bRet &= ReadProcessMemory(m_hCurrentProcess, NATIVE::RtlpUnhandledExceptionFilter, &ptr1, sizeof(ptr1), nullptr);
+			bRet &= ReadProcessMemory(m_hCurrentProcess, NATIVE::SingleHandler, &ptr2, sizeof(ptr2), nullptr);
+
+			if (!bRet)
+			{
+				return 0;
+			}
+
+			for (int i = 0; i < 0x40; ++i)
+			{
+				ULONG guess = ULONG(_rotr64(ptr1, i) ^ ctrl1);
+				ULONG_PTR test = _rotl64(ptr2, guess & 0x3F) ^ guess;
+				if (test == ctrl2)
+				{
+					cookie = guess;
+					break;
+				}
+			}
+		}
+#else
+		ULONG_PTR ctrl1 = ReCa<ULONG_PTR>(NATIVE::UnhandledExceptionFilter);
+		ULONG_PTR ctrl2 = ReCa<ULONG_PTR>(NATIVE::DefaultHandler);
+
+		ULONG_PTR ptr1 = 0;
+		ULONG_PTR ptr2 = 0;
+
+		BOOL bRet = TRUE;
+		bRet &= ReadProcessMemory(m_hCurrentProcess, NATIVE::RtlpUnhandledExceptionFilter, &ptr1, sizeof(ptr1), nullptr);
+		bRet &= ReadProcessMemory(m_hCurrentProcess, NATIVE::SingleHandler, &ptr2, sizeof(ptr2), nullptr);
+
+		if (!bRet)
+		{
+			return 0;
+		}
+
+		for (int i = 0; i < 0x20; ++i)
+		{
+			ULONG guess		= ULONG(_rotr(ptr1, i) ^ ctrl1);
+			ULONG_PTR test	= _rotl(ptr2, guess & 0x1F) ^ guess;
+
+			if (test == ctrl2)
+			{
+				cookie = guess;
+				break;
+			}
+		}
+#endif
+	}
+	else
+	{
+		m_pNtQueryInformationProcess(m_hCurrentProcess, PROCESSINFOCLASS::ProcessCookie, &cookie, sizeof(cookie), nullptr);
+	}
+
+	return cookie;
+}
+
 bool ProcessInfo::GetThreadState(THREAD_STATE & state, KWAIT_REASON & reason)
 {
 	if (!m_pCurrentThread)
@@ -437,39 +547,35 @@ bool ProcessInfo::GetThreadStartAddress(void *& start_address)
 		return false;
 	}
 
-	if (!IsNative())
-	{
-		return GetThreadStartAddress_WOW64(start_address);
-	}
-
 	start_address = m_pCurrentThread->StartAddress;
 
 	return true;
 }
 
-bool ProcessInfo::GetThreadStartAddress_WOW64(void *& start_address)
+void * ProcessInfo::GetTEB()
 {
 	if (!m_pCurrentThread)
 	{
-		return false;
+		return nullptr;
 	}
 
 	HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, MDWD(m_pCurrentThread->ClientId.UniqueThread));
 	if (!hThread)
 	{
-		return false;
+		return nullptr;
 	}
 
-	if (NT_SUCCESS(m_pNtQueryInformationThread(hThread, THREADINFOCLASS::ThreadQuerySetWin32StartAddress, &start_address, sizeof(start_address), nullptr)))
-	{
-		CloseHandle(hThread);
-
-		return true;
-	}
+	THREAD_BASIC_INFORMATION tbi{ 0 };
+	auto ntRet = m_pNtQueryInformationThread(hThread, THREADINFOCLASS::ThreadBasicInformation, &tbi, sizeof(tbi), nullptr);
 
 	CloseHandle(hThread);
 
-	return false;
+	if (NT_FAIL(ntRet))
+	{
+		return nullptr;
+	}
+
+	return tbi.TebBaseAddress;
 }
 
 bool ProcessInfo::IsThreadInAlertableState()
@@ -478,15 +584,6 @@ bool ProcessInfo::IsThreadInAlertableState()
 	{
 		return false;
 	}
-
-#ifdef _WIN64
-
-	if (m_IsWow64)
-	{
-		return IsThreadInAlertableState_WOW64();
-	}
-
-#endif
 
 	HANDLE hThread = OpenThread(THREAD_GET_CONTEXT, FALSE, MDWD(m_pCurrentThread->ClientId.UniqueThread));
 	if (!hThread)
@@ -626,22 +723,14 @@ bool ProcessInfo::IsThreadWorkerThread()
 		return false;
 	}
 
-	HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, MDWD(m_pCurrentThread->ClientId.UniqueThread));
-	if (!hThread)
+	BYTE * teb = ReCa<BYTE *>(GetTEB());
+	if (!teb)
 	{
 		return false;
 	}
-
-	THREAD_BASIC_INFORMATION tbi{ 0 };
-	if (FAILED(m_pNtQueryInformationThread(hThread, THREADINFOCLASS::ThreadBasicInformation, &tbi, sizeof(tbi), nullptr)) || !tbi.TebBaseAddress)
-	{
-		return false;
-	}
-
-	CloseHandle(hThread);
 
 	USHORT TebInfo = NULL;
-	if (ReadProcessMemory(m_hCurrentProcess, ReCa<BYTE *>(tbi.TebBaseAddress) + TEB_SAMETEBFLAGS, &TebInfo, sizeof(TebInfo), nullptr))
+	if (ReadProcessMemory(m_hCurrentProcess, teb + TEB_SameTebFlags, &TebInfo, sizeof(TebInfo), nullptr))
 	{
 		return ((TebInfo & TEB_SAMETEB_FLAGS_LoaderWorker) != 0);
 	}
@@ -663,7 +752,7 @@ const SYSTEM_THREAD_INFORMATION * ProcessInfo::GetThreadInfo()
 
 PEB_32 * ProcessInfo::GetPEB_WOW64()
 {
-	if (!m_pFirstProcess)
+	if (!m_pFirstProcess || !m_IsWow64)
 	{
 		return 0;
 	}
@@ -682,7 +771,7 @@ PEB_32 * ProcessInfo::GetPEB_WOW64()
 
 LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 {
-	if (!m_pFirstProcess)
+	if (!m_pFirstProcess || !m_IsWow64)
 	{
 		return nullptr;
 	}
@@ -694,13 +783,13 @@ LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 	}
 
 	PEB_32 peb{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(PEB_32), nullptr))
+	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
 	{
 		return nullptr;
 	}
 	
 	PEB_LDR_DATA_32 ldrdata{ 0 };
-	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(PEB_LDR_DATA_32), nullptr))
+	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(ldrdata), nullptr))
 	{
 		return nullptr;
 	}
@@ -710,8 +799,8 @@ LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY_32 CurrentEntry{ 0 };
-		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(LDR_DATA_TABLE_ENTRY_32), nullptr);
+		LDR_DATA_TABLE_ENTRY_32 CurrentEntry;
+		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr);
 
 		if (CurrentEntry.DllBase == MDWD(hMod))
 		{
@@ -728,9 +817,88 @@ LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 	return nullptr;
 }
 
+void * ProcessInfo::GetEntrypoint_WOW64()
+{
+	if (!m_pFirstProcess)
+	{
+		return nullptr;
+	}
+
+	PEB_32 * ppeb = GetPEB_WOW64();
+	if (!ppeb)
+	{
+		return nullptr;
+	}
+
+	PEB_32 peb;
+	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
+	{
+		return nullptr;
+	}
+
+	PEB_LDR_DATA_32 ldrdata;
+	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(ldrdata), nullptr))
+	{
+		return nullptr;
+	}
+
+	auto * pCurrentEntry	= ReCa<LIST_ENTRY32 *>(MPTR(ldrdata.InLoadOrderModuleListHead.Flink));
+	auto * pLastEntry		= ReCa<LIST_ENTRY32 *>(MPTR(ldrdata.InLoadOrderModuleListHead.Blink));
+
+	wchar_t NameBuffer[MAX_PATH]{ 0 };
+	while (true)
+	{
+		LDR_DATA_TABLE_ENTRY_32 CurrentEntry;
+		if (ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr))
+		{
+			if (ReadProcessMemory(m_hCurrentProcess, MPTR(CurrentEntry.BaseDllName.szBuffer), NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
+			{
+				if (NameBuffer[CurrentEntry.BaseDllName.Length / 2 - 1] == 'e')
+				{
+					return MPTR(CurrentEntry.EntryPoint);
+				}
+			}
+		}
+
+		if (pCurrentEntry == pLastEntry)
+		{
+			break;
+		}
+
+		pCurrentEntry = ReCa<LIST_ENTRY32 *>(MPTR(CurrentEntry.InLoadOrderLinks.Flink));
+	}
+
+	return nullptr;
+}
+
+bool ProcessInfo::GetThreadStartAddress_WOW64(void *& start_address)
+{
+	if (!m_pCurrentThread || !m_IsWow64)
+	{
+		return false;
+	}
+
+	HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, MDWD(m_pCurrentThread->ClientId.UniqueThread));
+	if (!hThread)
+	{
+		return false;
+	}
+
+	if (NT_SUCCESS(m_pNtQueryInformationThread(hThread, THREADINFOCLASS::ThreadQuerySetWin32StartAddress, &start_address, sizeof(start_address), nullptr)))
+	{
+		CloseHandle(hThread);
+
+		return true;
+	}
+
+	CloseHandle(hThread);
+
+	return false;
+}
+
 bool ProcessInfo::IsThreadInAlertableState_WOW64()
 {
-	if (!m_pCurrentThread)
+	if (!m_pCurrentThread || !m_IsWow64)
 	{
 		return false;
 	}
@@ -854,4 +1022,32 @@ bool ProcessInfo::IsThreadInAlertableState_WOW64()
 	
 	return false;		
 }
+
+void * ProcessInfo::GetTEB_WOW64()
+{
+	if (!m_pCurrentThread || !m_IsWow64)
+	{
+		return nullptr;
+	}
+	
+	BYTE * ret = ReCa<BYTE *>(GetTEB());
+	if (!ret)
+	{
+		return nullptr;
+	}
+
+	if (GetOSVersion() >= g_Win10)
+	{
+		LONG WowTebOffset = 0;
+		if (ReadProcessMemory(m_hCurrentProcess, ret + TEB_WowTebOffset_64, &WowTebOffset, sizeof(WowTebOffset), nullptr))
+		{
+			//TEB32 = TEB64 + TEB64.WowTebOffset
+			return ret + WowTebOffset;
+		}
+	}
+	
+	//TEB32 = TEB64 + 0x2000
+	return ret + 0x2000;
+}
+
 #endif

@@ -50,8 +50,8 @@ using _##name##_32	= _##name##suffix##_32;
 			DEF_STRUCT_DEFAULT_32(LDR_DATA_TABLE_ENTRY, _WIN81)
 			DEF_STRUCT_DEFAULT_32(LDR_DDAG_NODE, _WIN81)
 		#endif
-	#elif (_WIN32_WINNT == _WIN32_WINNT_WIN10)
-		#if(WDK_NTDDI_VERSION == 0x0A00000B)
+	#elif (_WIN32_WINNT == _WIN32_WINNT_WIN10) //includes Win11
+		#if (WDK_NTDDI_VERSION == NTDDI_WIN10_CO) //Win11 SDK is called NTDDI_WIN10_CO
 			DEF_STRUCT_DEFAULT(LDR_DATA_TABLE_ENTRY, _WIN11)
 			DEF_STRUCT_DEFAULT(LDR_DDAG_NODE, _WIN11)
 
@@ -93,14 +93,52 @@ using f_NtCreateThreadEx = NTSTATUS (__stdcall *)
 using f_LdrLoadDll = NTSTATUS (__stdcall *)
 (
 	LDR_SEARCH_PATH		ldrSearchPath,
-	ULONG			*	pFlags, 
+	ULONG			*	pFlags,
 	UNICODE_STRING	*	pModuleFileName, 
+	HANDLE			*	pOut
+);
+
+using f_LdrLoadDll_WIN8 = NTSTATUS (__stdcall *)
+(
+	BOOLEAN Unknown1, //set to TRUE
+	ULONG * LoadFlags,
+	UNICODE_STRING	*	pModuleFileName,
 	HANDLE			*	pOut
 );
 
 using f_LdrUnloadDll = NTSTATUS (__stdcall *)
 (
 	HANDLE DllHandle
+);
+
+using f_LdrpLoadDll_WIN7 = NTSTATUS (__stdcall *)
+(
+	UNICODE_STRING				*	dll_path,
+	UNICODE_STRING				*	search_path,
+	LDRP_LOAD_CONTEXT_FLAGS			Flags,
+	BOOLEAN							Unknown1, //set to TRUE
+	PVOID							Unknown2, //can be nullptr
+	LDR_DATA_TABLE_ENTRY_WIN7	**	ldr_out
+);
+
+using f_LdrpLoadDll_WIN8 = NTSTATUS (__stdcall *)
+(
+	UNICODE_STRING					*	dll_path,
+	LDRP_PATH_SEARCH_CONTEXT_WIN8	*	search_ctx,
+	LDRP_LOAD_CONTEXT_FLAGS				Flags,
+	BOOLEAN								Unknown, //set to TRUE
+	LDR_DATA_TABLE_ENTRY_WIN8		**	entry_out,
+	LDR_DDAG_NODE_WIN8				**	ddag_out
+);
+
+using f_LdrpLoadDll_WIN81 = NTSTATUS (__fastcall *)
+(
+	UNICODE_STRING					*	dll_path,
+	LDRP_PATH_SEARCH_CONTEXT_WIN81	*	search_ctx,
+	LDRP_LOAD_CONTEXT_FLAGS				Flags,
+	BOOLEAN								Unknown, //set to TRUE
+	LDR_DATA_TABLE_ENTRY_WIN81		**	entry_out,
+	LDR_DDAG_NODE_WIN81				**	ddag_out
 );
 
 //1507-1803
@@ -110,7 +148,7 @@ using f_LdrpLoadDll_1507 = NTSTATUS (__fastcall *)
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
 	LDRP_LOAD_CONTEXT_FLAGS			Flags,
 	BOOLEAN							bUnknown, //set to TRUE
-	LDR_DATA_TABLE_ENTRY		**	ldr_out
+	LDR_DATA_TABLE_ENTRY_WIN10	**	ldr_out
 );
 
 //1809+
@@ -128,13 +166,13 @@ using f_LdrpLoadDllInternal = NTSTATUS (__fastcall *)
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
 	LDRP_LOAD_CONTEXT_FLAGS			Flags,
 	ULONG32							Unknown0,	//set to 4
-	LDR_DATA_TABLE_ENTRY		*	Unknown1,	//set to nullptr
-	LDR_DATA_TABLE_ENTRY		*	Unknown2,	//set to nullptr
-	LDR_DATA_TABLE_ENTRY		**	ldr_out,
+	LDR_DATA_TABLE_ENTRY_WIN10	*	Unknown1,	//set to nullptr
+	LDR_DATA_TABLE_ENTRY_WIN10	*	Unknown2,	//set to nullptr
+	LDR_DATA_TABLE_ENTRY_WIN10	**	ldr_out,
 	ULONG_PTR					*	Unknown3	//set to pointer to nullptr
 );
 
-using f_LdrpLoadDllInternal_21H2 = NTSTATUS (__fastcall *)
+using f_LdrpLoadDllInternal_WIN11 = NTSTATUS (__fastcall *)
 (
 	UNICODE_STRING				*	dll_path, 
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
@@ -207,6 +245,19 @@ using f_LdrpPreprocessDllName = NTSTATUS (__fastcall *)
 	LDRP_LOAD_CONTEXT_FLAGS		* LoadContextFlags
 );
 
+using f_RtlInsertInvertedFunctionTable_WIN7 = NTSTATUS (__stdcall *)
+(
+	RTL_INVERTED_FUNCTION_TABLE_WIN7 *	pTable,
+	void *								ImageBase,
+	DWORD								SizeOfImage
+);
+
+using f_RtlInsertInvertedFunctionTable_WIN8 = NTSTATUS (__stdcall *)
+(
+	void *	ImageBase,
+	DWORD	SizeOfImage
+);
+
 using f_RtlInsertInvertedFunctionTable = BOOL (__fastcall *)
 (
 	void *	ImageBase,
@@ -221,6 +272,11 @@ using f_RtlAddFunctionTable = BOOL (__stdcall *)
 	DWORD64				BaseAddress
 );
 #endif
+
+using f_LdrpHandleTlsData_WIN8 = NTSTATUS (__stdcall *)
+(
+	LDR_DATA_TABLE_ENTRY_WIN8 * pEntry
+);
 
 using f_LdrpHandleTlsData = NTSTATUS (__fastcall *)
 (
@@ -386,7 +442,7 @@ using f_NtMapViewOfSection = NTSTATUS (__stdcall *)
 	ULONG				Win32Protect
 );
 
-using f_LdrProtectMrdata = NTSTATUS (__stdcall *)
+using f_LdrProtectMrdata = VOID (__stdcall *)
 (
 	BOOL bProtected
 );
@@ -402,16 +458,34 @@ using f_RtlRemoveVectoredExceptionHandler = ULONG (__stdcall *)
 	PVOID Handle
 );
 
+using f_NtDelayExecution = NTSTATUS (__stdcall *)
+(
+	BOOLEAN			Alertable,
+	LARGE_INTEGER * DelayInterval
+);
+
 using f_LdrpModuleBaseAddressIndex	= RTL_RB_TREE *;
 using f_LdrpMappingInfoIndex		= RTL_RB_TREE *;
 using f_LdrpHeap					= PVOID *;
 using f_LdrpInvertedFunctionTable	= RTL_INVERTED_FUNCTION_TABLE *;
 using f_LdrpDefaultPath				= UNICODE_STRING *;
+using f_LdrpVectorHandlerList		= RTL_VECTORED_HANDLER_LIST *;
+using f_LdrpTlsList					= LIST_ENTRY *;
+
+//ntdll.dll:
+using f_RtlpUnhandledExceptionFilter	= ULONG_PTR *; //encrypted with RtlEncodePointer, points to kernel32.UnhandledExceptionFilter
+
+//kernel32.dll:
+using f_UnhandledExceptionFilter		= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER 
+using f_SingleHandler					= ULONG_PTR *; //encrypted with RtlEncodePointer, points to kernel32.DefaultHandler
+using f_DefaultHandler					= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER 
 
 #pragma endregion
 
 inline HINSTANCE g_hNTDLL;
+inline HINSTANCE g_hKERNEL32;
 
 #ifdef  _WIN64
 inline HINSTANCE g_hNTDLL_WOW64;
+inline HINSTANCE g_hKERNEL32_WOW64;
 #endif

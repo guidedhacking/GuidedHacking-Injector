@@ -69,35 +69,54 @@ DWORD GetOSBuildVersion()
 
 using namespace NATIVE;
 
-#define S_FUNC(f) f, #f
+#define S_FUNC(f) NATIVE::f, #f
 
 template <typename T>
-DWORD LoadNtSymbolNative(T & Function, const char * szFunction)
+DWORD LoadSymbolNative(T & Function, const char * szFunction, int index = IDX_NTDLL)
 {
 	DWORD RVA = 0;
-	DWORD sym_ret = sym_ntdll_native.GetSymbolAddress(szFunction, RVA);
+	DWORD sym_ret = 0;
+	T out = nullptr;
+
+	sym_ret = sym_parser.GetSymbolAddress(szFunction, RVA);
+
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
-		LOG("    Failed to load native function: %s\n", szFunction);
+		LOG(1, "Failed to load native function: %s\n", szFunction);
 
-		return sym_ret;
+		return 0;
 	}
 
-	Function = ReCa<T>(ReCa<UINT_PTR>(g_hNTDLL) + RVA);
+	switch (index)
+	{
+		case IDX_NTDLL:
+			out = ReCa<T>(ReCa<UINT_PTR>(g_hNTDLL) + RVA);
+			break;
+
+		case IDX_KERNEL32:
+			out = ReCa<T>(ReCa<UINT_PTR>(g_hKERNEL32) + RVA);
+			break;
+
+		default:
+			LOG(1, "Invalid symbol index specified. Failed to load native function: %s\n", szFunction);
+			return 0;
+	}
+
+	Function = out;
 
 	return INJ_ERR_SUCCESS;
 }
 
 DWORD ResolveImports(ERROR_DATA & error_data)
 {
-	LOG("  ResolveImports called\n");
+	LOG(1, "ResolveImports called\n");
 
 	DWORD err = ERROR_SUCCESS;
 	if (!GetOSVersion(&err))
 	{
 		INIT_ERROR_DATA(error_data, err);
 
-		LOG("   Failed to determine Windows version\n");
+		LOG(1, "Failed to determine Windows version\n");
 
 		return INJ_ERR_WINDOWS_VERSION;
 	}
@@ -106,22 +125,24 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("   This Windows version is not supported\n");
+		LOG(1, "This Windows version is not supported\n");
 
 		return INJ_ERR_WINDOWS_TOO_OLD;
 	}
 
-	g_hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
+	g_hNTDLL	= GetModuleHandle(TEXT("ntdll.dll"));
+	g_hKERNEL32 = GetModuleHandle(TEXT("kernel32.dll"));
 
-	printf("   ntdll.dll loaded at %p\n", g_hNTDLL);
-	printf("   OSVersion = %d\n   OSBuildVersion = %d\n", GetOSVersion(), GetOSBuildVersion());
+	LOG(1, "ntdll.dll    loaded at %p\n", g_hNTDLL);
+	LOG(1, "kernel32.dll loaded at %p\n", g_hKERNEL32);
+	LOG(1, "OSVersion = %d\n   OSBuildVersion = %d\n", GetOSVersion(), GetOSBuildVersion());
 
 	HINSTANCE hK32 = GetModuleHandle(TEXT("kernel32.dll"));
 	if (!hK32)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   GetModuleHandle failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "GetModuleHandle failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_KERNEL32_MISSING;
 	}
@@ -133,109 +154,173 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   GetProcAddress failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "GetProcAddress failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	}
 
-	LOG("   Waiting for native symbol parser to finish initialization\n");
+	LOG(1, "Waiting for native symbol parser to finish initialization\n");
 
-	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
+	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+	{
+		if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+		{
+			return INJ_ERR_IMPORT_INTERRUPT;
+		}
+	}
 	
 	DWORD sym_ret = sym_ntdll_native_ret.get();
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
 		INIT_ERROR_DATA(error_data, sym_ret);
 
-		LOG("   Native symbol loading failed: %08X\n", sym_ret);
+		LOG(1, "Native symbol loading failed: %08X\n", sym_ret);
 
-		return INJ_ERR_SYMBOL_INIT_FAIL;
+		return INJ_ERR_SYMBOL_LOAD_FAIL;
 	}
 
-	printf("LoadLibrary: %p\n", LoadLibraryExW);
-
-	LOG("   Start loading native ntdll symbols\n");
-
-	if (LoadNtSymbolNative(S_FUNC(LdrLoadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrUnloadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(LdrpLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(LdrGetDllHandleEx)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrGetProcedureAddress)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtQueryInformationProcess)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtQuerySystemInformation)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtQueryInformationThread)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(NATIVE::memmove, "memmove"))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED; //I hate compilers
-	if (LoadNtSymbolNative(S_FUNC(RtlZeroMemory)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(RtlAllocateHeap)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(RtlFreeHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(RtlAnsiStringToUnicodeString)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtOpenFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtReadFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtSetInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtQueryInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtClose)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtAllocateVirtualMemory)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtFreeVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtProtectVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtCreateSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(NtMapViewOfSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(NtCreateThreadEx)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(RtlQueueApcWow64Thread)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(RtlInsertInvertedFunctionTable)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrpHandleTlsData)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(LdrLockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrUnlockLoaderLock)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(RtlAddVectoredExceptionHandler)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(RtlRemoveVectoredExceptionHandler)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolNative(S_FUNC(LdrpHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolNative(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (IsWin7OrGreater() && !IsWin8OrGreater())
+	sym_ret = sym_parser.Initialize(&sym_ntdll_native);
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
-		if (LoadNtSymbolNative(S_FUNC(LdrpDefaultPath)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		INIT_ERROR_DATA(error_data, sym_ret);
+
+		LOG(1, "Native symbol parsing failed: %08X\n", sym_ret);
+
+		return INJ_ERR_SYMBOL_PARSE_FAIL;
+	}
+
+	LOG(1, "LoadLibrary: %p\n", LoadLibraryExW);
+
+	LOG(1, "Start loading native ntdll symbols\n");
+
+	if (LoadSymbolNative(S_FUNC(LdrLoadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrUnloadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(LdrpLoadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(LdrGetDllHandleEx)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrGetProcedureAddress)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtQueryInformationProcess)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtQuerySystemInformation)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtQueryInformationThread)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(memmove)))								return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED; //I hate compilers
+	if (LoadSymbolNative(S_FUNC(RtlZeroMemory)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlAllocateHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlFreeHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(RtlAnsiStringToUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtOpenFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtReadFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtSetInformationFile)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtQueryInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtClose)))								return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtAllocateVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtFreeVirtualMemory)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtProtectVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtCreateSection)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(NtMapViewOfSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtCreateThreadEx)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlQueueApcWow64Thread)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(RtlInsertInvertedFunctionTable)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrpHandleTlsData)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(LdrLockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrUnlockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(RtlAddVectoredExceptionHandler)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlRemoveVectoredExceptionHandler)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(NtDelayExecution)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolNative(S_FUNC(LdrpHeap)))								return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(LdrpTlsList)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (GetOSVersion() == g_Win7)
+	{
+		if (LoadSymbolNative(S_FUNC(LdrpDefaultPath)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(RtlpUnhandledExceptionFilter)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin8OrGreater())
 	{
-		if (LoadNtSymbolNative(S_FUNC(RtlRbRemoveNode)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolNative(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolNative(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(RtlRbRemoveNode)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrpMappingInfoIndex)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin81OrGreater())
 	{
-		if (LoadNtSymbolNative(S_FUNC(LdrProtectMrdata)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrProtectMrdata)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin10OrGreater())
 	{
-		if (LoadNtSymbolNative(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolNative(S_FUNC(LdrpLoadDllInternal)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrpLoadDllInternal)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 #ifdef _WIN64
-	if (LoadNtSymbolNative(NATIVE::RtlAddFunctionTable, "RtlAddFunctionTable"))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlAddFunctionTable)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 #endif
 
-	LOG("   Native ntdll symbols loaded\n");
+	sym_ntdll_native.Cleanup();
 
-#ifdef _WIN64
-	return ResolveImports_WOW64(error_data);
-#else
+	if (GetOSVersion() == g_Win7)
+	{
+		while (sym_kernel32_native_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		{
+			if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+			{
+				return INJ_ERR_IMPORT_INTERRUPT;
+			}
+		}
+	
+		sym_ret = sym_kernel32_native_ret.get();
+		if (sym_ret != SYMBOL_ERR_SUCCESS)
+		{
+			INIT_ERROR_DATA(error_data, sym_ret);
+
+			LOG(1, "Native symbol loading failed: %08X\n", sym_ret);
+
+			return INJ_ERR_SYMBOL_LOAD_FAIL;
+		}
+
+		sym_ret = sym_parser.Initialize(&sym_kernel32_native);
+		if (sym_ret != SYMBOL_ERR_SUCCESS)
+		{
+			INIT_ERROR_DATA(error_data, sym_ret);
+
+			LOG(1, "Native symbol parsing failed: %08X\n", sym_ret);
+
+			return INJ_ERR_SYMBOL_PARSE_FAIL;
+		}
+
+		if (LoadSymbolNative(S_FUNC(UnhandledExceptionFilter),	IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(SingleHandler),				IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(DefaultHandler),			IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+		sym_kernel32_native.Cleanup();
+
+		LOG(1, "Native kernel32 symbols loaded\n");
+	}
+
+	LOG(1, "Native ntdll symbols loaded\n");
+
+#ifndef _WIN64
+	sym_parser.Cleanup();
+
+	g_LibraryState = true; //on x64 ResolveImports_WOW64 will update g_LibraryState and free parser resources
+#endif
+
 	return INJ_ERR_SUCCESS;
-#endif
 }

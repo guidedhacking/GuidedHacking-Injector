@@ -4,7 +4,7 @@
 
 BOOL CALLBACK _SWHEX_EnumWindowsCallback(HWND hWnd, LPARAM lParam)
 {
-	auto * data = reinterpret_cast<EnumWindowsCallback_Data*>(lParam);
+	auto * data = reinterpret_cast<EnumWindowsCallback_Data *>(lParam);
 
 	DWORD winPID = 0;
 	DWORD winTID = GetWindowThreadProcessId(hWnd, &winPID);
@@ -61,7 +61,7 @@ DWORD _SetWindowsHookEx()
 
 	File.seekg(0, std::ios::beg);
 
-	char * info = new char[static_cast<size_t>(FileSize)];
+	char * info = new(std::nothrow) char[static_cast<size_t>(FileSize)];
 	char * cpy = info;
 	File.read(info, FileSize);
 

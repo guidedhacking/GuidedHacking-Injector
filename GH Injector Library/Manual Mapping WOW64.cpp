@@ -10,7 +10,7 @@ using namespace MMAP_WOW64;
 
 DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
-	LOG("  Begin ManualMap_WOW64\n");
+	LOG(1, "Begin ManualMap_WOW64\n");
 
 	MANUAL_MAPPING_DATA_WOW64 data{ 0 };
 	data.Flags			= Flags;
@@ -23,7 +23,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -36,7 +36,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbCopyW failed: %08X\n", hr);
+		LOG(1, "StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -46,7 +46,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   wcsrchr failed\n");
+		LOG(1, "wcsrchr failed\n");
 
 		return INJ_ERR_INVALID_PATH_SEPERATOR;
 	}
@@ -60,7 +60,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -73,12 +73,12 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbCopyW failed: %08X\n", hr);
+		LOG(1, "StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
 
-	LOG("   Shell data initialized\n");
+	LOG(1, "Shell data initialized\n");
 
 	if (Flags & INJ_MM_SHIFT_MODULE_BASE && !(Flags & INJ_MM_SET_PAGE_PROTECTIONS))
 	{
@@ -91,7 +91,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 
 		data.ShiftOffset = shift_offset;
 
-		LOG("   Shift offset = %04X\n", shift_offset);
+		LOG(1, "Shift offset = %04X\n", shift_offset);
 	}
 
 	ULONG_PTR ShellSize		= sizeof(ManualMapping_Shell_WOW64);
@@ -103,10 +103,10 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	}
 
 	auto AllocationSize = sizeof(MANUAL_MAPPING_DATA_WOW64) + ShellSize + VEHShellSize + BASE_ALIGNMENT * 2;
-	BYTE * pAllocBase	= ReCa<BYTE*>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+	BYTE * pAllocBase	= ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 
 	BYTE * pArg			= pAllocBase;
-	BYTE * pShell		= ReCa<BYTE*>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), BASE_ALIGNMENT));
+	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(MANUAL_MAPPING_DATA_WOW64), BASE_ALIGNMENT));
 	BYTE * pVEHShell	= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pShell) + ShellSize, BASE_ALIGNMENT));
 
 	if (VEHShellSize)
@@ -119,43 +119,46 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
 
-	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+	LOG(2, "Shellsize	= %08X\n", MDWD(ShellSize));
+	LOG(2, "Total size	= %08X\n", MDWD(AllocationSize));
+	LOG(2, "pArg        = %08X\n", MDWD(pArg));
+	LOG(2, "pShell      = %08X\n", MDWD(pShell));
 
 	if (VEHShellSize)
 	{
-		LOG("   pVEHShell = %p\n", pVEHShell);
+		LOG(2, "pVEHShell   = %08X\n", MDWD(pVEHShell));
 	}
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(MANUAL_MAPPING_DATA_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("   Shelldata written to memory\n");
+	LOG(1, "Shelldata written to memory\n");
 
 	if (!WriteProcessMemory(hTargetProc, pShell, ManualMapping_Shell_WOW64, ShellSize, nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("   Shell written to memory\n");
+	LOG(1, "Shell written to memory\n");
 
 	if (VEHShellSize)
 	{
@@ -163,26 +166,31 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
 			return INJ_ERR_WPM_FAIL;
 		}
 
-		LOG("   VEHShell written to memory\n");
+		LOG(1, "VEHShell written to memory\n");
 	}
 
-	LOG("   Entering StartRoutine_WOW64\n");
+	if (Flags & INJ_THREAD_CREATE_CLOAKED)
+	{
+		Flags |= (INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER);
+	}
+
+	LOG(1, "Entering StartRoutine_WOW64\n");
 
 	DWORD remote_ret = 0;
-	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
+	DWORD dwRet = StartRoutine_WOW64(hTargetProc, (f_Routine_WOW64)(MDWD(pShell)), MDWD(pArg), Method, Flags, remote_ret, Timeout, error_data);
 
-	LOG("   Return from StartRoutine_WOW64\n");
+	LOG(1, "Return from StartRoutine_WOW64\n");
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
-		LOG("   StartRoutine_WOW64 failed: %08X\n", dwRet);
+		LOG(1, "StartRoutine_WOW64 failed: %08X\n", dwRet);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
@@ -192,13 +200,13 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 		return dwRet;
 	}
 
-	LOG("   Fetching routine data\n");
+	LOG(1, "Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pAllocBase, &data, sizeof(MANUAL_MAPPING_DATA_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
@@ -217,7 +225,7 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)data.ntRet);
 
-		LOG("   Shell failed: %08X\n", remote_ret);
+		LOG(1, "Shell failed: %08X\n", remote_ret);
 
 		return remote_ret;
 	}
@@ -226,16 +234,16 @@ DWORD MMAP_WOW64::ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc,
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("   Shell failed\n");
+		LOG(1, "Shell failed\n");
 
 		return INJ_ERR_FAILED_TO_LOAD_DLL;
 	}
 
-	LOG("   Shell returned successfully\n");
+	LOG(1, "Shell returned successfully\n");
 
 	hOut = ReCa<HINSTANCE>(MPTR(data.hRet));
 
-	LOG("   Imagebase = %p\n", ReCa<void *>(hOut));
+	LOG(1, "Imagebase = %p\n", ReCa<void *>(hOut));
 
 	return INJ_ERR_SUCCESS;
 }
@@ -284,8 +292,9 @@ MANUAL_MAPPING_FUNCTION_TABLE_WOW64::MANUAL_MAPPING_FUNCTION_TABLE_WOW64()
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpModuleBaseAddressIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpMappingInfoIndex);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpHeap);
-	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable); 
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpInvertedFunctionTable);
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpDefaultPath);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpTlsList);
 
 	pLdrpHeap = 0;
 }

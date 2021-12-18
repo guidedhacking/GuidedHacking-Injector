@@ -107,35 +107,6 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT_WIN8
 	ULONG_PTR	unknown3[3]; //sometimes imagebase?
 } LDRP_PATH_SEARCH_CONTEXT_WIN8, * PLDRP_PATH_SEARCH_CONTEXT_WIN8;
 
-using f_LdrLoadDll_WIN8 = NTSTATUS (__stdcall *)
-(
-	BOOLEAN Unknown1, //set to TRUE
-	ULONG * LoadFlags,
-	UNICODE_STRING	*	pModuleFileName,
-	HANDLE			*	pOut
-);
-
-using f_LdrpLoadDll_WIN8 = NTSTATUS (__stdcall *)
-(
-	UNICODE_STRING					*	dll_path,
-	LDRP_PATH_SEARCH_CONTEXT_WIN8	*	search_ctx,
-	LDRP_LOAD_CONTEXT_FLAGS				Flags,
-	BOOLEAN								Unknown, //set to TRUE
-	LDR_DATA_TABLE_ENTRY_WIN8		**	entry_out,
-	LDR_DDAG_NODE_WIN8				**	ddag_out
-);
-
-using f_RtlInsertInvertedFunctionTable_WIN8 = NTSTATUS (__stdcall *)
-(
-	void *	ImageBase,
-	DWORD	SizeOfImage
-);
-
-using f_LdrpHandleTlsData_WIN8 = NTSTATUS (__stdcall *)
-(
-	LDR_DATA_TABLE_ENTRY_WIN8 * pEntry
-);
-
 #ifdef _WIN64
 
 typedef ALIGN_86 struct _LDR_DDAG_NODE_WIN8_32

@@ -17,15 +17,15 @@ DWORD __declspec(code_seg(".inj_sec$2")) InjectionShell_End();
 DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
 #if !defined(_WIN64) && defined (DUMP_SHELLCODE)
-	auto length = ReCa<BYTE*>(InjectionShell_End) - ReCa<BYTE*>(InjectionShell);
-	DumpShellcode(ReCa<BYTE*>(InjectionShell), length, L"InjectionShell_WOW64");
+	auto length = ReCa<BYTE *>(InjectionShell_End) - ReCa<BYTE *>(InjectionShell);
+	DumpShellcode(ReCa<BYTE *>(InjectionShell), length, L"InjectionShell_WOW64");
 #endif
 
-	LOG("  Begin InjectDll\n");
+	LOG(1, "Begin InjectDll\n");
 
 	if (Mode == INJECTION_MODE::IM_ManualMap)
 	{
-		LOG("   Forwarding call to ManualMap\n");
+		LOG(1, "Forwarding call to ManualMap\n");
 
 		return MMAP_NATIVE::ManualMap(szDllFile, hTargetProc, Method, Flags, hOut, Timeout, error_data);
 	}
@@ -42,7 +42,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "StringCbLengthW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
@@ -55,12 +55,12 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, (DWORD)hr);
 
-		LOG("   StringCbCopyW failed: %08X\n", hr);
+		LOG(1, "StringCbCopyW failed: %08X\n", hr);
 
 		return INJ_ERR_STRINGC_XXX_FAIL;
 	}
 
-	LOG("   Shell data initialized\n");
+	LOG(1, "Shell data initialized\n");
 
 	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(InjectionShell_End)		- ReCa<ULONG_PTR>(InjectionShell);
 	ULONG_PTR VEHShellSize	= ReCa<ULONG_PTR>(VectoredHandlerShell_End) - ReCa<ULONG_PTR>(VectoredHandlerShell);
@@ -81,7 +81,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_OUT_OF_MEMORY_EXT;
 	}
@@ -94,7 +94,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("   VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
+			LOG(1, "VirtualAllocEx failed: %08X\n", error_data.AdvErrorCode);
 
 			VirtualFreeEx(hTargetProc, pAllocBase, 0, MEM_RELEASE);
 
@@ -105,18 +105,21 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		data.VEHShellSize	= MDWD(VEHShellSize);
 	}	
 
-	LOG("   Shellsize = %IX\n   Total size = %08X\n   pArg = %p\n   pShell = %p\n", ShellSize, (DWORD)AllocationSize, pArg, pShell);
+	LOG(2, "Shellsize  = %08X\n", MDWD(ShellSize));
+	LOG(2, "Total size = %08X\n", MDWD(AllocationSize));
+	LOG(2, "pArg       = %p\n", pArg);
+	LOG(2, "pShell     = %p\n", pShell);
 
 	if (VEHShellSize)
 	{
-		LOG("   pVEHShell = %p\n", pVEHShell);
+		LOG(2, "pVEHShell   = %p\n", pVEHShell);
 	}
 
 	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (pVEHShell)
 		{
@@ -132,7 +135,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (pVEHShell)
 		{
@@ -144,7 +147,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		return INJ_ERR_WPM_FAIL;
 	}
 
-	LOG("   Shell written to memory\n");
+	LOG(1, "Shell written to memory\n");
 
 	if (VEHShellSize)
 	{
@@ -152,7 +155,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());
 
-			LOG("   WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+			LOG(1, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 			if (pVEHShell)
 			{
@@ -164,19 +167,24 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 			return INJ_ERR_WPM_FAIL;
 		}
 
-		LOG("   VEHShell written to memory\n");
+		LOG(1, "VEHShell written to memory\n");
 	}
 
-	LOG("   Entering StartRoutine\n");
+	LOG(1, "Entering StartRoutine\n");
+
+	if (Flags & INJ_THREAD_CREATE_CLOAKED)
+	{
+		Flags |= (INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER);
+	}
 
 	DWORD remote_ret = 0;
-	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, (Flags & INJ_THREAD_CREATE_CLOAKED) != 0, remote_ret, Timeout, error_data);
+	DWORD dwRet = StartRoutine(hTargetProc, ReCa<f_Routine>(pShell), pArg, Method, Flags, remote_ret, Timeout, error_data);
 
-	LOG("   Return from StartRoutine\n");
+	LOG(1, "Return from StartRoutine\n");
 
 	if (dwRet != SR_ERR_SUCCESS)
 	{
-		LOG("   StartRoutine failed: %08X\n", dwRet);
+		LOG(1, "StartRoutine failed: %08X\n", dwRet);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC && !(Method == LAUNCH_METHOD::LM_HijackThread && dwRet == SR_HT_ERR_REMOTE_TIMEOUT))
 		{
@@ -191,13 +199,13 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		return dwRet;
 	}
 
-	LOG("   Fetching routine data\n");
+	LOG(1, "Fetching routine data\n");
 
 	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
 
 		if (Method != LAUNCH_METHOD::LM_QueueUserAPC)
 		{
@@ -221,7 +229,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, data.LastError);
 
-		LOG("   Shell failed: %08X\n", remote_ret);
+		LOG(1, "Shell failed: %08X\n", remote_ret);
 
 		return remote_ret;
 	}
@@ -230,16 +238,16 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG("   Shell failed\n");
+		LOG(1, "Shell failed\n");
 
 		return INJ_ERR_FAILED_TO_LOAD_DLL;
 	}
 
-	LOG("   Shell returned successfully\n");
+	LOG(1, "Shell returned successfully\n");
 
 	hOut = data.hRet;
 
-	LOG("   Imagebase = %p\n", ReCa<void *>(hOut));
+	LOG(1, "Imagebase = %p\n", ReCa<void *>(hOut));
 
 	return INJ_ERR_SUCCESS;
 }
@@ -294,19 +302,18 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		LDRP_PATH_SEARCH_CONTEXT * ctx = &pData->SearchPathContext;
 		ctx->OriginalFullDllName = pData->Path;
 
+		if (pData->OSBuildNumber == g_Win10_1511)
+		{
+			ReCa<LDRP_PATH_SEARCH_CONTEXT_1511 *>(ctx)->OriginalFullDllName = pData->Path;
+			ctx->OriginalFullDllName = nullptr;
+		}
+
 		if (pData->Mode == INJECTION_MODE::IM_LdrpLoadDll)
 		{
 			if (pData->OSBuildNumber <= g_Win10_1803)
 			{
 				auto _LdrpLoadDll = ReCa<f_LdrpLoadDll_1507>(f->LdrpLoadDll);
-
-				if (pData->OSBuildNumber <= g_Win10_1511)
-				{
-					ReCa<LDRP_PATH_SEARCH_CONTEXT_1507 *>(ctx)->OriginalFullDllName = pData->Path;
-					ctx->OriginalFullDllName = nullptr;
-				}
-
-				pData->LastError = _LdrpLoadDll(&pData->ModuleFileName, ctx, ctx_flags, TRUE, &entry_out);
+				pData->LastError = _LdrpLoadDll(&pData->ModuleFileName, ctx, ctx_flags, TRUE, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out));
 			}
 			else
 			{
@@ -326,14 +333,14 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 
 			ULONG_PTR unknown = 0;
 
-			if (pData->OSBuildNumber > g_Win10_21H1)
+			if (pData->OSBuildNumber >= g_Win11_21H2) //Win11 prototype has an additional argument
 			{
-				auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_21H2>(f->LdrpLoadDllInternal);
-				pData->LastError = _LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, &entry_out, &unknown, 0);
+				auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_WIN11>(f->LdrpLoadDllInternal);
+				pData->LastError = _LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &unknown, 0);
 			}
 			else
 			{
-				pData->LastError = f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, &entry_out, &unknown);
+				pData->LastError = f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &unknown);
 			}
 
 			if (NT_FAIL(pData->LastError))
@@ -438,9 +445,9 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 	LDR_DATA_TABLE_ENTRY	* pEntry	= nullptr;
 
 #ifdef  _WIN64
-	pPEB = ReCa<PEB*>(__readgsqword(0x60));
+	pPEB = ReCa<PEB *>(__readgsqword(0x60));
 #else
-	pPEB = ReCa<PEB*>(__readfsdword(0x30));
+	pPEB = ReCa<PEB *>(__readfsdword(0x30));
 #endif 
 
 	if (!pPEB)
@@ -455,14 +462,14 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 
 	if ((pData->Flags & (INJ_FAKE_HEADER | INJ_ERASE_HEADER)))
 	{
-		auto * dos_header	= ReCa<IMAGE_DOS_HEADER*>(ReCa<BYTE*>(pData->hRet));
-		auto * nt_headers	= ReCa<IMAGE_NT_HEADERS*>(ReCa<BYTE*>(pData->hRet) + dos_header->e_lfanew);
+		auto * dos_header	= ReCa<IMAGE_DOS_HEADER *>(ReCa<BYTE *>(pData->hRet));
+		auto * nt_headers	= ReCa<IMAGE_NT_HEADERS *>(ReCa<BYTE *>(pData->hRet) + dos_header->e_lfanew);
 		SIZE_T header_size	= nt_headers->OptionalHeader.SizeOfHeaders;
 
 		HANDLE hProc = NtCurrentProcess();
 
 		ULONG old_access	= NULL;
-		void * base			= ReCa<void*>(pData->hRet);
+		void * base			= ReCa<void *>(pData->hRet);
 
 		pData->LastError = (DWORD)f->NtProtectVirtualMemory(hProc, &base, &header_size, PAGE_EXECUTE_READWRITE, &old_access);
 
@@ -477,7 +484,7 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		}
 		else if (pData->Flags & INJ_FAKE_HEADER)
 		{
-			auto * ntdll_ldr = ReCa<LDR_DATA_TABLE_ENTRY*>(pPEB->Ldr->InLoadOrderModuleListHead.Flink->Flink);
+			auto * ntdll_ldr = ReCa<LDR_DATA_TABLE_ENTRY *>(pPEB->Ldr->InLoadOrderModuleListHead.Flink->Flink);
 
 			if (!ntdll_ldr)
 			{
@@ -575,7 +582,7 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 				{
 					ldr_size = offsetof(LDR_DATA_TABLE_ENTRY_WIN10, SigningLevel);
 				}
-				else if (pData->OSBuildNumber <= g_Win10_21H1) //1703 - 21H1
+				else if (pData->OSBuildNumber <= g_Win10_21H2) //1703 - 21H2 (Win10)
 				{
 					ldr_size	= sizeof(LDR_DATA_TABLE_ENTRY_WIN10);
 					ddag_size	= sizeof(LDR_DDAG_NODE_WIN10);

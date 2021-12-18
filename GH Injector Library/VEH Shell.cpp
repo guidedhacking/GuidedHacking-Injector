@@ -63,15 +63,9 @@ LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION
 		Entries = &pData->_LdrpInvertedFunctionTable->Entries[0];
 	}
 
-	auto ntRet = STATUS_SUCCESS;
 	if (pData->OSVersion >= g_Win81)
 	{
-		ntRet = pData->_LdrProtectMrdata(FALSE);
-
-		if (NT_FAIL(ntRet))
-		{
-			return EXCEPTION_CONTINUE_SEARCH;
-		}
+		pData->_LdrProtectMrdata(FALSE);
 	}
 
 	auto cookie = *P_KUSER_SHARED_DATA_COOKIE;

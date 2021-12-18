@@ -16,7 +16,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	std::ifstream File(szFile, std::ios::binary | std::ios::ate);
 	if (!File.good())
 	{
-		LOG("Can't open file\n");
+		LOG(1, "Can't open file\n");
 
 		return FILE_ERR_CANT_OPEN_FILE;
 	}
@@ -24,24 +24,31 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	auto FileSize = File.tellg();
 	if (FileSize < 0x1000)
 	{
-		LOG("Specified file is too small\n");
+		LOG(1, "Specified file is too small\n");
 
 		return FILE_ERR_INVALID_FILE_SIZE;
 	}
 
-	BYTE * headers = new BYTE[0x1000];
+	BYTE * headers = new(std::nothrow) BYTE[0x1000]();
+	if (headers == nullptr)
+	{
+		LOG(1, "Memory allocation failed\n");
+
+		return FILE_ERR_MEMORY_ALLOCATION_FAILED;
+	}
+
 	File.seekg(0, std::ios::beg);
-	File.read(ReCa<char*>(headers), 0x1000);
+	File.read(ReCa<char *>(headers), 0x1000);
 	File.close();
 
-	auto * pDos = ReCa<IMAGE_DOS_HEADER*>(headers);
+	auto * pDos = ReCa<IMAGE_DOS_HEADER *>(headers);
 	WORD magic = pDos->e_magic;
 	
 	if (magic != IMAGE_DOS_SIGNATURE)
 	{
 		delete[] headers;
 
-		LOG("Invalid DOS header signature\n");
+		LOG(1, "Invalid DOS header signature\n");
 
 		return FILE_ERR_INVALID_FILE;
 	}
@@ -50,7 +57,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	{
 		delete[] headers;
 
-		LOG("Invalid nt header offset\n");
+		LOG(1, "Invalid nt header offset\n");
 
 		return FILE_ERR_INVALID_FILE;
 	}
@@ -64,7 +71,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 
 	if (signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
 	{
-		LOG("Invalid PE header\n");
+		LOG(1, "Invalid PE header\n");
 
 		return FILE_ERR_INVALID_FILE;
 	}
@@ -153,8 +160,7 @@ bool IsElevatedProcess(HANDLE hTargetProc)
 
 void ErrorLog(ERROR_INFO * info)
 {
-	auto FullPath = g_RootPathW;
-	FullPath += L"GH_Inj_Log.txt";
+	auto FullPath = g_RootPathW + L"GH_Inj_Log.txt";
 
 	time_t time_raw	= time(nullptr);
 	tm time_info;
@@ -203,7 +209,7 @@ void ErrorLog(ERROR_INFO * info)
 	std::wofstream error_log(FullPath, std::ios_base::out | std::ios_base::app);
 	if (!error_log.good())
 	{
-		LOG("Failed to open/create error log file:\n%ls\n", FullPath.c_str());
+		LOG(1, "Failed to open/create error log file:\n%ls\n", FullPath.c_str());
 
 		return;
 	}
@@ -281,6 +287,9 @@ std::wstring LaunchMethodToString(LAUNCH_METHOD method)
 		case LAUNCH_METHOD::LM_KernelCallback:
 			return std::wstring(L"KernelCallback");
 
+		case LAUNCH_METHOD::LM_FakeVEH:
+			return std::wstring(L"FakeVEH");
+
 		default:
 			break;
 	}
@@ -332,6 +341,9 @@ std::wstring BuildNumberToVersionString(int OSBuildNumber)
 		case g_Win10_21H1:
 			return std::wstring(L"21H1");
 
+		case g_Win10_21H2:
+			return std::wstring(L"21H2");
+
 		case g_Win11_21H2:
 			return std::wstring(L"21H2");
 
@@ -353,7 +365,7 @@ void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 	std::wofstream shellcodes(FullPath, std::ios_base::out | std::ios_base::app);
 	if (!shellcodes.good())
 	{
-		LOG("Failed to open/create shellcodename.txt file:\n%ls\n", FullPath);
+		LOG(2, "Failed to open/create shellcodename.txt file:\n%ls\n", FullPath);
 
 		return;
 	}
@@ -363,11 +375,11 @@ void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 
 	int row_length = 500;
 	int char_count = 6 * length - 2 + (length / row_length + 1) * 2 + 1; 
-	wchar_t * array_out = new wchar_t[char_count]();
+	wchar_t * array_out = new(std::nothrow) wchar_t[char_count]();
 
 	if (!array_out)
 	{
-		LOG("Failed to allocate buffer for shellcode data\n");
+		LOG(2, "Failed to allocate buffer for shellcode data\n");
 	
 		shellcodes.close();
 	}
@@ -407,40 +419,78 @@ float __stdcall GetDownloadProgress(bool bWow64)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
-#ifdef _WIN64
-	if (bWow64)
-	{
-		return sym_ntdll_wow64.GetDownloadProgress();
-	}
-	else
-	{
-		return sym_ntdll_native.GetDownloadProgress();
-	}	
-#else
-	UNREFERENCED_PARAMETER(bWow64);
+	return GetDownloadProgressEx(0, bWow64);
+}
 
-	return sym_ntdll_native.GetDownloadProgress();
+float __stdcall GetDownloadProgressEx(int index, bool bWow64)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	if (index == 0)
+	{
+#ifdef _WIN64
+		if (bWow64)
+		{
+			return sym_ntdll_wow64.GetDownloadProgress();
+		}
+		else
+		{
+			return sym_ntdll_native.GetDownloadProgress();
+		}
+#else
+		UNREFERENCED_PARAMETER(bWow64);
+
+		return sym_ntdll_native.GetDownloadProgress();
 #endif
+	}
+	else if (index == 1)
+	{
+#ifdef _WIN64
+		if (bWow64)
+		{
+			return sym_kernel32_wow64.GetDownloadProgress();
+		}
+		else
+		{
+			return sym_kernel32_native.GetDownloadProgress();
+		}
+#else
+		UNREFERENCED_PARAMETER(bWow64);
+
+		return sym_kernel32_native.GetDownloadProgress();
+#endif
+	}
+
+	return 0.0f;
 }
 
 void __stdcall StartDownload()
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
-	LOG("Beginning download(s)\n");
+	LOG(0, "Beginning download(s)\n");
 
 	sym_ntdll_native.SetDownload(true);
 
 #ifdef _WIN64
 	sym_ntdll_wow64.SetDownload(true);
 #endif
+
+	if (GetOSVersion() == g_Win7)
+	{
+		sym_kernel32_native.SetDownload(true);
+
+#ifdef _WIN64
+		sym_kernel32_wow64.SetDownload(true);
+#endif
+	}
 }
 
 void __stdcall InterruptDownload()
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
-	LOG("Interupting download thread(s)\n");
+	LOG(0, "Interupting download thread(s)\n");
 
 	sym_ntdll_native.Interrupt();
 
@@ -448,16 +498,100 @@ void __stdcall InterruptDownload()
 	sym_ntdll_wow64.Interrupt();
 #endif
 
-	LOG("Waiting for download thread(s) to exit\n");
-
-	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
-	LOG("ntdll.pdb download thread exited successfully\n");
+	if (GetOSVersion() == g_Win7)
+	{
+		sym_kernel32_native.Interrupt();
 
 #ifdef _WIN64
-	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
-	LOG("wntdll.pdb download thread exited successfully\n");
+		sym_kernel32_wow64.Interrupt();
+#endif
+	}
+
+	SetEvent(g_hInterruptImport);
+
+	LOG(0, "Waiting for download thread(s) to exit\n");
+
+	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+	LOG(0, "ntdll.pdb download thread exited successfully\n");
+
+#ifdef _WIN64
+	while (sym_ntdll_native_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+	LOG(0, "wntdll.pdb download thread exited successfully\n");
 #endif
 	
-	while (import_handler_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
-	LOG("Import handler thread exited successfully\n");
+	if (GetOSVersion() == g_Win7)
+	{
+		while (sym_kernel32_native_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+		LOG(0, "kernel32.pdb download thread exited successfully\n");
+
+#ifdef _WIN64
+		while (sym_kernel32_wow64_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+		LOG(0, "wkernel32.pdb download thread exited successfully\n");
+#endif
+	}
+
+	while (import_handler_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+	LOG(0, "Import handler thread (native) exited successfully\n");
+
+#ifdef _WIN64
+	while (import_handler_wow64_ret.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready);
+	LOG(0, "Import handler thread (wow64) exited successfully\n");
+#endif
+}
+
+DWORD __stdcall InterruptDownloadEx(void * pArg)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	UNREFERENCED_PARAMETER(pArg);
+
+	InterruptDownload();
+
+	return 0;
+}
+
+bool __stdcall InterruptInjection(DWORD Timeout)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	auto ret = WaitForSingleObject(g_hRunningEvent, 0);
+	if (ret != WAIT_OBJECT_0)
+	{
+		LOG(0, "No injection running\n");
+
+		return false;
+	}
+
+	if (!SetEvent(g_hInterruptEvent))
+	{
+		LOG(0, "Failed to set interrupt event: %08X\n", GetLastError());
+
+		return false;
+	}
+
+	ret = WaitForSingleObject(g_hInterruptedEvent, Timeout);
+	if (ret != WAIT_OBJECT_0)
+	{
+		if (ret == WAIT_FAILED)
+		{
+			LOG(0, "Interrupt failed:\n", GetLastError());
+		}
+		else
+		{
+			LOG(0, "Interrupt timed out: %08X\n", ret);
+		}
+
+		return false;
+	}
+
+	LOG(0, "Successfully interrupted injection thread\n");
+
+	return true;
+}
+
+DWORD __stdcall InterruptInjectionEx(void * Timeout)
+{
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
+	return InterruptInjection(MDWD(Timeout));
 }

@@ -54,7 +54,7 @@ DWORD _KernelCallbackTable()
 
 	File.seekg(0, std::ios::beg);
 
-	char * info = new char[static_cast<size_t>(FileSize)];
+	char * info = new(std::nothrow) char[static_cast<size_t>(FileSize)];
 	File.read(info, FileSize);
 
 	File.close();

@@ -12,28 +12,47 @@
 
 using namespace WOW64;
 
-#define S_FUNC(f) f##_WOW64, #f
+#define S_FUNC(f) WOW64::f##_WOW64, #f
 
 template <typename T>
-DWORD LoadNtSymbolWOW64(T & Function, const char * szFunction)
+DWORD LoadSymbolWOW64(T & Function, const char * szFunction, int index = IDX_NTDLL)
 {
-	DWORD RVA = 0;
-	DWORD sym_ret = sym_ntdll_wow64.GetSymbolAddress(szFunction, RVA);
+	DWORD RVA		= 0;
+	DWORD sym_ret	= 0;
+	DWORD out		= 0;
+
+	sym_ret = sym_parser.GetSymbolAddress(szFunction, RVA);
+
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
-		LOG("    Failed to load WOW64 function: %s\n", szFunction);
+		LOG(1, "Failed to load WOW64 function: %s\n", szFunction);
 
 		return 0;
 	}
 
-	Function = (T)(ReCa<UINT_PTR>(g_hNTDLL_WOW64) + RVA);
+	switch (index)
+	{
+		case IDX_NTDLL:			
+			out	= MDWD(g_hNTDLL_WOW64) + RVA;
+			break;
+
+		case IDX_KERNEL32:
+			out	= MDWD(g_hKERNEL32_WOW64) + RVA;
+			break;
+
+		default:
+			LOG(1, "Invalid symbol index specified. Failed to load WOW64 function: %s\n", szFunction);
+			return 0;
+	}
+
+	Function = (T)out;
 
 	return INJ_ERR_SUCCESS;
 }
 
 DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 {
-	LOG("  ResolveImports_WOW64 called\n");
+	LOG(1, "ResolveImports_WOW64 called\n");
 
 	PROCESS_INFORMATION pi{ 0 };
 	STARTUPINFOW		si{ 0 };
@@ -50,7 +69,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   CreateEventEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "CreateEventEx failed: %08X\n", error_data.AdvErrorCode);
 
 		return INJ_ERR_CREATE_EVENT_FAILED;
 	}
@@ -60,7 +79,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   CreateEventEx failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "CreateEventEx failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hEventStart);
 
@@ -87,7 +106,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
-		LOG("   CreateProcessW failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "CreateProcessW failed: %08X\n", error_data.AdvErrorCode);
 
 		CloseHandle(hEventStart);
 		CloseHandle(hEventEnd);
@@ -110,7 +129,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 			err_ret = INJ_ERR_WAIT_TIMEOUT;
 		}
 
-		LOG("   WaitForSingleObject failed: %08X\n", error_data.AdvErrorCode);
+		LOG(1, "WaitForSingleObject failed: %08X\n", error_data.AdvErrorCode);
 
 		SetEvent(hEventEnd);
 
@@ -124,23 +143,23 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	}
 
 	auto wow64_pid = GetProcessId(pi.hProcess);
-	LOG("   Successfully spawned wow64 dummy process: %08X (%d)\n", wow64_pid, wow64_pid);
+	LOG(1, "Successfully spawned wow64 dummy process: %08X (%d)\n", wow64_pid, wow64_pid);
 
-	g_hNTDLL_WOW64 = GetModuleHandleExW_WOW64(pi.hProcess, L"ntdll.dll");
-	auto hKernel32_WOW64 = GetModuleHandleExW_WOW64(pi.hProcess, L"kernel32.dll");
+	g_hNTDLL_WOW64		= GetModuleHandleExW_WOW64(pi.hProcess, L"ntdll.dll");
+	g_hKERNEL32_WOW64	= GetModuleHandleExW_WOW64(pi.hProcess, L"kernel32.dll");
 
-	if (!g_hNTDLL_WOW64 || !hKernel32_WOW64)
+	if (!g_hNTDLL_WOW64 || !g_hKERNEL32_WOW64)
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
 		if (!g_hNTDLL_WOW64)
 		{
-			LOG("   Failed to get WOW64 ntdll.dll\n");
+			LOG(1, "Failed to get WOW64 ntdll.dll\n");
 		}
 
-		if (!hKernel32_WOW64)
+		if (!g_hKERNEL32_WOW64)
 		{
-			LOG("   Failed to get WOW64 kernel32.dll\n");
+			LOG(1, "Failed to get WOW64 kernel32.dll\n");
 		}
 
 		SetEvent(hEventEnd);
@@ -154,10 +173,10 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 		return INJ_ERR_WOW64_NTDLL_MISSING;
 	}
 
-	LOG("   WOW64 kernel32.dll loaded at %08X\n", MDWD(hKernel32_WOW64));
+	LOG(1, "WOW64 kernel32.dll loaded at %08X\n", MDWD(g_hKERNEL32_WOW64));
 
-	bool b_lle	= GetProcAddressEx_WOW64(pi.hProcess, hKernel32_WOW64, "LoadLibraryExW", WOW64::LoadLibraryExW_WOW64);
-	bool b_gle	= GetProcAddressEx_WOW64(pi.hProcess, hKernel32_WOW64, "GetLastError", WOW64::GetLastError_WOW64);
+	bool b_lle	= GetProcAddressEx_WOW64(pi.hProcess, g_hKERNEL32_WOW64, "LoadLibraryExW", WOW64::LoadLibraryExW_WOW64);
+	bool b_gle	= GetProcAddressEx_WOW64(pi.hProcess, g_hKERNEL32_WOW64, "GetLastError", WOW64::GetLastError_WOW64);
 
 	SetEvent(hEventEnd);
 
@@ -173,103 +192,184 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 
 		if (!b_lle)
 		{
-			LOG("   Failed to resolve WOW64 address of LoadLibrarExW\n");
+			LOG(1, "Failed to resolve WOW64 address of LoadLibrarExW\n");
 		}
 
 		if (!b_gle)
 		{
-			LOG("   Failed to resolve WOW64 address of GetLastError\n");
+			LOG(1, "Failed to resolve WOW64 address of GetLastError\n");
 		}
 
 		return INJ_ERR_GET_PROC_ADDRESS_FAIL;
 	}
 
-	LOG("    LoadLibraryExW = %08X\n", WOW64::LoadLibraryExW_WOW64);
-	LOG("    GetLastError   = %08X\n", WOW64::GetLastError_WOW64);
+	LOG(1, "LoadLibraryExW = %08X\n", WOW64::LoadLibraryExW_WOW64);
+	LOG(1, "GetLastError   = %08X\n", WOW64::GetLastError_WOW64);
 
-	LOG("   Waiting for WOW64 symbol parser to finish initialization\n");
+	LOG(1, "Waiting for WOW64 symbol parser to finish initialization\n");
 
-	while (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready);
+	while (sym_ntdll_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+	{
+		if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+		{
+			return INJ_ERR_IMPORT_INTERRUPT;
+		}
+	}
 
-	LOG("   WOW64 ntdll.dll loaded at %08X\n", MDWD(g_hNTDLL_WOW64));
+	LOG(1, "WOW64 ntdll.dll loaded at %08X\n", MDWD(g_hNTDLL_WOW64));
 
 	DWORD sym_ret = sym_ntdll_wow64_ret.get();
 	if (sym_ret != SYMBOL_ERR_SUCCESS)
 	{
 		INIT_ERROR_DATA(error_data, sym_ret);
 
-		LOG("   WOW64 symbol loading failed: %08X\n", sym_ret);
+		LOG(1, "WOW64 symbol loading failed: %08X\n", sym_ret);
 
-		return INJ_ERR_SYMBOL_INIT_FAIL;
+		return INJ_ERR_SYMBOL_LOAD_FAIL;
 	}
 
-	LOG("   Start loading WOW64 ntdll symbols\n");
-
-	if (LoadNtSymbolWOW64(S_FUNC(LdrLoadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrUnloadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrpLoadDll)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(LdrGetDllHandleEx)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrGetProcedureAddress)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(WOW64::memmove_WOW64, "memmove"))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(RtlZeroMemory)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(RtlAllocateHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(RtlFreeHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(RtlAnsiStringToUnicodeString)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-
-	if (LoadNtSymbolWOW64(S_FUNC(NtOpenFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtReadFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtSetInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtQueryInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(NtClose)))								return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	
-	if (LoadNtSymbolWOW64(S_FUNC(NtAllocateVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtFreeVirtualMemory)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtProtectVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(NtCreateSection)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(NtMapViewOfSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(RtlInsertInvertedFunctionTable)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrpHandleTlsData)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(LdrLockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrUnlockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(RtlAddVectoredExceptionHandler)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(RtlRemoveVectoredExceptionHandler)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (LoadNtSymbolWOW64(S_FUNC(LdrpHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadNtSymbolWOW64(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
-	if (IsWin7OrGreater() && !IsWin8OrGreater())
+	while (!import_handler_ret.valid())
 	{
-		if (LoadNtSymbolWOW64(S_FUNC(LdrpDefaultPath)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+		{
+			return INJ_ERR_IMPORT_INTERRUPT;
+		}
+	}
+
+	while (import_handler_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+	{
+		if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+		{
+			return INJ_ERR_IMPORT_INTERRUPT;
+		}
+	}
+
+	sym_ret = sym_parser.Initialize(&sym_ntdll_wow64);
+	if (sym_ret != SYMBOL_ERR_SUCCESS)
+	{
+		INIT_ERROR_DATA(error_data, sym_ret);
+
+		LOG(1, "WOW64 symbol parsing failed: %08X\n", sym_ret);
+
+		return INJ_ERR_SYMBOL_PARSE_FAIL;
+	}
+
+	LOG(1, "Start loading WOW64 ntdll symbols\n");
+
+	if (LoadSymbolWOW64(S_FUNC(LdrLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrUnloadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrpLoadDll)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(LdrGetDllHandleEx)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrGetProcedureAddress)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(memmove)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlZeroMemory)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlAllocateHeap)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlFreeHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(RtlAnsiStringToUnicodeString)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(NtOpenFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtReadFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtSetInformationFile)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtQueryInformationFile)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(NtClose)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	
+	if (LoadSymbolWOW64(S_FUNC(NtAllocateVirtualMemory)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtFreeVirtualMemory)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtProtectVirtualMemory)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(NtCreateSection)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(NtMapViewOfSection)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(RtlInsertInvertedFunctionTable)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrpHandleTlsData)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(LdrLockLoaderLock)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrUnlockLoaderLock)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(RtlAddVectoredExceptionHandler)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlRemoveVectoredExceptionHandler)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(NtDelayExecution)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (LoadSymbolWOW64(S_FUNC(LdrpHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(LdrpTlsList)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (GetOSVersion() == g_Win7)
+	{
+		if (LoadSymbolWOW64(S_FUNC(LdrpDefaultPath)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(RtlpUnhandledExceptionFilter)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin8OrGreater())
 	{
-		if (LoadNtSymbolWOW64(S_FUNC(RtlRbRemoveNode)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolWOW64(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolWOW64(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(RtlRbRemoveNode)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrpModuleBaseAddressIndex)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin81OrGreater())
 	{
-		if (LoadNtSymbolWOW64(S_FUNC(LdrProtectMrdata)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrProtectMrdata)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	if (IsWin10OrGreater())
 	{
-		if (LoadNtSymbolWOW64(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-		if (LoadNtSymbolWOW64(S_FUNC(LdrpLoadDllInternal)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrpLoadDllInternal)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
-	LOG("   WOW64 ntdll symbols loaded\n");
+	sym_ntdll_wow64.Cleanup();
+
+	if (GetOSVersion() == g_Win7)
+	{
+		while (sym_kernel32_wow64_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		{
+			if (WaitForSingleObject(g_hInterruptImport, 10) == WAIT_OBJECT_0)
+			{
+				return INJ_ERR_IMPORT_INTERRUPT;
+			}
+		}
+
+		sym_ret = sym_kernel32_wow64_ret.get();
+		if (sym_ret != SYMBOL_ERR_SUCCESS)
+		{
+			INIT_ERROR_DATA(error_data, sym_ret);
+
+			LOG(1, "WOW64 symbol loading failed: %08X\n", sym_ret);
+
+			return INJ_ERR_SYMBOL_LOAD_FAIL;
+		}
+
+		sym_ret = sym_parser.Initialize(&sym_kernel32_wow64);
+		if (sym_ret != SYMBOL_ERR_SUCCESS)
+		{
+			INIT_ERROR_DATA(error_data, sym_ret);
+
+			LOG(1, "WOW64 symbol loading failed: %08X\n", sym_ret);
+
+			return INJ_ERR_SYMBOL_PARSE_FAIL;
+		}
+
+		if (LoadSymbolWOW64(S_FUNC(UnhandledExceptionFilter),	IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(SingleHandler),				IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(DefaultHandler),				IDX_KERNEL32))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+		sym_kernel32_wow64.Cleanup();
+
+		LOG(1, "WOW64 kernel32 symbols loaded\n");
+	}
+
+	sym_parser.Cleanup();
+
+	LOG(1, "WOW64 ntdll symbols loaded\n");
+
+	g_LibraryState = true;
 
 	return INJ_ERR_SUCCESS;
 }
@@ -305,7 +405,7 @@ HINSTANCE GetModuleHandleExW_WOW64(HANDLE hTargetProc, const wchar_t * lpModuleN
 	{
 		if (ME32.modBaseAddr && !_wcsicmp(ME32.szModule, lpModuleName) && (ME32.modBaseAddr < (BYTE *)0x7FFFF000))
 		{
-			BYTE header[0x1000];
+			BYTE header[0x1000]{ 0 };
 			if (!ReadProcessMemory(hTargetProc, ME32.modBaseAddr, header, sizeof(header), nullptr))
 			{
 				bRet = Module32NextW(hSnap, &ME32);
@@ -313,8 +413,8 @@ HINSTANCE GetModuleHandleExW_WOW64(HANDLE hTargetProc, const wchar_t * lpModuleN
 				continue;
 			}
 
-			IMAGE_DOS_HEADER	* pDos	= ReCa<IMAGE_DOS_HEADER *>(header);
-			IMAGE_NT_HEADERS32	* pNT	= ReCa<IMAGE_NT_HEADERS32 *>(header + pDos->e_lfanew);
+			IMAGE_DOS_HEADER	* pDos	= ReCa<IMAGE_DOS_HEADER		*>(header);
+			IMAGE_NT_HEADERS32	* pNT	= ReCa<IMAGE_NT_HEADERS32	*>(header + pDos->e_lfanew);
 
 			if (pNT->FileHeader.Machine != IMAGE_FILE_MACHINE_I386)
 			{
@@ -346,14 +446,19 @@ bool GetProcAddressExW_WOW64(HANDLE hTargetProc, const wchar_t * szModuleName, c
 
 bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * szProcName, DWORD &pOut)
 {
-	BYTE * modBase = ReCa<BYTE*>(hModule);
+	BYTE * modBase = ReCa<BYTE *>(hModule);
 
 	if (!modBase)
 	{
 		return false;
 	}
 
-	BYTE * pBuffer = new BYTE[0x1000];
+	BYTE * pBuffer = new(std::nothrow) BYTE[0x1000];
+	if (!pBuffer)
+	{
+		return false;
+	}
+
 	if (!ReadProcessMemory(hTargetProc, modBase, pBuffer, 0x1000, nullptr))
 	{
 		delete[] pBuffer;
@@ -361,7 +466,7 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 		return false;
 	}
 
-	auto * pNT = ReCa<IMAGE_NT_HEADERS32*>(ReCa<IMAGE_DOS_HEADER*>(pBuffer)->e_lfanew + pBuffer);
+	auto * pNT = ReCa<IMAGE_NT_HEADERS32*>(ReCa<IMAGE_DOS_HEADER *>(pBuffer)->e_lfanew + pBuffer);
 	auto * pDir = &pNT->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 
 	auto ExportSize = pDir->Size;
@@ -374,8 +479,16 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 		return false;
 	}
 
-	BYTE * pExpDirBuffer = new BYTE[ExportSize];
-	auto * pExportDir = ReCa<IMAGE_EXPORT_DIRECTORY*>(pExpDirBuffer);
+	BYTE * pExpDirBuffer = new(std::nothrow) BYTE[ExportSize];
+	auto * pExportDir = ReCa<IMAGE_EXPORT_DIRECTORY *>(pExpDirBuffer);
+
+	if (!pExpDirBuffer)
+	{
+		delete[] pBuffer;
+
+		return false;
+	}
+
 	if (!ReadProcessMemory(hTargetProc, modBase + DirRVA, pExpDirBuffer, ExportSize, nullptr))
 	{
 		delete[] pExpDirBuffer;
@@ -391,19 +504,19 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 		char pFullExport[MAX_PATH]{ 0 };
 		size_t len_out = 0;
 
-		HRESULT hr = StringCchLengthA(ReCa<char*>(pBase + FuncRVA), sizeof(pFullExport), &len_out);
+		HRESULT hr = StringCchLengthA(ReCa<char *>(pBase + FuncRVA), sizeof(pFullExport), &len_out);
 		if (FAILED(hr) || !len_out)
 		{
 			return false;
 		}
 
-		StringCchCopyA(pFullExport, len_out, ReCa<char*>(pBase + FuncRVA));
+		StringCchCopyA(pFullExport, len_out, ReCa<char *>(pBase + FuncRVA));
 		
 		char * pFuncName = strchr(pFullExport, '.');
 		*pFuncName++ = '\0';
 		if (*pFuncName == '#')
 		{
-			pFuncName = ReCa<char*>(LOWORD(atoi(++pFuncName)));
+			pFuncName = ReCa<char *>(LOWORD(atoi(++pFuncName)));
 		}
 
 		wchar_t ModNameW[MAX_PATH]{ 0 };
@@ -423,7 +536,7 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 	{
 		WORD Base		= LOWORD(pExportDir->Base - 1);
 		WORD Ordinal	= LOWORD(szProcName) - Base;
-		DWORD FuncRVA	= ReCa<DWORD*>(pBase + pExportDir->AddressOfFunctions)[Ordinal];
+		DWORD FuncRVA	= ReCa<DWORD *>(pBase + pExportDir->AddressOfFunctions)[Ordinal];
 
 		delete[] pExpDirBuffer;
 		delete[] pBuffer;
@@ -446,8 +559,8 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 	{
 		DWORD mid = (min + max) / 2;
 
-		DWORD CurrNameRVA	= ReCa<DWORD*>(pBase + pExportDir->AddressOfNames)[mid];
-		char * szName		= ReCa<char*>(pBase + CurrNameRVA);
+		DWORD CurrNameRVA	= ReCa<DWORD *>(pBase + pExportDir->AddressOfNames)[mid];
+		char * szName		= ReCa<char *>(pBase + CurrNameRVA);
 
 		int cmp = strcmp(szName, szProcName);
 		if (cmp < 0)
@@ -460,8 +573,8 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 		}
 		else 
 		{
-			WORD Ordinal = ReCa<WORD*>(pBase + pExportDir->AddressOfNameOrdinals)[mid];
-			FuncRVA = ReCa<DWORD*>(pBase + pExportDir->AddressOfFunctions)[Ordinal];
+			WORD Ordinal = ReCa<WORD *>(pBase + pExportDir->AddressOfNameOrdinals)[mid];
+			FuncRVA = ReCa<DWORD *>(pBase + pExportDir->AddressOfFunctions)[Ordinal];
 
 			break;
 		}

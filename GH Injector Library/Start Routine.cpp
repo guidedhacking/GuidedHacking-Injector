@@ -2,16 +2,14 @@
 
 #include "Start Routine.h"
 
-DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_METHOD Method, bool CloakThread, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
+DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_METHOD Method, DWORD Flags, DWORD & Out, DWORD Timeout, ERROR_DATA & error_data)
 {
 	DWORD Ret = 0;
-
-	LOG("    Entering StartRoutine\n");
 	
 	switch (Method)
 	{
 		case LAUNCH_METHOD::LM_NtCreateThreadEx:
-			Ret = SR_NtCreateThreadEx(hTargetProc, pRoutine, pArg, CloakThread, Out, Timeout, error_data);
+			Ret = SR_NtCreateThreadEx(hTargetProc, pRoutine, pArg, Flags, Out, Timeout, error_data);
 			break;
 
 		case LAUNCH_METHOD::LM_HijackThread:
@@ -59,6 +57,10 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 		case LAUNCH_METHOD::LM_QueueUserAPC:
 			Ret = SR_QueueUserAPC(hTargetProc, pRoutine, pArg, Out, Timeout, error_data);
 			break;
+
+		case LAUNCH_METHOD::LM_FakeVEH:
+			Ret = SR_FakeVEH(hTargetProc, pRoutine, pArg, Out, Timeout, error_data);
+			break;
 		
 		default:
 			INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
@@ -66,8 +68,6 @@ DWORD StartRoutine(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, LAUNCH_M
 			Ret = SR_ERR_INVALID_LAUNCH_METHOD;
 			break;
 	}
-
-	LOG("    Exiting StartRoutine\n");
 		
 	return Ret;
 }

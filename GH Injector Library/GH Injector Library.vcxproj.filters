@@ -111,6 +111,9 @@
     <ClInclude Include="VEH Shell.h">
       <Filter>Headerdateien\Injection Methods</Filter>
     </ClInclude>
+    <ClInclude Include="Symbol Loader.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Handle Hijacking.cpp">
@@ -202,6 +205,15 @@
     </ClCompile>
     <ClCompile Include="VEH Shell.cpp">
       <Filter>Quelldateien\native\Injection Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="FakeVEH WOW64.cpp">
+      <Filter>Quelldateien\wow64\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="FakeVEH.cpp">
+      <Filter>Quelldateien\native\Start Routine Methods</Filter>
+    </ClCompile>
+    <ClCompile Include="Symbol Loader.cpp">
+      <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

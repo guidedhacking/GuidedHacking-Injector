@@ -108,16 +108,6 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT_WIN81
 	UINT_PTR unknown_1[1];
 } LDRP_PATH_SEARCH_CONTEXT_WIN81, * PLDRP_PATH_SEARCH_CONTEXT_WIN81; //x86 size = 0x14, x64 size = 0x28
 
-using f_LdrpLoadDll_WIN81 = NTSTATUS (__fastcall *)
-(
-	UNICODE_STRING					*	dll_path,
-	LDRP_PATH_SEARCH_CONTEXT_WIN81	*	search_ctx,
-	LDRP_LOAD_CONTEXT_FLAGS				Flags,
-	BOOLEAN								Unknown, //set to TRUE
-	LDR_DATA_TABLE_ENTRY_WIN81		**	entry_out,
-	LDR_DDAG_NODE_WIN81				**	ddag_out
-);
-
 #ifdef _WIN64
 
 typedef ALIGN_86 struct _LDR_DDAG_NODE_WIN81_32

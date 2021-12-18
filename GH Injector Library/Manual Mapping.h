@@ -14,7 +14,7 @@
 #define MIN_SHIFT_OFFSET	0x100
 #define MAX_SHIFT_OFFSET	0x1000
 
-using f_DLL_ENTRY_POINT	= BOOL(WINAPI*)(HINSTANCE hDll, DWORD dwReason, void * pReserved);
+using f_DLL_ENTRY_POINT	= BOOL(WINAPI *)(HINSTANCE hDll, DWORD dwReason, void * pReserved);
 
 //list to track imports and unload on failure
 typedef struct _MM_DEPENDENCY_RECORD
@@ -84,6 +84,7 @@ namespace MMAP_NATIVE
 		ALIGN NT_FUNC_LOCAL(LdrpHeap);
 		ALIGN NT_FUNC_LOCAL(LdrpInvertedFunctionTable);
 		ALIGN NT_FUNC_LOCAL(LdrpDefaultPath);
+		ALIGN NT_FUNC_LOCAL(LdrpTlsList);
 
 		ALIGN void * pLdrpHeap;
 
@@ -171,6 +172,7 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpHeap);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpInvertedFunctionTable);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpDefaultPath);
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpTlsList);
 
 		ALIGN_86 DWORD pLdrpHeap;
 

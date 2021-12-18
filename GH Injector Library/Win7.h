@@ -82,16 +82,6 @@ typedef struct _LDR_DATA_TABLE_ENTRY_WIN7
 	LARGE_INTEGER	LoadTime;
 } LDR_DATA_TABLE_ENTRY_WIN7, * PLDR_DATA_TABLE_ENTRY_WIN7;
 
-using f_LdrpLoadDll_WIN7 = NTSTATUS (__stdcall *)
-(
-	UNICODE_STRING				*	dll_path,
-	UNICODE_STRING				*	search_path,
-	LDRP_LOAD_CONTEXT_FLAGS			Flags,
-	BOOLEAN							Unknown1, //set to TRUE
-	PVOID							Unknown2, //can be nullptr
-	LDR_DATA_TABLE_ENTRY_WIN7	**	ldr_out
-);
-
 typedef struct _RTL_INVERTED_FUNCTION_TABLE_WIN7
 {
 	ULONG Count;
@@ -99,13 +89,6 @@ typedef struct _RTL_INVERTED_FUNCTION_TABLE_WIN7
 	ULONG Epoch;
 	RTL_INVERTED_FUNCTION_TABLE_ENTRY Entries[ANYSIZE_ARRAY];
 } RTL_INVERTED_FUNCTION_TABLE_WIN7, * PRTL_INVERTED_FUNCTION_TABLE_WIN7;
-
-using f_RtlInsertInvertedFunctionTable_WIN7 = NTSTATUS (__stdcall *)
-(
-	RTL_INVERTED_FUNCTION_TABLE_WIN7 *	pTable,
-	void *								ImageBase,
-	DWORD								SizeOfImage
-);
 
 #ifdef _WIN64
 
@@ -157,5 +140,12 @@ typedef struct _LDR_DATA_TABLE_ENTRY_WIN7_32
 	DWORD			OriginalBase;
 	LARGE_INTEGER	LoadTime;
 } LDR_DATA_TABLE_ENTRY_WIN7_32, * PLDR_DATA_TABLE_ENTRY_WIN7_32;
+
+typedef struct _RTL_VECTORED_EXCEPTION_ENTRY_WIN7_32 //prototype
+{
+	LIST_ENTRY32	List;
+	DWORD			Flag;
+	DWORD			VectoredHandler; //PVECTORED_EXCEPTION_HANDLER
+} RTL_VECTORED_EXCEPTION_ENTRY_WIN7_32, * PRTL_VECTORED_EXCEPTION_ENTRY_WIN7_32;
 
 #endif

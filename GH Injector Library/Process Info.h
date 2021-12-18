@@ -11,18 +11,20 @@
 #define NT_RET_OFFSET_64_WIN7		0x0A //Win7 - Win10 1507
 #define NT_RET_OFFSET_64_WIN10_1511 0x14 //Win10 1511+
 
-#define NT_RET_OFFSET_86_WIN7							0x15 //Win7 only
-#define NT_RET_OFFSET_86_WIN8							0x0C //Win8+
+#define NT_RET_OFFSET_86_WIN7 0x15 //Win7 only
+#define NT_RET_OFFSET_86_WIN8 0x0C //Win8+
 
-#define TEB_SAMETEBFLAGS_64 0x17EE
-#define TEB_SAMETEBFLAGS_86 0xFCA
+#define TEB_SameTebFlags_64 0x17EE
+#define TEB_SameTebFlags_86 0xFCA
+
+#define TEB_WowTebOffset_64 0x180C //Win10+ only
 
 #define TEB_SAMETEB_FLAGS_LoaderWorker 0x2000
 
 #ifdef _WIN64
-#define TEB_SAMETEBFLAGS TEB_SAMETEBFLAGS_64
+#define TEB_SameTebFlags TEB_SameTebFlags_64
 #else
-#define TEB_SAMETEBFLAGS TEB_SAMETEBFLAGS_86
+#define TEB_SameTebFlags TEB_SameTebFlags_86
 #endif
 
 class ProcessInfo
@@ -79,9 +81,11 @@ public:
 	DWORD GetTID();
 	DWORD GetThreadId();
 
+	DWORD GetProcessCookie();
+
 	bool GetThreadState(THREAD_STATE & state, KWAIT_REASON & reason);
 	bool GetThreadStartAddress(void *& start_address);
-	bool GetThreadStartAddress_WOW64(void *& start_address);
+	void * GetTEB();
 
 	bool IsThreadInAlertableState();
 	bool IsThreadWorkerThread();
@@ -93,8 +97,11 @@ public:
 
 	PEB_32					* GetPEB_WOW64();
 	LDR_DATA_TABLE_ENTRY_32	* GetLdrEntry_WOW64(HINSTANCE hMod);
+	void					* GetEntrypoint_WOW64();
 
+	bool GetThreadStartAddress_WOW64(void *& start_address);
 	bool IsThreadInAlertableState_WOW64();
+	void * GetTEB_WOW64();
 
 #endif
 };
