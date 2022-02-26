@@ -51,8 +51,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,5,0,0
- PRODUCTVERSION 4,5,0,0
+ FILEVERSION 4,6,0,0
+ PRODUCTVERSION 4,6,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -69,10 +69,10 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Guided Hacking"
             VALUE "FileDescription", "Injection library of the GH Injector"
-            VALUE "FileVersion", "4.5.0.0"
+            VALUE "FileVersion", "4.6.0.0"
             VALUE "LegalCopyright", "Broihon (C) 1987 - 2035"
             VALUE "ProductName", "GH Injection Library"
-            VALUE "ProductVersion", "4.5.0.0"
+            VALUE "ProductVersion", "4.6.0.0"
         END
     END
     BLOCK "VarFileInfo"

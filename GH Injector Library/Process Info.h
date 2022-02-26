@@ -19,7 +19,8 @@
 
 #define TEB_WowTebOffset_64 0x180C //Win10+ only
 
-#define TEB_SAMETEB_FLAGS_LoaderWorker 0x2000
+#define TEB_SAMETEB_FLAGS_SkipAttach	0x0008
+#define TEB_SAMETEB_FLAGS_LoaderWorker	0x2000
 
 #ifdef _WIN64
 #define TEB_SameTebFlags TEB_SameTebFlags_64

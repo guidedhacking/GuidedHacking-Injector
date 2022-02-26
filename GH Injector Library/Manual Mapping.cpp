@@ -447,7 +447,7 @@ __forceinline NTSTATUS LoadModule(MANUAL_MAPPING_DATA * pData, MANUAL_MAPPING_FU
 			DeleteObject(f, pModPathW);
 			DeleteObject(f, ModNameW->szBuffer);
 			DeleteObject(f, ModNameW);
-
+			
 			return ntRet;
 		}
 
@@ -470,16 +470,14 @@ __forceinline NTSTATUS LoadModule(MANUAL_MAPPING_DATA * pData, MANUAL_MAPPING_FU
 			ctx->OriginalFullDllName = ModNameW->szBuffer;
 		}
 
-		ULONG_PTR unknown3 = 0;
-
 		if (pData->OSBuildNumber >= g_Win11_21H2)
 		{
 			auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_WIN11>(f->LdrpLoadDllInternal);
-			ntRet = _LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &unknown3, 0);
+			_LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &ntRet, 0);
 		}
 		else
 		{
-			ntRet = f->LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &unknown3);
+			f->LdrpLoadDllInternal(&pModPathW->String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &ntRet);
 		}
 
 		DeleteObject(f, ctx);
@@ -817,6 +815,7 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 			veh_shell_data->ImgBase		= ReCa<ULONG_PTR>(pBase);
 			veh_shell_data->ImgSize		= pOptionalHeader->SizeOfImage;
 			veh_shell_data->OSVersion	= pData->OSVersion;
+
 			veh_shell_data->_LdrpInvertedFunctionTable	= f->LdrpInvertedFunctionTable;
 			veh_shell_data->_LdrProtectMrdata			= f->LdrProtectMrdata;
 
@@ -945,6 +944,18 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 
 			if (NT_FAIL(ntRet))
 			{
+				if (ntRet == STATUS_APISET_NOT_HOSTED)
+				{
+					++pImportDescr;
+
+					if (pImportDescr >= ReCa<IMAGE_IMPORT_DESCRIPTOR *>(pBase + pImportDir->VirtualAddress + pImportDir->Size))
+					{
+						break;
+					}
+
+					continue;
+				}
+
 				//unable to load required library
 				ErrorBreak = true;
 				break;
@@ -1046,12 +1057,23 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		while (pDelayImportDescr && pDelayImportDescr->DllNameRVA)
 		{
 			char * szMod = ReCa<char *>(pBase + pDelayImportDescr->DllNameRVA);
-			
 			HINSTANCE hDll = NULL;
 			ntRet = LoadModule(pData, f, szMod, &hDll, &delay_imports);
 
 			if (NT_FAIL(ntRet))
 			{
+				if (ntRet == STATUS_APISET_NOT_HOSTED)
+				{
+					++pDelayImportDescr;
+
+					if (pDelayImportDescr >= ReCa<IMAGE_DELAYLOAD_DESCRIPTOR *>(pBase + pDelayImportDir->VirtualAddress + pDelayImportDir->Size))
+					{
+						break;
+					}
+
+					continue;
+				}
+
 				ErrorBreak = true;
 				break;
 			}
@@ -1217,9 +1239,9 @@ DWORD __declspec(code_seg(".mmap_sec$1")) __stdcall ManualMapping_Shell(MANUAL_M
 		bool partial = true;
 		
 #ifdef _WIN64
-		if (veh_shell_fixed)
+		if (veh_shell_fixed) //really needed for x64?
 		{
-			//register VEH shell to fill handler list
+			//register VEH shell to fill SEH handler list
 			pData->hVEH = f->RtlAddVectoredExceptionHandler(0, ReCa<PVECTORED_EXCEPTION_HANDLER>(pVEHShell));
 		}
 #endif

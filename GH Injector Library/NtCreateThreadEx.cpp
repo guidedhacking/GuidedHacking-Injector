@@ -55,7 +55,8 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, D
 
 	if (Flags & INJ_CTF_SKIP_THREAD_ATTACH)
 	{
-		ntFlags |= THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH;
+		ntFlags |= THREAD_CREATE_FLAGS_CREATE_SUSPENDED;
+		//ntFlags |= THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH;
 	}
 
 	if (Flags & INJ_CTF_FAKE_TEB_CLIENT_ID)
@@ -297,7 +298,61 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, D
 		}
 
 		LOG(2, "Thread redirected\n");
+	}
 
+	if (Flags & INJ_CTF_SKIP_THREAD_ATTACH)
+	{
+		THREAD_BASIC_INFORMATION tbi{ 0 };
+		ntRet = NATIVE::NtQueryInformationThread(hThread, THREADINFOCLASS::ThreadBasicInformation, &tbi, sizeof(tbi), nullptr);
+		if (NT_FAIL(ntRet) || !tbi.TebBaseAddress)
+		{
+			INIT_ERROR_DATA(error_data, ntRet);
+
+			LOG(2, "NtQueryInformationThread failed: %08X\n", error_data.AdvErrorCode);
+
+			TerminateThread(hThread, 0);
+			CloseHandle(hThread);
+
+			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+			return SR_NTCTE_ERR_NTQIT_FAIL;
+		}
+
+		WORD same_teb_flags = 0;
+		if (!ReadProcessMemory(hTargetProc, ReCa<BYTE *>(tbi.TebBaseAddress) + TEB_SameTebFlags, &same_teb_flags, sizeof(same_teb_flags), nullptr))
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG(2, "ReadProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			TerminateThread(hThread, 0);
+			CloseHandle(hThread);
+
+			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+			return SR_NTCTE_ERR_RPM_FAIL;
+		}
+
+		same_teb_flags |= TEB_SAMETEB_FLAGS_SkipAttach;
+		if (!WriteProcessMemory(hTargetProc, ReCa<BYTE *>(tbi.TebBaseAddress) + TEB_SameTebFlags, &same_teb_flags, sizeof(same_teb_flags), nullptr))
+		{
+			INIT_ERROR_DATA(error_data, GetLastError());
+
+			LOG(2, "WriteProcessMemory failed: %08X\n", error_data.AdvErrorCode);
+
+			TerminateThread(hThread, 0);
+			CloseHandle(hThread);
+
+			VirtualFreeEx(hTargetProc, pMem, 0, MEM_RELEASE);
+
+			return SR_NTCTE_ERR_WPM_FAIL;
+		}
+
+		LOG(2, "Fixed TEB flags\n");
+	}
+
+	if (ntFlags & THREAD_CREATE_FLAGS_CREATE_SUSPENDED)
+	{
 		if (ResumeThread(hThread) == (DWORD)-1)
 		{
 			INIT_ERROR_DATA(error_data, GetLastError());

@@ -148,6 +148,7 @@
 #define SR_NTCTE_ERR_SHELLCODE_SETUP_FAIL	0x1010000B	//shellcode					: - 					: argument passed to the shellcode is 0
 #define SR_NTCTE_ERR_RPM_FAIL				0x1010000C	//ReadProcessMemory			: win32 error			: reading the results of the shellcode failed
 #define SR_NTCTE_ERR_CANT_FIND_THREAD		0x1010000D	//internal error			: -						: ProcessInfo class failed to resolve information about the new thread
+#define SR_NTCTE_ERR_NTQIT_FAIL				0x1010000E	//NtQueryInformationThread	: NTSTATUS				: failed to get THREAD_BASIC_INFORMATION
 
 
 ///////////////

@@ -160,7 +160,7 @@ using f_LdrpLoadDll = NTSTATUS (__fastcall *)
 	LDR_DATA_TABLE_ENTRY		**	ldr_out
 );
 
-using f_LdrpLoadDllInternal = NTSTATUS (__fastcall *)
+using f_LdrpLoadDllInternal = VOID (__fastcall *)
 (
 	UNICODE_STRING				*	dll_path, 
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
@@ -169,10 +169,10 @@ using f_LdrpLoadDllInternal = NTSTATUS (__fastcall *)
 	LDR_DATA_TABLE_ENTRY_WIN10	*	Unknown1,	//set to nullptr
 	LDR_DATA_TABLE_ENTRY_WIN10	*	Unknown2,	//set to nullptr
 	LDR_DATA_TABLE_ENTRY_WIN10	**	ldr_out,
-	ULONG_PTR					*	Unknown3	//set to pointer to nullptr
+	NTSTATUS					*	ntRet
 );
 
-using f_LdrpLoadDllInternal_WIN11 = NTSTATUS (__fastcall *)
+using f_LdrpLoadDllInternal_WIN11 = VOID (__fastcall *)
 (
 	UNICODE_STRING				*	dll_path, 
 	LDRP_PATH_SEARCH_CONTEXT	*	search_path,
@@ -181,7 +181,7 @@ using f_LdrpLoadDllInternal_WIN11 = NTSTATUS (__fastcall *)
 	LDR_DATA_TABLE_ENTRY_WIN11	*	Unknown1,	//set to nullptr
 	LDR_DATA_TABLE_ENTRY_WIN11	*	Unknown2,	//set to nullptr
 	LDR_DATA_TABLE_ENTRY_WIN11	**	ldr_out,
-	ULONG_PTR					*	Unknown3,	//set to pointer to nullptr
+	NTSTATUS					*	ntRet,
 	ULONG							Unknown4	//set to 0
 );
 
@@ -476,9 +476,9 @@ using f_LdrpTlsList					= LIST_ENTRY *;
 using f_RtlpUnhandledExceptionFilter	= ULONG_PTR *; //encrypted with RtlEncodePointer, points to kernel32.UnhandledExceptionFilter
 
 //kernel32.dll:
-using f_UnhandledExceptionFilter		= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER 
+using f_UnhandledExceptionFilter		= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER
 using f_SingleHandler					= ULONG_PTR *; //encrypted with RtlEncodePointer, points to kernel32.DefaultHandler
-using f_DefaultHandler					= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER 
+using f_DefaultHandler					= ULONG_PTR *; //PTOP_LEVEL_EXCEPTION_FILTER
 
 #pragma endregion
 

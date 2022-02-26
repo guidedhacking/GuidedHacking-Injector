@@ -331,20 +331,22 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 				return INJ_ERR_LDRP_PREPROCESS_FAILED;
 			}
 
-			ULONG_PTR unknown = 0;
+			NTSTATUS nt_out = 0;
 
 			if (pData->OSBuildNumber >= g_Win11_21H2) //Win11 prototype has an additional argument
 			{
 				auto _LdrpLoadDllInternal = ReCa<f_LdrpLoadDllInternal_WIN11>(f->LdrpLoadDllInternal);
-				pData->LastError = _LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &unknown, 0);
+				_LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN11 **>(&entry_out), &nt_out, 0);
 			}
 			else
 			{
-				pData->LastError = f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &unknown);
+				f->LdrpLoadDllInternal(&pData->ModuleFileNameBundle.String, ctx, ctx_flags, 4, nullptr, nullptr, ReCa<LDR_DATA_TABLE_ENTRY_WIN10 **>(&entry_out), &nt_out);
 			}
 
-			if (NT_FAIL(pData->LastError))
+			if (NT_FAIL(nt_out))
 			{
+				pData->LastError = (DWORD)nt_out;
+
 				return INJ_ERR_LDRPLDLLINTERNAL_FAILED;
 			}
 		}
