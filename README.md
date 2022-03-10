@@ -1,7 +1,7 @@
 ## GH Injector Library
 
 A feature-rich DLL injection library which supports x86, WOW64 and x64 injections.
-It features five injection methods, four shellcode execution methods and various additional options.
+It features five injection methods, six  shellcode execution methods and various additional options.
 Session separation can be bypassed with all methods.
 
 ----
