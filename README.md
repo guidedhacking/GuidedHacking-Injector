@@ -4,6 +4,8 @@ A feature-rich DLL injection library which supports x86, WOW64 and x64 injection
 It features five injection methods, six  shellcode execution methods and various additional options.
 Session separation can be bypassed with all methods.
 
+If you want to use this library with a GUI check out the [GH Injector GUI](https://github.com/Broihon/GH-Injector-GUI).
+
 ----
 
 ### Injection methods
