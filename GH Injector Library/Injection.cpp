@@ -34,7 +34,7 @@ DWORD InitErrorStruct(const wchar_t * szDllPath, INJECTIONDATAW * pData, int bNa
 		info.szFunctionName				= error_data.szFunctionName;
 		info.Line						= error_data.Line;
 
-		ErrorLog(&info);
+		ErrorLog(info);
 	}
 
 	return ErrorCode;

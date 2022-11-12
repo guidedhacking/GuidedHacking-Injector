@@ -4,9 +4,6 @@
 
 DownloadManager::DownloadManager(bool ForceRedownload)
 {
-    m_hInterruptEvent   = nullptr;
-    m_fProgress         = 0.0f;
-    m_fOldProgress      = 0.0f;
     m_bForceRedownload  = ForceRedownload;
 }
 
@@ -133,9 +130,9 @@ HRESULT __stdcall DownloadManager::OnProgress(ULONG ulProgress, ULONG ulProgress
     {
         m_fProgress = (float)ulProgress / ulProgressMax;
 
-        if (m_fProgress - m_fOldProgress >= 0.1f)
+        if (m_fProgress - m_fOldProgress >= 0.095f)
         {
-            LOG(2, "DownloadManager: %2.0f%%\n", 100.0 * m_fProgress);
+            LOG(2, "DownloadManager: %2.0f%%\n", (float)100.0f * m_fProgress);
             m_fOldProgress = m_fProgress;
         }
     }

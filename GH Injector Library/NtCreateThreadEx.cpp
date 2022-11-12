@@ -255,7 +255,7 @@ DWORD SR_NtCreateThreadEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, D
 	auto TID = GetThreadId(hThread);
 
 	LOG(2, "Thread created with TID = %06X (%06d)\n", TID, TID);
-	
+
 	if (FakeStartAddress)
 	{
 		CONTEXT ctx{ 0 };

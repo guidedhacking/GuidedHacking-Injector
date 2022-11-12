@@ -77,7 +77,7 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 	if (VEHShellSize)
 	{
 		pVEHShell = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, VEHShellSize + sizeof(VEH_SHELL_DATA) + BASE_ALIGNMENT, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-		//VEH_SHELL_DATA is bigger than the wow64 version of it, no need to define it
+		//VEH_SHELL_DATA is bigger than the wow64 version of it, no need to define it, will be filled using wow64 anyway
 
 		if (!pVEHShell)
 		{

@@ -34,6 +34,19 @@
 
 #define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
 
+////
+#define FILE_DELETE_ON_CLOSE                    0x00001000
+#define FILE_OPEN_BY_FILE_ID                    0x00002000
+#define FILE_OPEN_FOR_BACKUP_INTENT             0x00004000
+#define FILE_NO_COMPRESSION                     0x00008000
+
+#define FILE_RESERVE_OPFILTER                   0x00100000
+#define FILE_OPEN_REPARSE_POINT                 0x00200000
+#define FILE_OPEN_NO_RECALL                     0x00400000
+#define FILE_OPEN_FOR_FREE_SPACE_QUERY          0x00800000
+////
+
+
 #define InitializeObjectAttributes(p, n, a, r, s) \
 { \
 	(p)->Length = sizeof(OBJECT_ATTRIBUTES); \
@@ -76,11 +89,11 @@ typedef enum class _THREADINFOCLASS
 	ThreadQuerySetWin32StartAddress = 9
 } THREADINFOCLASS;
 
-typedef enum class _THREAD_STATE
+typedef enum class _KTHREAD_STATE
 {
 	Running = 0x02,
 	Waiting = 0x05
-} THREAD_STATE;
+} KTHREAD_STATE;
 
 typedef enum class _KWAIT_REASON
 {
@@ -127,8 +140,9 @@ typedef enum _LDR_DLL_LOAD_REASON : int
 	LoadReasonDynamicLoad					= 4,
 	LoadReasonAsImageLoad					= 5,
 	LoadReasonAsDataLoad					= 6,
-	LoadReasonEnclavePrimary				= 7,
-	LoadReasonEnclaveDependency				= 8
+	LoadReasonEnclavePrimary				= 7, 
+	LoadReasonEnclaveDependency				= 8,
+	LoadReasonPatchImage					= 9
 } LDR_DLL_LOAD_REASON, * PLDR_DLL_LOAD_REASON;
 
 typedef enum _SECTION_INHERIT
@@ -145,7 +159,7 @@ typedef enum _LDR_HOT_PATCH_STATE
     LdrHotPatchAppliedForward	= 3,
     LdrHotPatchFailedToPatch	= 4,
     LdrHotPatchStateMax			= 5
-} LDR_HOT_PATCH_STATE, *PLDR_HOT_PATCH_STATE;
+} LDR_HOT_PATCH_STATE, * PLDR_HOT_PATCH_STATE;
 
 #pragma endregion
 
@@ -250,7 +264,7 @@ typedef struct _SYSTEM_THREAD_INFORMATION
 	KPRIORITY		Priority;
 	LONG			BasePriority;
 	ULONG			ContextSwitches;
-	THREAD_STATE	ThreadState;
+	KTHREAD_STATE	ThreadState;
 	KWAIT_REASON	WaitReason;
 } SYSTEM_THREAD_INFORMATION, * PSYSTEM_THREAD_INFORMATION;
 
@@ -516,7 +530,7 @@ typedef struct _LDRP_PATH_SEARCH_CONTEXT
 typedef union _LDRP_LOAD_CONTEXT_FLAGS
 {
 	ULONG32 Flags;
-	struct
+	struct //These are very most likely wrong!
 	{
 		ULONG32 Redirected					: 1;
 		ULONG32 Static						: 1;

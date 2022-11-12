@@ -114,6 +114,9 @@
     <ClInclude Include="Symbol Loader.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="Manual Mapping Internal.h">
+      <Filter>Headerdateien\Injection Methods</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Handle Hijacking.cpp">

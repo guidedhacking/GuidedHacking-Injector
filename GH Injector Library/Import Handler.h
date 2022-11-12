@@ -2,6 +2,7 @@
 
 #include "NT Funcs.h"
 #include "Symbol Parser.h"
+#include "Tools.h"
 
 inline HANDLE g_hRunningEvent		= nullptr;
 inline HANDLE g_hInterruptEvent		= nullptr;
@@ -22,9 +23,9 @@ inline std::shared_future<DWORD>	import_handler_wow64_ret;
 #define NT_FUNC_LOCAL(func) f_##func func
 #define NT_FUNC_CONSTRUCTOR_INIT(func) this->func = NATIVE::func
 
-#define WIN32_FUNC(func) inline decltype(func)* p##func = nullptr
-#define WIN32_FUNC_LOCAL(func) decltype(func)* p##func
-#define WIN32_FUNC_INIT(func, lib) NATIVE::p##func = ReCa<decltype(func)*>(GetProcAddress(lib, #func));
+#define WIN32_FUNC(func) inline decltype(func) * p##func = nullptr
+#define WIN32_FUNC_LOCAL(func) decltype(func) * p##func
+#define WIN32_FUNC_INIT(func, lib) NATIVE::p##func = ReCa<decltype(func) *>(GetProcAddress(lib, #func));
 #define WIN32_FUNC_CONSTRUCTOR_INIT(func) this->p##func = NATIVE::p##func
 
 #define K32_FUNC(func) inline f_##func func = nullptr
@@ -32,7 +33,7 @@ inline std::shared_future<DWORD>	import_handler_wow64_ret;
 #define K32_FUNC_CONSTRUCTOR_INIT(func) this->func = NATIVE::func
 
 #define WOW64_FUNCTION_POINTER(func) inline DWORD func##_WOW64 = 0
-#define WOW64_FUNCTION_POINTER_LOCAL(func) DWORD func
+#define WOW64_FUNCTION_POINTER_LOCAL(func) DWORD func = 0
 #define WOW64_FUNC_CONSTRUCTOR_INIT(func) this->func = WOW64::func##_WOW64
 
 #define IDX_NTDLL		0
@@ -74,7 +75,9 @@ inline DWORD g_OSBuildNumber	= 0;
 #define g_Win10_20H2 19042
 #define g_Win10_21H1 19043
 #define g_Win10_21H2 19044
+#define g_Win10_22H2 19045
 #define g_Win11_21H2 22000
+#define g_Win11_22H2 22621
 
 bool IsWin7OrGreater();
 bool IsWin8OrGreater();
@@ -113,7 +116,26 @@ DWORD GetOSBuildVersion();
 
 namespace NATIVE
 {
+	WIN32_FUNC(LoadLibraryA);
+	WIN32_FUNC(LoadLibraryW);
+	WIN32_FUNC(LoadLibraryExA);
 	WIN32_FUNC(LoadLibraryExW);
+
+	WIN32_FUNC(GetModuleHandleA);
+	WIN32_FUNC(GetModuleHandleW);
+	WIN32_FUNC(GetModuleHandleExA);
+	WIN32_FUNC(GetModuleHandleExW);
+
+	WIN32_FUNC(GetModuleFileNameA);
+	WIN32_FUNC(GetModuleFileNameW);
+
+	WIN32_FUNC(GetProcAddress);
+
+	WIN32_FUNC(DisableThreadLibraryCalls);
+	WIN32_FUNC(FreeLibrary);
+	WIN32_FUNC(FreeLibraryAndExitThread);
+	WIN32_FUNC(ExitThread);
+
 	WIN32_FUNC(GetLastError);
 
 	NT_FUNC(LdrLoadDll);
@@ -132,6 +154,7 @@ namespace NATIVE
 	NT_FUNC(NtQuerySystemInformation);
 	NT_FUNC(NtQueryInformationThread);
 
+	NT_FUNC(LdrGetDllPath);
 	NT_FUNC(LdrpPreprocessDllName);
 	NT_FUNC(RtlInsertInvertedFunctionTable);
 	NT_FUNC(LdrpHandleTlsData);
@@ -145,6 +168,9 @@ namespace NATIVE
 	NT_FUNC(RtlFreeHeap);
 
 	NT_FUNC(RtlAnsiStringToUnicodeString);
+	NT_FUNC(RtlUnicodeStringToAnsiString);
+	NT_FUNC(RtlCompareUnicodeString);
+	NT_FUNC(RtlCompareString);
 
 	NT_FUNC(RtlRbInsertNodeEx);
 	NT_FUNC(RtlRbRemoveNode);
@@ -222,6 +248,7 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(NtQuerySystemInformation);
 	WOW64_FUNCTION_POINTER(NtQueryInformationThread);
 
+	WOW64_FUNCTION_POINTER(LdrGetDllPath);
 	WOW64_FUNCTION_POINTER(LdrpPreprocessDllName);
 	WOW64_FUNCTION_POINTER(RtlInsertInvertedFunctionTable);
 	WOW64_FUNCTION_POINTER(LdrpHandleTlsData);
@@ -235,6 +262,9 @@ namespace WOW64
 	WOW64_FUNCTION_POINTER(RtlFreeHeap);
 
 	WOW64_FUNCTION_POINTER(RtlAnsiStringToUnicodeString);
+	WOW64_FUNCTION_POINTER(RtlUnicodeStringToAnsiString);
+	WOW64_FUNCTION_POINTER(RtlCompareUnicodeString);
+	WOW64_FUNCTION_POINTER(RtlCompareString);
 
 	WOW64_FUNCTION_POINTER(RtlRbRemoveNode);
 

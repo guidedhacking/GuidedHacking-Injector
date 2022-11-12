@@ -16,6 +16,7 @@
 //Injection errors:
 #define INJ_ERR_SUCCESS					0x00000000
 #define INJ_ERR_ADVANCED_NOT_DEFINED	0x00000000
+#define INJ_ERR_SHELLCODE_DUMPED		0x80000000
 													
 														//Source							: advanced error type	: error description
 
@@ -89,6 +90,7 @@
 #define INJ_ERR_INVALID_SYMBOL_INDEX		0x00000044	//internal error					: -						: an invalid index was passed to the symbol loader
 #define INJ_ERR_INTERRUPT					0x00000045	//internal error					: -						: the injection was interrupted because the interrupt event was set
 #define INJ_ERR_SYMBOL_PARSE_FAIL			0x00000046	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - ...)
+#define	INJ_ERR_SM86_EXE_MISSING			0x00000047	//internal errro					: -						: "GH Injector SM - x86.exe" is missing, this file is required for import resolving
 
 ///////////////////
 ///ManualMap

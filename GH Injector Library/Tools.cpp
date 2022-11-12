@@ -158,7 +158,7 @@ bool IsElevatedProcess(HANDLE hTargetProc)
 	return (te.TokenIsElevated != 0);
 }
 
-void ErrorLog(ERROR_INFO * info)
+void ErrorLog(const ERROR_INFO & info)
 {
 	auto FullPath = g_RootPathW + L"GH_Inj_Log.txt";
 
@@ -192,7 +192,7 @@ void ErrorLog(ERROR_INFO * info)
 			szWinProductName = L"Windows 10";
 	}
 
-	if (GetOSVersion() == g_Win10 && GetOSBuildVersion() == g_Win11_21H2)
+	if (GetOSVersion() == g_Win10 && GetOSBuildVersion() >= g_Win11_21H2)
 	{
 		szWinProductName = L"Windows 11";	
 	}
@@ -201,45 +201,59 @@ void ErrorLog(ERROR_INFO * info)
 	wchar_t szErrorCode		[9]{ 0 };
 	wchar_t szAdvErrorCode	[9]{ 0 };
 	wchar_t szHandleValue	[9]{ 0 };
-	StringCchPrintfW(szFlags,			9, L"%08X", info->Flags);
-	StringCchPrintfW(szErrorCode,		9, L"%08X", info->ErrorCode);
-	StringCchPrintfW(szAdvErrorCode,	9, L"%08X", info->AdvErrorCode);
-	StringCchPrintfW(szHandleValue,		9, L"%08X", info->HandleValue);
+	StringCchPrintfW(szFlags,			9, L"%08X", info.Flags);
+	StringCchPrintfW(szErrorCode,		9, L"%08X", info.ErrorCode);
+	StringCchPrintfW(szAdvErrorCode,	9, L"%08X", info.AdvErrorCode);
+	StringCchPrintfW(szHandleValue,		9, L"%08X", info.HandleValue);
+
+	std::wstringstream old_log;
+
+	std::wifstream error_log_in(FullPath);
+	if (error_log_in.good())
+	{
+		old_log << error_log_in.rdbuf();
+		error_log_in.close();
+	}
 	
-	std::wofstream error_log(FullPath, std::ios_base::out | std::ios_base::app);
-	if (!error_log.good())
+	std::wofstream error_log_out(FullPath, std::ios::out | std::ios::trunc);
+	if (!error_log_out.good())
 	{
 		LOG(1, "Failed to open/create error log file:\n%ls\n", FullPath.c_str());
 
 		return;
 	}
 
-	error_log << szTime																															<< std::endl;
-	error_log << L"Version            : "	<< L"GH Injector V" << GH_INJ_VERSION																<< std::endl;
+	error_log_out << szTime																															<< std::endl;
+	error_log_out << L"Version            : "	<< L"GH Injector V" << GH_INJ_VERSION																<< std::endl;
 
 	if (szWinReleaseId.length() > 1)
 	{
-		error_log << L"OS                 : " << szWinProductName << L" " << szWinReleaseId.c_str() << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+		error_log_out << L"OS                 : " << szWinProductName << L" " << szWinReleaseId.c_str() << L" (Build " << szWinCurrentBuild << L")" << std::endl;
 	}
 	else
 	{
-		error_log << L"OS                 : " << szWinProductName << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+		error_log_out << L"OS                 : " << szWinProductName << L" (Build " << szWinCurrentBuild << L")" << std::endl;
 	}
 
-	error_log << L"File               : "	<< (info->szDllFileName ? info->szDllFileName : L"(nullptr)")										<< std::endl;
-	error_log << L"Target             : "	<< (info->szTargetProcessExeFileName[0] ? info->szTargetProcessExeFileName : L"(undetermined)")		<< std::endl;
-	error_log << L"Target PID         : "	<< info->TargetProcessId																			<< std::endl;
-	error_log << L"Source             : "	<< info->szSourceFile << L" in " << info->szFunctionName << L" at line " << info->Line				<< std::endl;
-	error_log << L"Errorcode          : 0x"	<< szErrorCode																						<< std::endl;
-	error_log << L"Advanced errorcode : 0x"	<< szAdvErrorCode																					<< std::endl;
-	error_log << L"Injectionmode      : "	<< InjectionModeToString(info->InjectionMode)														<< std::endl;
-	error_log << L"Launchmethod       : "	<< LaunchMethodToString(info->LaunchMethod)															<< std::endl;
-	error_log << L"Platform           : "	<< (info->bNative > 0 ? L"x64/x86 (native)" : (info->bNative == 0 ? L"wow64" : L"---"))				<< std::endl;
-	error_log << L"HandleValue        : 0x"	<< szHandleValue																					<< std::endl;
-	error_log << L"Flags              : 0x"	<< szFlags																							<< std::endl;
-	error_log << std::endl;
+	error_log_out << L"File               : "	<< (info.szDllFileName ? info.szDllFileName : L"(nullptr)")										<< std::endl;
+	error_log_out << L"Target             : "	<< (info.szTargetProcessExeFileName[0] ? info.szTargetProcessExeFileName : L"(undetermined)")	<< std::endl;
+	error_log_out << L"Target PID         : "	<< info.TargetProcessId																			<< std::endl;
+	error_log_out << L"Source             : "	<< info.szSourceFile << L" in " << info.szFunctionName << L" at line " << info.Line				<< std::endl;
+	error_log_out << L"Errorcode          : 0x"	<< szErrorCode																					<< std::endl;
+	error_log_out << L"Advanced errorcode : 0x"	<< szAdvErrorCode																				<< std::endl;
+	error_log_out << L"Injectionmode      : "	<< InjectionModeToString(info.InjectionMode)													<< std::endl;
+	error_log_out << L"Launchmethod       : "	<< LaunchMethodToString(info.LaunchMethod)														<< std::endl;
+	error_log_out << L"Platform           : "	<< (info.bNative > 0 ? L"x64/x86 (native)" : (info.bNative == 0 ? L"wow64" : L"---"))			<< std::endl;
+	error_log_out << L"HandleValue        : 0x"	<< szHandleValue																				<< std::endl;
+	error_log_out << L"Flags              : 0x"	<< szFlags																						<< std::endl;
+	error_log_out << std::endl;
 
-	error_log.close();
+	if (old_log.rdbuf()->in_avail() > 0)
+	{
+		error_log_out << old_log.rdbuf();
+	}
+
+	error_log_out.close();
 }
 
 std::wstring InjectionModeToString(INJECTION_MODE mode)
@@ -344,8 +358,14 @@ std::wstring BuildNumberToVersionString(int OSBuildNumber)
 		case g_Win10_21H2:
 			return std::wstring(L"21H2");
 
+		case g_Win10_22H2:
+			return std::wstring(L"22H2");
+
 		case g_Win11_21H2:
 			return std::wstring(L"21H2");
+
+		case g_Win11_22H2:
+			return std::wstring(L"22H2");
 
 		default:
 			return std::wstring(L"");
@@ -353,6 +373,8 @@ std::wstring BuildNumberToVersionString(int OSBuildNumber)
 }
 
 #if !defined(_WIN64) && defined(DUMP_SHELLCODE)
+
+int section_index = 0;
 
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 {
@@ -370,8 +392,14 @@ void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 		return;
 	}
 
-	shellcodes << L"inline unsigned char " << szShellname << L"[] =\n";
-	shellcodes << L"{";
+	++section_index;
+
+	wchar_t sec_idx[3]{ 0 };
+	swprintf_s(sec_idx, 3, L"%02X", section_index);
+
+	shellcodes << "#pragma section(\"wow64_sec$" << sec_idx << "\", read, write)\n";
+	shellcodes << "__declspec(allocate(\"wow64_sec$" << sec_idx << "\"))";
+	shellcodes << L"inline unsigned char " << szShellname << L"[] =\n{";
 
 	int row_length = 500;
 	int char_count = 6 * length - 2 + (length / row_length + 1) * 2 + 1; 

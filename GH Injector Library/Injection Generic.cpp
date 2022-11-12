@@ -12,13 +12,14 @@ if (e.Flink && e.Blink)			\
 using namespace NATIVE;
 
 DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_INTERNAL * pData);
-DWORD __declspec(code_seg(".inj_sec$2")) InjectionShell_End();
+DWORD __declspec(code_seg(".inj_sec$2")) INJ_SEC_END();
 
 DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
 #if !defined(_WIN64) && defined (DUMP_SHELLCODE)
-	auto length = ReCa<BYTE *>(InjectionShell_End) - ReCa<BYTE *>(InjectionShell);
-	DumpShellcode(ReCa<BYTE *>(InjectionShell), length, L"InjectionShell_WOW64");
+	DUMP_WOW64(InjectionShell, INJ_SEC_END);
+
+	return INJ_ERR_SHELLCODE_DUMPED;
 #endif
 
 	LOG(1, "Begin InjectDll\n");
@@ -62,8 +63,8 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 	LOG(1, "Shell data initialized\n");
 
-	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(InjectionShell_End)		- ReCa<ULONG_PTR>(InjectionShell);
-	ULONG_PTR VEHShellSize	= ReCa<ULONG_PTR>(VectoredHandlerShell_End) - ReCa<ULONG_PTR>(VectoredHandlerShell);
+	ULONG_PTR ShellSize		= ReCa<ULONG_PTR>(INJ_SEC_END) - ReCa<ULONG_PTR>(InjectionShell);
+	ULONG_PTR VEHShellSize	= ReCa<ULONG_PTR>(VEH_SEC_END) - ReCa<ULONG_PTR>(VectoredHandlerShell);
 
 	if (!(Flags & INJ_UNLINK_FROM_PEB))
 	{
@@ -76,7 +77,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	BYTE * pArg			= pAllocBase;
 	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_INTERNAL), BASE_ALIGNMENT));
 	BYTE * pVEHShell	= nullptr;
-	
+
 	if (!pArg)
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
@@ -613,9 +614,9 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 	return INJ_ERR_SUCCESS;
 }
 
-DWORD __declspec(code_seg(".inj_sec$2")) InjectionShell_End()
+DWORD __declspec(code_seg(".inj_sec$2")) INJ_SEC_END()
 {
-	return 0;
+	return 1338;
 }
 
 INJECTION_FUNCTION_TABLE::INJECTION_FUNCTION_TABLE()

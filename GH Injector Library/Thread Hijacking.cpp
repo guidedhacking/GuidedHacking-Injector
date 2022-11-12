@@ -21,13 +21,13 @@ DWORD SR_HijackThread(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	do
 	{
 		KWAIT_REASON reason;
-		THREAD_STATE state;
+		KTHREAD_STATE state;
 		if (!PI.GetThreadState(state, reason) || reason == KWAIT_REASON::WrQueue)
 		{
 			continue;
 		}
 
-		if ((!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == THREAD_STATE::Running)) && PI.GetThreadId() != GetCurrentThreadId())
+		if ((!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == KTHREAD_STATE::Running)) && PI.GetThreadId() != GetCurrentThreadId())
 		{
 			ThreadID = PI.GetThreadId();
 			break;

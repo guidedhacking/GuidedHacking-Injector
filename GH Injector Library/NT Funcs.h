@@ -94,14 +94,14 @@ using f_LdrLoadDll = NTSTATUS (__stdcall *)
 (
 	LDR_SEARCH_PATH		ldrSearchPath,
 	ULONG			*	pFlags,
-	UNICODE_STRING	*	pModuleFileName, 
+	UNICODE_STRING	*	pModuleFileName,
 	HANDLE			*	pOut
 );
 
 using f_LdrLoadDll_WIN8 = NTSTATUS (__stdcall *)
 (
-	BOOLEAN Unknown1, //set to TRUE
-	ULONG * LoadFlags,
+	BOOLEAN				Unknown1, //set to TRUE
+	ULONG			*	LoadFlags,
 	UNICODE_STRING	*	pModuleFileName,
 	HANDLE			*	pOut
 );
@@ -237,6 +237,14 @@ using f_RtlQueueApcWow64Thread = NTSTATUS (__stdcall *)
 	void	*	pArg3
 );
 
+using f_LdrGetDllPath = NTSTATUS (__stdcall *)
+(
+	const wchar_t	*	DllName,
+	ULONG				Flags,
+	wchar_t			**	PathOut,
+	wchar_t			**	Unknown
+);
+
 using f_LdrpPreprocessDllName = NTSTATUS (__fastcall *)
 (
 	UNICODE_STRING				* DllName,
@@ -325,9 +333,30 @@ using f_RtlFreeHeap = BOOLEAN (__stdcall *)
 
 using f_RtlAnsiStringToUnicodeString = NTSTATUS (__stdcall *)
 (
-	UNICODE_STRING	*	DestinationString,
-	ANSI_STRING		*	SourceString,
-	BOOLEAN				AllocateDestinationString
+	UNICODE_STRING		*	DestinationString,
+	const ANSI_STRING	*	SourceString,
+	BOOLEAN					AllocateDestinationString
+);
+
+using f_RtlUnicodeStringToAnsiString = NTSTATUS (__stdcall *)
+(
+	ANSI_STRING				*	DestinationString,
+	const UNICODE_STRING	*	SourceString,
+	BOOLEAN						AllocateDestinationString
+);
+
+using f_RtlCompareString = LONG (__stdcall *)
+(
+	const ANSI_STRING * String1,
+	const ANSI_STRING * String2,
+	BOOLEAN				CaseInSensitive
+);
+
+using f_RtlCompareUnicodeString = LONG (__stdcall *)
+(
+	const UNICODE_STRING *	String1,
+	const UNICODE_STRING *	String2,
+	BOOLEAN					CaseInSensitive
 );
 
 using f_RtlRbInsertNodeEx = VOID (__stdcall *)

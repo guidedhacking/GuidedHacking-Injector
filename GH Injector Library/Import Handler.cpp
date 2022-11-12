@@ -147,7 +147,26 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 		return INJ_ERR_KERNEL32_MISSING;
 	}
 
+	WIN32_FUNC_INIT(LoadLibraryA, hK32);
+	WIN32_FUNC_INIT(LoadLibraryW, hK32);
+	WIN32_FUNC_INIT(LoadLibraryExA, hK32);
 	WIN32_FUNC_INIT(LoadLibraryExW, hK32);
+
+	WIN32_FUNC_INIT(GetModuleHandleA, hK32);
+	WIN32_FUNC_INIT(GetModuleHandleW, hK32);
+	WIN32_FUNC_INIT(GetModuleHandleExA, hK32);
+	WIN32_FUNC_INIT(GetModuleHandleExW, hK32);
+
+	WIN32_FUNC_INIT(GetModuleFileNameA, hK32);
+	WIN32_FUNC_INIT(GetModuleFileNameW, hK32);
+
+	WIN32_FUNC_INIT(GetProcAddress, hK32);
+
+	WIN32_FUNC_INIT(DisableThreadLibraryCalls, hK32);
+	WIN32_FUNC_INIT(FreeLibrary, hK32);
+	WIN32_FUNC_INIT(FreeLibraryAndExitThread, hK32);
+	WIN32_FUNC_INIT(ExitThread, hK32);
+
 	WIN32_FUNC_INIT(GetLastError, hK32);
 
 	if (!NATIVE::pLoadLibraryExW || !NATIVE::pGetLastError)
@@ -210,8 +229,11 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	if (LoadSymbolNative(S_FUNC(RtlAllocateHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(RtlFreeHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
-	if (LoadSymbolNative(S_FUNC(RtlAnsiStringToUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
+	if (LoadSymbolNative(S_FUNC(RtlAnsiStringToUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED; 
+	if (LoadSymbolNative(S_FUNC(RtlUnicodeStringToAnsiString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlCompareUnicodeString)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolNative(S_FUNC(RtlCompareString)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	
 	if (LoadSymbolNative(S_FUNC(NtOpenFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(NtReadFile)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(NtSetInformationFile)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
@@ -241,9 +263,17 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	if (LoadSymbolNative(S_FUNC(NtDelayExecution)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
 	if (LoadSymbolNative(S_FUNC(LdrpHeap)))								return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadSymbolNative(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(LdrpTlsList)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	
+	if (IsWin10OrGreater() && (GetOSBuildVersion() >= g_Win10_22H2 && GetOSBuildVersion() < g_Win11_21H2 || GetOSBuildVersion() >= g_Win11_22H2))
+	{
+		if (LoadSymbolNative(LdrpInvertedFunctionTable, "LdrpInvertedFunctionTables")) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	}
+	else
+	{
+		if (LoadSymbolNative(S_FUNC(LdrpInvertedFunctionTable))) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	}
 
 	if (GetOSVersion() == g_Win7)
 	{
@@ -253,6 +283,8 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 
 	if (IsWin8OrGreater())
 	{
+		if (LoadSymbolNative(S_FUNC(LdrGetDllPath)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
 		if (LoadSymbolNative(S_FUNC(RtlRbRemoveNode)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolNative(S_FUNC(LdrpModuleBaseAddressIndex)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolNative(S_FUNC(LdrpMappingInfoIndex)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;

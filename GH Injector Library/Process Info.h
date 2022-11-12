@@ -84,7 +84,7 @@ public:
 
 	DWORD GetProcessCookie();
 
-	bool GetThreadState(THREAD_STATE & state, KWAIT_REASON & reason);
+	bool GetThreadState(KTHREAD_STATE & state, KWAIT_REASON & reason);
 	bool GetThreadStartAddress(void *& start_address);
 	void * GetTEB();
 

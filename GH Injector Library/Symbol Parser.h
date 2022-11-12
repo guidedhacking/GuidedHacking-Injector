@@ -6,12 +6,10 @@
 
 class SYMBOL_PARSER
 {
-	HANDLE m_hProcess;
-
-	bool m_bInitialized;
-	bool m_bReady;
-
-	DWORD64 m_SymbolTable;
+	HANDLE m_hProcess		= NULL;
+	bool m_bInitialized		= false;
+	bool m_bReady			= false;
+	DWORD64 m_SymbolTable	= 0;
 
 public:
 

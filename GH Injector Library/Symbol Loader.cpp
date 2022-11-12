@@ -4,13 +4,7 @@
 
 SYMBOL_LOADER::SYMBOL_LOADER()
 {
-	m_hPdbFile			= nullptr;
-	m_Filesize			= 0;
-	m_bInterruptEvent	= false;
-	m_hInterruptEvent	= CreateEvent(nullptr, TRUE, FALSE, nullptr);
-	m_fProgress			= 0.0f;
-	m_bStartDownload	= false;
-	m_bReady			= false;
+	m_hInterruptEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 }
 
 SYMBOL_LOADER::~SYMBOL_LOADER()

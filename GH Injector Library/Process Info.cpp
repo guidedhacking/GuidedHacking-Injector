@@ -527,7 +527,7 @@ ULONG ProcessInfo::GetProcessCookie()
 	return cookie;
 }
 
-bool ProcessInfo::GetThreadState(THREAD_STATE & state, KWAIT_REASON & reason)
+bool ProcessInfo::GetThreadState(KTHREAD_STATE & state, KWAIT_REASON & reason)
 {
 	if (!m_pCurrentThread)
 	{

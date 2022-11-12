@@ -147,13 +147,13 @@ DWORD SR_QueueUserAPC(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, DWORD
 	do
 	{
 		KWAIT_REASON reason;
-		THREAD_STATE state;
+		KTHREAD_STATE state;
 		if (!PI.GetThreadState(state, reason) || reason == KWAIT_REASON::WrQueue)
 		{
 			continue;
 		}
 		
-		if ((!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == THREAD_STATE::Running)) && PI.GetThreadId() != GetCurrentThreadId())
+		if ((!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState() || state == KTHREAD_STATE::Running)) && PI.GetThreadId() != GetCurrentThreadId())
 		{
 			DWORD ThreadID = PI.GetThreadId();
 			HANDLE hThread = OpenThread(THREAD_SET_CONTEXT, FALSE, ThreadID);

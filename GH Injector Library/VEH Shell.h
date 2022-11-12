@@ -17,8 +17,6 @@
 #define VEHDATASIG VEHDATASIG_32
 #endif
 
-
-
 ALIGN struct VEH_SHELL_DATA
 {
 	ULONG_PTR	ImgBase;
@@ -29,8 +27,8 @@ ALIGN struct VEH_SHELL_DATA
 	f_LdrProtectMrdata			_LdrProtectMrdata;
 };
 
-LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * EP);
-LONG __declspec(code_seg(".mmap_sec$4")) VectoredHandlerShell_End();
+LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * EP);
+DWORD __declspec(code_seg(".veh_sec$02")) VEH_SEC_END();
 
 __forceinline bool FindAndReplacePtr(BYTE * start, DWORD size, UINT_PTR stub, UINT_PTR value)
 {

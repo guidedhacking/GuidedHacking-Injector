@@ -6,11 +6,11 @@
 
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
-#define GH_INJ_VERSIONW L"4.6"
+#define GH_INJ_VERSIONW L"4.7"
 
 #define GH_INJ_MOD_NAME64A "GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86A "GH Injector - x86.dll"
-#define GH_INJ_VERSIONA "4.6"
+#define GH_INJ_VERSIONA "4.7"
 
 #ifdef _WIN64
 #define GH_INJ_MOD_NAMEW GH_INJ_MOD_NAME64W
@@ -67,7 +67,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine);
 //		szFile (const wchar_t *):
 ///			Pointer to a string containing the full path to the file.
 //		desired_machine (DWORD):
-///			A value to be compared to the Machine member of the files IMAGE_FILE_HEADER	.
+///			A value to be compared to the Machine member of the files IMAGE_FILE_HEADER.
 //
 //Returnvalue (DWORD):
 ///		On success: 0.
@@ -122,7 +122,7 @@ bool IsElevatedProcess(HANDLE hTargetProc);
 ///		true:	process is elevated.
 ///		false:	process is not elevated.
 
-void ErrorLog(ERROR_INFO * info);
+void ErrorLog(const ERROR_INFO & info);
 //A function used to generate an error log file in case shit hit the fan for some reason.
 //
 //Arguments:
@@ -134,6 +134,9 @@ void ErrorLog(ERROR_INFO * info);
 #if !defined(_WIN64) && defined(DUMP_SHELLCODE)
 //Rad function to dump the injection / mapping shells to paste them into "WOW64 Shells.h"
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname);
+
+//Terrible macro to do terrible things
+#define DUMP_WOW64(start, end) DumpShellcode(ReCa<BYTE *>(start), ReCa<BYTE *>(end) - ReCa<BYTE *>(start), L#start L"_WOW64")
 #endif
 
 float __stdcall GetDownloadProgress(bool bWow64);

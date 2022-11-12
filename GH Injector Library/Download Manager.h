@@ -8,10 +8,10 @@
 
 class DownloadManager : public IBindStatusCallback
 {
-    HANDLE  m_hInterruptEvent;
-    float   m_fProgress;
-    float   m_fOldProgress;
-    bool    m_bForceRedownload;
+    HANDLE  m_hInterruptEvent   = nullptr;
+    float   m_fProgress         = 0.0f;
+    float   m_fOldProgress      = 0.0f;
+    bool    m_bForceRedownload  = false;
 
 public:
 

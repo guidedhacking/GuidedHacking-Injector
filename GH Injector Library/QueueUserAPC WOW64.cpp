@@ -92,13 +92,13 @@ DWORD SR_QueueUserAPC_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD 
 	do
 	{
 		KWAIT_REASON reason;
-		THREAD_STATE state;
+		KTHREAD_STATE state;
 		if (!PI.GetThreadState(state, reason) || reason == KWAIT_REASON::WrQueue)
 		{
 			continue;
 		}
 
-		if (!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState_WOW64() || state == THREAD_STATE::Running))
+		if (!PI.IsThreadWorkerThread() && (PI.IsThreadInAlertableState_WOW64() || state == KTHREAD_STATE::Running))
 		{
 			DWORD ThreadID = PI.GetThreadId();
 			HANDLE hThread = OpenThread(THREAD_SET_CONTEXT, FALSE, ThreadID);

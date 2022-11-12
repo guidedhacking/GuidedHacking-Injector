@@ -96,6 +96,15 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
 	StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
 
+	if (!FileExists(RootPath))
+	{
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
+
+		printf("GH Injector SM - x86.exe is missing\n");
+
+		return INJ_ERR_SM86_EXE_MISSING;
+	}
+
 	wchar_t cmdLine[MAX_PATH]{ 0 };
 	StringCbCatW(cmdLine, sizeof(cmdLine), L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ");
 	StringCbCatW(cmdLine, sizeof(cmdLine), hEventStart_string);
@@ -267,8 +276,11 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	if (LoadSymbolWOW64(S_FUNC(RtlZeroMemory)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(RtlAllocateHeap)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(RtlFreeHeap)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-
+	
 	if (LoadSymbolWOW64(S_FUNC(RtlAnsiStringToUnicodeString)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlUnicodeStringToAnsiString)))		return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlCompareUnicodeString)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	if (LoadSymbolWOW64(S_FUNC(RtlCompareString)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
 	if (LoadSymbolWOW64(S_FUNC(NtOpenFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(NtReadFile)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
@@ -296,9 +308,17 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	if (LoadSymbolWOW64(S_FUNC(NtDelayExecution)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
 	if (LoadSymbolWOW64(S_FUNC(LdrpHeap)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
-	if (LoadSymbolWOW64(S_FUNC(LdrpInvertedFunctionTable)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(LdrpTlsList)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
+	if (IsWin10OrGreater() && (GetOSBuildVersion() >= g_Win10_22H2 && GetOSBuildVersion() < g_Win11_21H2 || GetOSBuildVersion() >= g_Win11_22H2))
+	{
+		if (LoadSymbolWOW64(LdrpInvertedFunctionTable_WOW64, "LdrpInvertedFunctionTables")) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	}
+	else
+	{
+		if (LoadSymbolWOW64(S_FUNC(LdrpInvertedFunctionTable))) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+	}
 
 	if (GetOSVersion() == g_Win7)
 	{
@@ -308,6 +328,8 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 
 	if (IsWin8OrGreater())
 	{
+		if (LoadSymbolWOW64(S_FUNC(LdrGetDllPath)))					return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+
 		if (LoadSymbolWOW64(S_FUNC(RtlRbRemoveNode)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolWOW64(S_FUNC(LdrpModuleBaseAddressIndex)))	return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolWOW64(S_FUNC(LdrpMappingInfoIndex)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;

@@ -11,6 +11,7 @@
 
 //string shit
 #include <codecvt> 
+#include <sstream>
 #include <string>
 #include <strsafe.h>
 #include <tchar.h>

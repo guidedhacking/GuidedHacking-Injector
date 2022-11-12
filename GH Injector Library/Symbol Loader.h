@@ -7,19 +7,19 @@
 
 class SYMBOL_LOADER
 {
-	HANDLE			m_hPdbFile;
-	std::wstring	m_szPdbPath;
-	std::wstring	m_szModulePath;
-	DWORD			m_Filesize;
+	HANDLE			m_hPdbFile		= NULL;
+	std::wstring	m_szPdbPath		= std::wstring(L"");
+	std::wstring	m_szModulePath	= std::wstring(L"");
+	DWORD			m_Filesize		= 0;
 
-	HANDLE	m_hInterruptEvent;
-	bool	m_bInterruptEvent;
+	HANDLE	m_hInterruptEvent = NULL;
+	bool	m_bInterruptEvent = false;
 
 	DownloadManager m_DlMgr;
-	float	m_fProgress;
-	bool	m_bStartDownload;
+	float	m_fProgress			= 0.0f;
+	bool	m_bStartDownload	= false;
 	
-	bool m_bReady;
+	bool m_bReady = false;
 
 	bool VerifyExistingPdb(const GUID & guid);
 

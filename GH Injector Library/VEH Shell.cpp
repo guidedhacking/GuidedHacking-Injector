@@ -15,7 +15,7 @@ __forceinline UINT_PTR bit_rotate_l(UINT_PTR val, int count)
 
 #ifdef _WIN64
 
-LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
+LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
 {
 	volatile auto * pData = ReCa<VEH_SHELL_DATA *>(VEHDATASIG_64);
 
@@ -37,7 +37,7 @@ LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION
 
 #else
 
-LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
+LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
 {
 	UNREFERENCED_PARAMETER(ExceptionInfo);
 
@@ -144,9 +144,9 @@ LONG __declspec(code_seg(".mmap_sec$3")) CALLBACK VectoredHandlerShell(EXCEPTION
 
 #endif
 
-LONG __declspec(code_seg(".mmap_sec$4")) VectoredHandlerShell_End()
+DWORD __declspec(code_seg(".veh_sec$02")) VEH_SEC_END()
 {
-	return 2;
+	return 1339;
 }
 
 #pragma optimize( "", on)

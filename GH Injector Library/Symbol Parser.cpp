@@ -4,10 +4,7 @@
 
 SYMBOL_PARSER::SYMBOL_PARSER()
 {
-	m_bInitialized	= false;
-	m_bReady			= false;
-	m_SymbolTable	= 0;
-	m_hProcess		= nullptr;
+
 }
 
 SYMBOL_PARSER::~SYMBOL_PARSER()
