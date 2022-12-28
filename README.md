@@ -69,9 +69,14 @@ auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImport
 auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
 auto GetDownloadProgressEx = (f_GetDownloadProgressEx)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
 
+//due to a minor bug in the current version you have to wait a bit before starting the download
+	//will be fixed in version 4.7
+Sleep(500);
+
 StartDownload();
 
-//since GetSymbolState and GetImportState only return after the downloads are finished checking the download progress is not necessary
+//since GetSymbolState and GetImportState only return after the downloads are finished 
+	//checking the download progress is not necessary
 while (GetDownloadProgressEx(PDB_DOWNLOAD_INDEX_NTDLL, false) != 1.0f)
 {
 	Sleep(10);
