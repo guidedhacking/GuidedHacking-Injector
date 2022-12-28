@@ -67,7 +67,7 @@ auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
 auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
 auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
 auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
-auto GetDownloadProgressEx = (f_GetDownloadProgress)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
+auto GetDownloadProgressEx = (f_GetDownloadProgressEx)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
 
 StartDownload();
 
