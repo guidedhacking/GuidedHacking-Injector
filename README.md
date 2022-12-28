@@ -105,6 +105,7 @@ INJECTIONDATAA data =
 	NULL,
 	0,
 	NULL,
+	NULL,
 	true
 };
 
