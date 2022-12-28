@@ -12,13 +12,16 @@
 //auto RestorenjectionFunctions		= (f_RestoreInjectionFunctions)GetProcAddress(hInjectionMod, "RestorenjectionFunctions");
 //
 //Symbol state:
-//auto GetSymbolState 		= (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
-//auto GetDownloadProgress 	= (f_GetDownloadProgress)GetProcAddress(hInjectionMod, "GetDownloadProgress");
+//auto GetSymbolState 			= (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
+//auto GetImportState			= (f_GetImportState)GetProcAddress(hInjectionMod, "GetImportState");
+//
+//Download progress:
+//auto GetDownloadProgressEx 	= (f_GetDownloadProgress)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
 
 #pragma once
 
-#define GH_INJ_VERSIONW L"4.0"
-#define GH_INJ_VERSIONA "4.0"
+#define GH_INJ_VERSIONW L"4.6"
+#define GH_INJ_VERSIONA "4.6"
 
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
@@ -131,17 +134,21 @@ struct HookInfo
 //Manual mapping options:
 #define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
 #define INJ_MM_RESOLVE_IMPORTS			0x00020000	//resolves dll imports
-#define INJ_MM_RESOLVE_DELAY_IMPORTS		0x00040000	//resolves delayed imports
-#define INJ_MM_EXECUTE_TLS			0x00080000	//executes TLS callbacks and initializes static TLS data
+#define INJ_MM_RESOLVE_DELAY_IMPORTS	0x00040000	//resolves delayed imports
+#define INJ_MM_EXECUTE_TLS				0x00080000	//executes TLS callbacks and initializes static TLS data
 #define INJ_MM_ENABLE_EXCEPTIONS		0x00100000	//enables exception handling
 #define INJ_MM_SET_PAGE_PROTECTIONS		0x00200000	//sets page protections based on section characteristics, if set INJ_MM_CLEAN_DATA_DIR will be ignored
 #define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
-#define INJ_MM_RUN_DLL_MAIN			0x00800000	//executes DllMain
+#define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 								//this option induces INJ_MM_RESOLVE_IMPORTS
 #define INJ_MM_RUN_UNDER_LDR_LOCK		0x01000000	//runs the DllMain under the loader lock
 #define INJ_MM_SHIFT_MODULE_BASE		0x02000000	//shifts the module base by a random offset
 
 #define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
+
+//Arguments for GetDownloadProgressEx
+#define PDB_DOWNLOAD_INDEX_NTDLL	(int)0 //ntdll pdb download
+#define PDB_DOWNLOAD_INDEX_KERNEL32 (int)1 //kernel32 pdb download (Windows 7 only)
 
 using f_InjectA = DWORD(__stdcall*)(INJECTIONDATAA * pData);
 using f_InjectW = DWORD(__stdcall*)(INJECTIONDATAW * pData);

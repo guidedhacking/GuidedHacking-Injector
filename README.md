@@ -67,8 +67,22 @@ auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
 auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
 auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
 auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
+auto GetDownloadProgressEx = (f_GetDownloadProgress)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
 
 StartDownload();
+
+//since GetSymbolState and GetImportState only return after the downloads are finished checking the download progress is not necessary
+while (GetDownloadProgressEx(PDB_DOWNLOAD_INDEX_NTDLL, false) != 1.0f)
+{
+	Sleep(10);
+}
+
+#ifdef _WIN64
+while (GetDownloadProgressEx(PDB_DOWNLOAD_INDEX_NTDLL, true) != 1.0f)
+{
+	Sleep(10);
+}
+#endif
 
 while (GetSymbolState() != 0)
 {
