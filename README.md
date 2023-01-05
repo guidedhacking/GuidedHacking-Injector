@@ -6,6 +6,8 @@ Session separation can be bypassed with all methods.
 
 If you want to use this library with a GUI check out the [GH Injector GUI](https://github.com/Broihon/GH-Injector-GUI).
 
+If you are a .NET developer see: [DotNet Readme](https://github.com/DestroyerDarkNess/GH-Injector-Library/tree/master/GH_Inj_Lib_DotNet)
+
 ----
 
 ### Injection methods
