@@ -29,8 +29,14 @@
 													//this option induces INJ_MM_RESOLVE_IMPORTS
 #define INJ_MM_RUN_UNDER_LDR_LOCK		0x01000000	//runs the DllMain under the loader lock
 #define INJ_MM_SHIFT_MODULE_BASE		0x02000000	//shifts the module base by a random offset, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
+#define INJ_MM_MAP_FROM_MEMORY			0x04000000	//loads the file from memory instead of from disk (1)
+#define INJ_MM_LINK_MODULE				0x08000000	//links the module to the PEB
 
-#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
+//Notes:
+///(1) only works with Memory_Inject and is set automatically when that function is used, ignored when passed to (DotNet_)InjectA/W
+
+#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS | INJ_MM_RUN_UNDER_LDR_LOCK)
+#define MM_MASK (MM_DEFAULT | INJ_MM_SHIFT_MODULE_BASE | INJ_MM_CLEAN_DATA_DIR | INJ_MM_MAP_FROM_MEMORY | INJ_MM_LINK_MODULE)
 
 //ansi version of the info structure:
 struct INJECTIONDATAA
@@ -47,11 +53,9 @@ struct INJECTIONDATAA
 };
 
 //unicode version of the info structure (documentation above).
-//the additional member szTargetProcessExeFileName should be ignored since it's only used for error logging.
 struct INJECTIONDATAW
 {
 	wchar_t			szDllPath[MAX_PATH * 2];
-	wchar_t			szTargetProcessExeFileName[MAX_PATH];	//exe name of the target process, this value gets set automatically and should be initialized with 0s
 	DWORD			ProcessID;
 	INJECTION_MODE	Mode;
 	LAUNCH_METHOD	Method;
@@ -67,18 +71,40 @@ DWORD __stdcall InjectW(INJECTIONDATAW * pData);
 //Main injection functions (ansi/unicode).
 //
 //Arguments:
-//		pData (INJECTIONDATAA/INJECTIONDATAW):
+//		pData (INJECTIONDATAA/INJECTIONDATAW *):
 ///			Pointer to the information structure for the injection.
 //
 //Returnvalue (DWORD):
 ///		On success: INJ_ERR_SUCCESS.
 ///		On failure: One of the errorcodes defined in Error.h.
 
+//use this to load a file from memory (manual mapping only, other methods will be ignored, make sure to set appropriate manual mapping flags)
+struct MEMORY_INJECTIONDATA
+{
+	BYTE *			RawData;	//pointer to raw file data
+	DWORD			RawSize;	//size in bytes of RawData
+	DWORD			ProcessID;
+	INJECTION_MODE	Mode;
+	LAUNCH_METHOD	Method;
+	DWORD			Flags;
+	DWORD			Timeout;
+	DWORD			hHandleValue;
+	HINSTANCE		hDllOut;
+	bool			GenerateErrorLog;
+};
+
+DWORD __stdcall Memory_Inject(MEMORY_INJECTIONDATA * pData);
+//From memory injection function.
+//
+//Arguments:
+//		pData (MEMORY_INJECTIONDATA *):
+///			Pointer to the information structure for the injection
+//
+//Returnvalue (DWORD):
+///		On success: INJ_ERR_SUCCESS.
+///		On failure: One of the errorcodes defined in Error.h.
+
 //Internal stuff
-#define MAXPATH_IN_TCHAR	MAX_PATH
-#define MAXPATH_IN_BYTE_A	MAX_PATH * sizeof(char)
-#define MAXPATH_IN_BYTE_W	MAX_PATH * sizeof(wchar_t)
-#define MAXPATH_IN_BYTE		MAX_PATH * sizeof(TCHAR)
 #define INJ_HIJACK_TIMEOUT	250
 
 //Returns the version string of the current instance
@@ -96,3 +122,29 @@ DWORD __stdcall GetSymbolState();
 //If still in progress INJ_ERR_IMPORT_HANDLER_NOT_DONE (0x37) is returned.
 //Other error codes are defined in Error.h.
 DWORD __stdcall GetImportState();
+
+//internal stuff, use it if you know what you're doing
+struct INJECTIONDATA_INTERNAL
+{
+	std::wstring	DllPath;
+	std::wstring	TargetProcessExeFileName;
+
+	BYTE *			RawData;
+	DWORD			RawSize;
+
+	DWORD			ProcessID;
+	INJECTION_MODE	Mode;
+	LAUNCH_METHOD	Method;
+	DWORD			Flags;
+	DWORD			Timeout;
+	DWORD			hHandleValue;
+	HINSTANCE		hDllOut;
+	bool			GenerateErrorLog;
+
+	INJECTIONDATA_INTERNAL(const INJECTIONDATAA			* pData);
+	INJECTIONDATA_INTERNAL(const INJECTIONDATAW			* pData);
+	INJECTIONDATA_INTERNAL(const MEMORY_INJECTIONDATA	* pData);
+	INJECTIONDATA_INTERNAL();
+};
+
+DWORD __stdcall Inject_Internal(INJECTIONDATA_INTERNAL * pData);

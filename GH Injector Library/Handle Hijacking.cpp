@@ -56,6 +56,7 @@ std::vector<SYSTEM_HANDLE_TABLE_ENTRY_INFO> EnumProcessHandles()
 		if (NT_FAIL(ntRet))
 		{
 			delete[] pBuffer;
+
 			return Ret;
 		}
 	}

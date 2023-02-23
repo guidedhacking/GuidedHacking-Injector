@@ -30,58 +30,70 @@ BOOL CALLBACK _SWHEX_EnumWindowsCallback(HWND hWnd, LPARAM lParam)
 
 DWORD _SetWindowsHookEx()
 {
-	wchar_t InfoPath[MAX_PATH * 2]{ 0 };
-	GetModuleFileNameW(GetModuleHandleW(nullptr), InfoPath, sizeof(InfoPath) / sizeof(InfoPath[0]));
+	auto ModuleBase = GetModuleHandleW(nullptr);
+	if (!ModuleBase)
+	{
+		return SWHEX_ERR_NO_MODULEBASE;
+	}
 
-	size_t size_out = 0;
-	if (FAILED(StringCchLengthW(InfoPath, MAX_PATH * 2, &size_out)))
+	wchar_t szInfoPath[MAX_PATH * 2]{ 0 };
+	size_t max_size = sizeof(szInfoPath) / sizeof(wchar_t);
+
+	DWORD dwRet = GetModuleFileNameW(ModuleBase, szInfoPath, (DWORD)max_size);
+	if (!dwRet || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+	{
+		return SWHEX_ERR_NO_PATH;
+	}
+
+	std::wstring InfoPath = szInfoPath;
+	auto pos = InfoPath.find_last_of('\\');
+	if (pos == std::wstring::npos)
 	{
 		return SWHEX_ERR_INVALID_PATH;
 	}
 
-	wchar_t * pInfoEnd = InfoPath;
-	pInfoEnd += size_out;
-	while (*pInfoEnd-- != '\\');
-	*(pInfoEnd + 2) = 0;
+	InfoPath.erase(pos, InfoPath.back());
+	InfoPath += FILENAME;
 
-	StringCbCatW(InfoPath, sizeof(InfoPath), FILENAME);
-
-	std::ifstream File(InfoPath, std::ios::ate);
+	std::ifstream File(InfoPath);
 	if (!File.good())
 	{
+		File.close();
+
+		DeleteFileW(InfoPath.c_str());
+
 		return SWHEX_ERR_CANT_OPEN_FILE;
 	}
 
-	auto FileSize = File.tellg();
-	if (!FileSize)
+	std::stringstream info;
+	info << File.rdbuf();
+	
+	File.close();
+
+	DeleteFileW(InfoPath.c_str());
+
+	std::string sPID = info.str();
+	if (sPID.length() < 1)
 	{
-		File.close();
 		return SWHEX_ERR_EMPTY_FILE;
 	}
 
-	File.seekg(0, std::ios::beg);
+	pos = sPID.find('!');
+	if (pos == std::string::npos)
+	{
+		return SWHEX_ERR_INVALID_INFO;
+	}
+	
+	std::string sHook = sPID.substr(pos + 1, std::string::npos);
+	sPID.erase(pos, std::string::npos);
 
-	char * info = new(std::nothrow) char[static_cast<size_t>(FileSize)];
-	char * cpy = info;
-	File.read(info, FileSize);
+	DWORD ProcID = strtol(sPID.c_str(), nullptr, 10);
 
-	File.close();
-
-	DeleteFileW(InfoPath);
-
-	char * pszPID = info;
-	while (*info++ != '!');
-	info[-1] = '\0';
-	char * pszHook = info;
-
-	DWORD ProcID = strtol(pszPID, nullptr, 10);
 #ifdef _WIN64
-	ULONG_PTR pHook = strtoll(pszHook, nullptr, 0x10);
+	ULONG_PTR pHook = strtoll(sHook.c_str(), nullptr, 0x10);
 #else
-	DWORD pHook = strtol(pszHook, nullptr, 0x10);
+	DWORD pHook = strtol(sHook.c_str(), nullptr, 0x10);
 #endif
-
-	delete[] cpy;
 
 	if (!ProcID || !pHook)
 	{
@@ -103,7 +115,7 @@ DWORD _SetWindowsHookEx()
 		return SWHEX_ERR_NO_WINDOWS;
 	}
 
-	for (auto i : data.m_HookData)
+	for (const auto & i : data.m_HookData)
 	{
 		SetForegroundWindow(i.m_hWnd);
 		SendMessageW(i.m_hWnd, WM_KEYDOWN, VK_SPACE, 0);

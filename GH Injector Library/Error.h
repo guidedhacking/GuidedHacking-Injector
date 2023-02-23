@@ -39,7 +39,6 @@
 #define	INJ_ERR_RPM_FAIL					0x00000011	//ReadProcessMemory					: win32 error			: read operation failed
 #define INJ_ERR_GET_MODULE_HANDLE_FAIL		0x00000012	//GetModuleHandle					: win32 error			: address of the specified module couldn't be resolved
 #define INJ_ERR_CANT_FIND_MOD_PEB			0x00000013	//internal error					: -						: injected module isn't linked to the peb
-#define INJ_ERR_UNLINKING_FAILED			0x00000014	//internal error					: PEB linker error		: unlinking the injected module from the PEB failed (PEB linker error 0x60000001 - 0x600000XX)
 #define INJ_ERR_OUT_OF_MEMORY_EXT			0x00000015	//VirtualAllocEx					: win32 error			: memory allocation in the target process failed
 #define INJ_ERR_OUT_OF_MEMORY_INT			0x00000016	//VirtualAlloc						: win32 error			: internal memory allocation failed
 #define INJ_ERR_OUT_OF_MEMORY_NEW			0x00000017	//operator new						: -						: internal memory allocation on heap failed
@@ -78,7 +77,7 @@
 #define INJ_ERR_WCSRCHR_FAILED				0x00000038	//wcsrchr							: -						: wcsrchr failed to find a character in a string (usually '\\' in a path)
 #define INJ_ERR_TARGET_EXE_NAME_IS_NULL		0x00000039	//internal error					: -						: the length of the name of the specified process is 0
 #define INJ_ERR_LDR_ENTRY_IS_NULL			0x0000003A	//internal error					: -						: LdrpLoadDll(Internal) didn't return a valid LDR_DATA_TABLE_ENTRY pointer
-#define INJ_ERR_NOT_SUPPORTED				0x0000003B	//internal error					: -						: the requested operation is not supported on the current operating system
+#define INJ_ERR_NOT_SUPPORTED				0x0000003B	//internal error					: -						: the requested operation is not supported on the current operating system or injector version
 #define INJ_ERR_CREATE_EVENT_FAILED			0x0000003C	//CreateEventEx						: win32 error			: failed to create an event for wow64 process
 #define INJ_ERR_CREATE_PROCESS_FAILED		0x0000003D	//CreateProcessW					: win32 error			: failed to create process for wow64 module addresses
 #define INJ_ERR_WAIT_FAILED					0x0000003E	//WaitForSingleObject				: win32 error			: failed to wait for an event to trigger
@@ -90,7 +89,13 @@
 #define INJ_ERR_INVALID_SYMBOL_INDEX		0x00000044	//internal error					: -						: an invalid index was passed to the symbol loader
 #define INJ_ERR_INTERRUPT					0x00000045	//internal error					: -						: the injection was interrupted because the interrupt event was set
 #define INJ_ERR_SYMBOL_PARSE_FAIL			0x00000046	//SYMBOL_PARSER::Initialize			: symbol error			: initialization failed (symbol error 0x40000001 - ...)
-#define	INJ_ERR_SM86_EXE_MISSING			0x00000047	//internal errro					: -						: "GH Injector SM - x86.exe" is missing, this file is required for import resolving
+#define	INJ_ERR_SM86_EXE_MISSING			0x00000047	//internal error					: -						: "GH Injector SM - x86.exe" is missing, this file is required for import resolving
+#define INJ_ERR_INVALID_EXE_PATH			0x00000048	//internal error					: -						: failed to extract exe name from path
+#define INJ_ERR_STRING_TOO_LONG				0x00000049	//internal error					: -						: string exceeds the amount of available characters
+#define INJ_ERR_NO_RAW_DATA					0x0000004A	//internal error					: -						: RawData pointer is 0
+#define INJ_ERR_INVALID_RAW_DATA			0x0000004B	//internal error					: -						: RawSize is less than 0x1000 bytes
+#define INJ_ERR_FAILED_TO_RESOLVE_PATH		0x0000004C	//GetFullPathNameW					: win32 error			: failed to resolve the absolute file path of the specified file
+
 
 ///////////////////
 ///ManualMap
@@ -271,25 +276,31 @@
 
 ///SetWindowHookEx:
 #define SWHEX_ERR_SUCCESS 0x00000000
-												//Source				: error description
+												//Source						: error description
 
-#define SWHEX_ERR_INVALID_PATH		0x30100001	//StringCchLengthW		: path exceeds MAX_PATH * 2 chars
-#define SWHEX_ERR_CANT_OPEN_FILE	0x30100002	//std::ifstream::good	: openening the SMXX.txt failed
-#define SWHEX_ERR_EMPTY_FILE		0x30100003	//internal error		: SMXX.txt is empty
-#define SWHEX_ERR_INVALID_INFO		0x30100004	//internal error		: provided info is wrong / invalid
-#define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005	//EnumWindows			: API fail
-#define SWHEX_ERR_NO_WINDOWS		0x30100006	//internal error		: no compatible window found
+#define SWHEX_ERR_INVALID_PATH		0x30100001	//std::wstring::find_last_of	: path formatting is wrong
+#define SWHEX_ERR_CANT_OPEN_FILE	0x30100002	//std::ifstream::good			: opening SMXX.txt failed
+#define SWHEX_ERR_EMPTY_FILE		0x30100003	//internal error				: SMXX.txt is empty
+#define SWHEX_ERR_INVALID_INFO		0x30100004	//internal error				: provided info is wrong / invalid
+#define SWHEX_ERR_ENUM_WINDOWS_FAIL 0x30100005	//EnumWindows					: API fail
+#define SWHEX_ERR_NO_WINDOWS		0x30100006	//internal error				: no compatible window found
+#define SWHEX_ERR_NO_MODULEBASE		0x30100007	//GetModuleHandleW				: failed to resolve module base of SM process
+#define SWHEX_ERR_OUT_OF_MEMORY		0x30100008	//operator new					: failed to allocated memory
+#define SWHEX_ERR_NO_PATH			0x30100009	//GetModuleFileNameW			: failed to resolve own module path
 
 ///KernelCallbackTable
 #define KC_ERR_SUCCESS 0x00000000
-												//Source				: error description
+												//Source						: error description
 
-#define KC_ERR_INVALID_PATH			0x50100001	//StringCchLengthW		: path exceeds MAX_PATH * 2 chars
-#define KC_ERR_CANT_OPEN_FILE		0x50100002	//std::ifstream::good	: opening the SMXX.txt failed
-#define KC_ERR_EMPTY_FILE			0x50100003	//internal error		: SMXX.txt is empty
-#define KC_ERR_INVALID_INFO			0x50100004	//internal error		: provided info is wrong / invalid
-#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005	//EnumWindows			: API fail
-#define KC_ERR_NO_WINDOWS			0x50100006	//internal error		: no compatible window found
+#define KC_ERR_INVALID_PATH			0x50100001	//std::wstring::find_last_of	: path formatting is wrong
+#define KC_ERR_CANT_OPEN_FILE		0x50100002	//std::ifstream::good			: opening SMXX.txt failed
+#define KC_ERR_EMPTY_FILE			0x50100003	//internal error				: SMXX.txt is empty
+#define KC_ERR_INVALID_INFO			0x50100004	//internal error				: provided info is wrong / invalid
+#define KC_ERR_ENUM_WINDOWS_FAIL	0x50100005	//EnumWindows					: API fail
+#define KC_ERR_NO_WINDOWS			0x50100006	//internal error				: no compatible window found
+#define KC_ERR_NO_MODULEBASE		0x50100007	//GetModuleHandleW				: failed to resolve module base of SM process
+#define KC_ERR_OUT_OF_MEMORY		0x50100008	//operator new					: failed to allocated memory
+#define KC_ERR_NO_PATH				0x50100009	//GetModuleFileNameW			: failed to resolve own module path
 
 
 
@@ -362,6 +373,33 @@
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//.NET
+#define DNP_ERR_SUCCESS					0x00000000
+
+													//Source				: advanced error type	: error description
+#define DNP_ERR_CANT_OPEN_FILE			0x60000001	//std::ifstream::good	: -						: opening DNPD.txt failed
+#define DNP_ERR_EMPTY_FILE				0x60000002	//internal error		: -						: file is empty
+#define DNP_ERR_OUT_OF_MEMORY			0x60000003	//operator new			: -						: memory allocation failed
+#define DNP_ERR_INVALID_DATA			0x60000004	//internal error		: -						: the data provided is invalid and/or incomplete
+#define DNP_ERR_HRESULT					0x60000005	//internal error		: HRESULT				: one of the managed functions failed
+#define DNP_ERR_CANT_FIND_MODULE		0x60000006	//interanl error		: win32 error code		: failed to resolve the module base of the loaded module
+#define DNP_ERR_REMOTE_LOADER_MISSING	0x60000007	//internal error		: -						: "GH Injector DNP - x64/86.dll" is missing
+#define DNP_ERR_CANT_OPEN_INFO_TXT		0x60000008	//internal error		: -						: failed to open dnp info file
+#define DNP_ERR_FAILED_TO_LOAD_LOADER	0x60000009	//internal error		: any Error.h code		: failed to load the .NET loader into the target process
+#define DNP_ERR_LOADER_TIMEOUT			0x6000000A	//internal error		: -						: .NET loader timed out in the target process
+#define DNP_ERR_LOADER_FAILED			0x6000000B	//internal error		: DNP Error or HRESULT	: .NET loader failed and returned an error code
+#define DNP_ERR_INTERRUPT				0x6000000C	//internal error		: -						: execution of the injection was interrupted by InterruptInjection()
+#define DNP_ERR_UNKNOWN					0x6000000D	//internal error		: - 
+
+
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 struct ERROR_DATA
 {

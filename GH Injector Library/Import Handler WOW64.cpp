@@ -92,26 +92,26 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	wchar_t hEventEnd_string[9]{ 0 };
 	_ultow_s(MDWD(hEventEnd), hEventEnd_string, 0x10);
 
-	wchar_t RootPath[MAX_PATH * 2]{ 0 };
-	StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
-	StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
+	std::wstring SM_Path = g_RootPathW + SM_EXE_FILENAME86;
 
-	if (!FileExists(RootPath))
+	if (!FileExistsW(SM_Path))
 	{
 		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		printf("GH Injector SM - x86.exe is missing\n");
+		LOG(1, "GH Injector SM - x86.exe is missing\n");
 
 		return INJ_ERR_SM86_EXE_MISSING;
 	}
 
-	wchar_t cmdLine[MAX_PATH]{ 0 };
-	StringCbCatW(cmdLine, sizeof(cmdLine), L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ");
-	StringCbCatW(cmdLine, sizeof(cmdLine), hEventStart_string);
-	StringCbCatW(cmdLine, sizeof(cmdLine), L" ");
-	StringCbCatW(cmdLine, sizeof(cmdLine), hEventEnd_string);
+	std::wstring CmdLine = L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ";
+	CmdLine += hEventStart_string;
+	CmdLine += L" ";
+	CmdLine += hEventEnd_string;
 
-	if (!CreateProcessW(RootPath, cmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+	wchar_t szCmdLine[MAX_PATH]{ 0 };
+	CmdLine.copy(szCmdLine, CmdLine.length()); //CmdLine will not exceed MAX_PATH characters (46 characters max)
+
+	if (!CreateProcessW(SM_Path.c_str(), szCmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
@@ -311,7 +311,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	if (LoadSymbolWOW64(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolWOW64(S_FUNC(LdrpTlsList)))						return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 
-	if (IsWin10OrGreater() && (GetOSBuildVersion() >= g_Win10_22H2 && GetOSBuildVersion() < g_Win11_21H2 || GetOSBuildVersion() >= g_Win11_22H2))
+	if (IsWin11OrGreater() && GetOSBuildVersion() >= g_Win11_22H2)
 	{
 		if (LoadSymbolWOW64(LdrpInvertedFunctionTable_WOW64, "LdrpInvertedFunctionTables")) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
@@ -344,6 +344,7 @@ DWORD ResolveImports_WOW64(ERROR_DATA & error_data)
 	{
 		if (LoadSymbolWOW64(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolWOW64(S_FUNC(LdrpLoadDllInternal)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolWOW64(S_FUNC(LdrpDereferenceModule)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 	sym_ntdll_wow64.Cleanup();
@@ -522,35 +523,35 @@ bool GetProcAddressEx_WOW64(HANDLE hTargetProc, HINSTANCE hModule, const char * 
 	BYTE * pBase = pExpDirBuffer - DirRVA;
 
 	auto Forward = [&](DWORD FuncRVA, DWORD &pForwarded) -> bool
-	{
-		char pFullExport[MAX_PATH]{ 0 };
-		size_t len_out = 0;
+	{		
+		std::string FullExport = ReCa<char *>(pBase + FuncRVA);
 
-		HRESULT hr = StringCchLengthA(ReCa<char *>(pBase + FuncRVA), sizeof(pFullExport), &len_out);
-		if (FAILED(hr) || !len_out)
+		auto PosSplitter = FullExport.find('.');
+		if (PosSplitter == std::string::npos)
 		{
 			return false;
 		}
 
-		StringCchCopyA(pFullExport, len_out, ReCa<char *>(pBase + FuncRVA));
-		
-		char * pFuncName = strchr(pFullExport, '.');
-		*pFuncName++ = '\0';
-		if (*pFuncName == '#')
+		bool IsOrdinal	= false;
+		WORD Ordinal	= 0;
+
+		std::string FuncName = FullExport.substr(PosSplitter + 1);
+		if (FuncName[0] == '#')
 		{
-			pFuncName = ReCa<char *>(LOWORD(atoi(++pFuncName)));
+			IsOrdinal	= true;
+			Ordinal		= LOWORD(atoi(FuncName.substr(1).c_str()));
 		}
+		
+		auto ModName	= FullExport.substr(0, PosSplitter);
+		auto ModNameW	= CharArrayToStdWstring(ModName.c_str());
 
-		wchar_t ModNameW[MAX_PATH]{ 0 };
-		size_t SizeOut = 0;
-
-		if (mbstowcs_s(&SizeOut, ModNameW, pFullExport, MAX_PATH))
+		if (IsOrdinal)
 		{
-			return GetProcAddressExW_WOW64(hTargetProc, ModNameW, pFuncName, pForwarded);
+			return GetProcAddressExW_WOW64(hTargetProc, ModNameW.c_str(), ReCa<char *>(Ordinal), pForwarded);
 		}
 		else
 		{
-			return false;
+			return GetProcAddressExW_WOW64(hTargetProc, ModNameW.c_str(), FuncName.c_str(), pForwarded);
 		}
 	};
 

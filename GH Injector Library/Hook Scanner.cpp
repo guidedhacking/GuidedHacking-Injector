@@ -146,17 +146,17 @@ bool __stdcall ValidateInjectionFunctions(DWORD dwTargetProcessId, DWORD & Error
 		wchar_t hEventEnd_string[9]{ 0 };
 		_ultow_s(MDWD(hEventEnd), hEventEnd_string, 0x10);
 
-		wchar_t RootPath[MAX_PATH * 2]{ 0 };
-		StringCbCopyW(RootPath, sizeof(RootPath), g_RootPathW.c_str());
-		StringCbCatW(RootPath, sizeof(RootPath), SM_EXE_FILENAME86);
+		auto RootPath = g_RootPathW + SM_EXE_FILENAME86;
 
-		wchar_t cmdLine[MAX_PATH]{ 0 };
-		StringCbCatW(cmdLine, sizeof(cmdLine), L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ");
-		StringCbCatW(cmdLine, sizeof(cmdLine), hEventStart_string);
-		StringCbCatW(cmdLine, sizeof(cmdLine), L" ");
-		StringCbCatW(cmdLine, sizeof(cmdLine), hEventEnd_string);
+		std::wstring CmdLine = L"\"" SM_EXE_FILENAME86 "\" " ID_WOW64 " ";
+		CmdLine += hEventStart_string;
+		CmdLine += L" ";
+		CmdLine += hEventEnd_string;
 
-		if (!CreateProcessW(RootPath, cmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+		wchar_t szCmdLine[MAX_PATH]{ 0 };
+		CmdLine.copy(szCmdLine, CmdLine.length()); //CmdLine will not exceed MAX_PATH characters (46 characters max)
+
+		if (!CreateProcessW(RootPath.c_str(), szCmdLine, nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
 		{
 			LastWin32Error	= GetLastError();
 			ErrorCode		= HOOK_SCAN_ERR_CREATE_PROCESS_FAILED;

@@ -3,6 +3,7 @@
 #include "Error.h"
 
 #pragma comment (lib, "DbgHelp.lib")
+#pragma comment (lib, "Shlwapi.lib")
 #pragma comment (lib, "Urlmon.lib")
 #pragma comment (lib, "Version.lib")
 #pragma comment (lib, "WinInet.lib")
@@ -149,6 +150,8 @@ void custom_print(int indention_offset, const char * format, ...)
 
 DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print)
 {
+#pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
+
 	UNREFERENCED_PARAMETER(print);
 
 	return INJ_ERR_NOT_IMPLEMENTED;

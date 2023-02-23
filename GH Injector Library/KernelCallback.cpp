@@ -6,10 +6,8 @@ DWORD SR_KernelCallback(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULO
 {
 	LOG(2, "Begin SR_KernelCallback\n");
 
-	std::wstring InfoPath = g_RootPathW;
-	InfoPath += SM_INFO_FILENAME;
-
-	if (FileExists(InfoPath.c_str()))
+	std::wstring InfoPath = g_RootPathW + SM_INFO_FILENAME;
+	if (FileExistsW(InfoPath))
 	{
 		DeleteFileW(InfoPath.c_str());
 	}
@@ -280,8 +278,7 @@ DWORD SR_KernelCallback(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULO
 	kc_info << std::dec << GetProcessId(hTargetProc) << std::endl;
 	kc_info.close();
 
-	std::wstring smPath = g_RootPathW;
-	smPath += SM_EXE_FILENAME;
+	std::wstring smPath = g_RootPathW + SM_EXE_FILENAME;
 
 	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME "\" " ID_KC;
 
@@ -293,7 +290,7 @@ DWORD SR_KernelCallback(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, ULO
 
 	LOG(2, "Data and command line prepared\n");
 
-	if (TargetSessionId != -1)
+	if (TargetSessionId != SESSION_ID_INVALID)
 	{
 		LOG(2, "Target process is in a different session\n");
 

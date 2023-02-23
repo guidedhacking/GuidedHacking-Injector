@@ -45,75 +45,6 @@ inline std::shared_future<DWORD>	import_handler_wow64_ret;
 #define ID_WOW64	"1" //use for wow64 addresses
 #define ID_KC		"2" //use for KernelCallbackTable
 
-//Global variable to store the base address of the current image of the injector. Initialized in DllMain.
-inline HINSTANCE g_hInjMod = NULL;
-
-//Global variable to store the root directory of the module
-inline std::wstring	g_RootPathW;
-
-inline DWORD g_OSVersion		= 0;
-inline DWORD g_OSBuildNumber	= 0;
-
-#define g_Win7	61
-#define g_Win8	62
-#define g_Win81	63
-#define g_Win10	100
-#define g_Win11	100
-
-#define g_Win7_SP1 7601
-#define g_Win8_SP1 9600
-#define g_Win10_1507 10240
-#define g_Win10_1511 10586
-#define g_Win10_1607 14393
-#define g_Win10_1703 15063
-#define g_Win10_1709 16299
-#define g_Win10_1803 17134
-#define g_Win10_1809 17763
-#define g_Win10_1903 18362
-#define g_Win10_1909 18363
-#define g_Win10_2004 19041
-#define g_Win10_20H2 19042
-#define g_Win10_21H1 19043
-#define g_Win10_21H2 19044
-#define g_Win10_22H2 19045
-#define g_Win11_21H2 22000
-#define g_Win11_22H2 22621
-
-bool IsWin7OrGreater();
-bool IsWin8OrGreater();
-bool IsWin81OrGreater();
-bool IsWin10OrGreater();
-bool IsWin11OrGreater();
-//These functions are used to determine the currently running version of windows. GetNTDLLVersion needs to be successfully called before these work.
-//
-//Arguements:
-//		none
-//
-//Returnvalue (bool):
-///		true:	Running OS is equal or newer than specified in the function name.
-///		false:	Running OS is older than specified in the function name.
-
-DWORD GetOSVersion(DWORD * error_code = nullptr);
-//This function is used to determine the version of the operating system.
-// 
-//Arguments:
-//		errode_code (DWORD *):
-///			A reference to a DWORD which will receive an error code if the function fails (optional).
-//
-//Returnvalue (DWORD):
-///		On success:	The version of the operating system to 1 decimal place (multiplied by 10 as an integer)
-///		On failure:	0.
-
-DWORD GetOSBuildVersion();
-//This function is used to determine the build version of the operating system.
-// 
-//Arguments:
-//		none
-//
-//Returnvalue (DWORD):
-///		On success:	The build version of the operating system.
-///		On failure:	0.
-
 namespace NATIVE
 {
 	WIN32_FUNC(LoadLibraryA);
@@ -161,6 +92,8 @@ namespace NATIVE
 
 	NT_FUNC(LdrLockLoaderLock);
 	NT_FUNC(LdrUnlockLoaderLock);
+
+	NT_FUNC(LdrpDereferenceModule);
 
 	NT_FUNC(memmove);
 	NT_FUNC(RtlZeroMemory);
@@ -255,6 +188,8 @@ namespace WOW64
 
 	WOW64_FUNCTION_POINTER(LdrLockLoaderLock);
 	WOW64_FUNCTION_POINTER(LdrUnlockLoaderLock);
+
+	WOW64_FUNCTION_POINTER(LdrpDereferenceModule);
 
 	WOW64_FUNCTION_POINTER(memmove);
 	WOW64_FUNCTION_POINTER(RtlZeroMemory);

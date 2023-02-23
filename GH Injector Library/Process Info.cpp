@@ -6,7 +6,7 @@
 
 ProcessInfo::ProcessInfo()
 {
-	HINSTANCE hNTDLL = GetModuleHandle(TEXT("ntdll.dll"));
+	HINSTANCE hNTDLL = GetModuleHandleW(L"ntdll.dll");
 	if (!hNTDLL)
 	{
 		return;
@@ -55,7 +55,7 @@ ProcessInfo::ProcessInfo()
 
 	if (GetOSBuildVersion() >= g_Win10_1607)
 	{
-		m_hWin32U = LoadLibrary(TEXT("win32u.dll"));
+		m_hWin32U = LoadLibraryW(L"win32u.dll");
 		if (m_hWin32U)
 		{
 			m_WaitFunctionReturnAddress[4] = ReCa<UINT_PTR>(GetProcAddress(m_hWin32U, "NtUserMsgWaitForMultipleObjectsEx")) + nt_ret_offset;
@@ -189,7 +189,7 @@ bool ProcessInfo::RefreshInformation()
 {
 	if (!m_pFirstProcess)
 	{
-		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new(std::nothrow) BYTE[m_BufferSize]);
+		m_pFirstProcess = ReCa<SYSTEM_PROCESS_INFORMATION *>(new(std::nothrow) BYTE[m_BufferSize]());
 		if (!m_pFirstProcess)
 		{
 			return false;
@@ -293,7 +293,7 @@ LDR_DATA_TABLE_ENTRY * ProcessInfo::GetLdrEntry_Native(HINSTANCE hMod)
 
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY CurrentEntry;
+		LDR_DATA_TABLE_ENTRY CurrentEntry{ };
 		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr);
 
 		if (CurrentEntry.DllBase == hMod)
@@ -324,13 +324,13 @@ void * ProcessInfo::GetEntrypoint()
 		return nullptr;
 	}
 
-	PEB	peb;
+	PEB	peb{ };
 	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
 	{
 		return nullptr;
 	}
 
-	PEB_LDR_DATA ldrdata;
+	PEB_LDR_DATA ldrdata{ };
 	if (!ReadProcessMemory(m_hCurrentProcess, peb.Ldr, &ldrdata, sizeof(ldrdata), nullptr))
 	{
 		return nullptr;
@@ -342,16 +342,20 @@ void * ProcessInfo::GetEntrypoint()
 	wchar_t NameBuffer[MAX_PATH]{ 0 };
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY CurrentEntry;
+		LDR_DATA_TABLE_ENTRY CurrentEntry{ };
 		if (ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr))
 		{
-			if (ReadProcessMemory(m_hCurrentProcess, CurrentEntry.BaseDllName.szBuffer, NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
+			if (CurrentEntry.BaseDllName.Length < sizeof(NameBuffer) && CurrentEntry.BaseDllName.szBuffer)
 			{
-				if (NameBuffer[CurrentEntry.BaseDllName.Length / 2 - 1] == 'e')
+				if (ReadProcessMemory(m_hCurrentProcess, CurrentEntry.BaseDllName.szBuffer, NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
 				{
-					return CurrentEntry.EntryPoint;
+					std::wstring Name = NameBuffer + CurrentEntry.BaseDllName.Length / sizeof(wchar_t) - 3; //std::wstring::ends_with doesn't support case insensitive comparisons...
+					if (lstrcmpiW(Name.c_str(), L"exe") == 0)
+					{
+						return MPTR(CurrentEntry.EntryPoint);
+					}
 				}
-			}
+			}			
 		}
 
 		if (pCurrentEntry == pLastEntry)
@@ -377,7 +381,7 @@ DWORD ProcessInfo::GetSessionID()
 		return m_pCurrentProcess->SessionId;
 	}
 
-	return 0;
+	return SESSION_ID_INVALID;
 }
 
 bool ProcessInfo::IsNative()
@@ -799,7 +803,7 @@ LDR_DATA_TABLE_ENTRY_32 * ProcessInfo::GetLdrEntry_WOW64(HINSTANCE hMod)
 
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY_32 CurrentEntry;
+		LDR_DATA_TABLE_ENTRY_32 CurrentEntry{ };
 		ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr);
 
 		if (CurrentEntry.DllBase == MDWD(hMod))
@@ -830,13 +834,13 @@ void * ProcessInfo::GetEntrypoint_WOW64()
 		return nullptr;
 	}
 
-	PEB_32 peb;
+	PEB_32 peb{ };
 	if (!ReadProcessMemory(m_hCurrentProcess, ppeb, &peb, sizeof(peb), nullptr))
 	{
 		return nullptr;
 	}
 
-	PEB_LDR_DATA_32 ldrdata;
+	PEB_LDR_DATA_32 ldrdata{ };
 	if (!ReadProcessMemory(m_hCurrentProcess, MPTR(peb.Ldr), &ldrdata, sizeof(ldrdata), nullptr))
 	{
 		return nullptr;
@@ -848,14 +852,18 @@ void * ProcessInfo::GetEntrypoint_WOW64()
 	wchar_t NameBuffer[MAX_PATH]{ 0 };
 	while (true)
 	{
-		LDR_DATA_TABLE_ENTRY_32 CurrentEntry;
+		LDR_DATA_TABLE_ENTRY_32 CurrentEntry{ };
 		if (ReadProcessMemory(m_hCurrentProcess, pCurrentEntry, &CurrentEntry, sizeof(CurrentEntry), nullptr))
 		{
-			if (ReadProcessMemory(m_hCurrentProcess, MPTR(CurrentEntry.BaseDllName.szBuffer), NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
+			if (CurrentEntry.BaseDllName.Length < sizeof(NameBuffer) && CurrentEntry.BaseDllName.Length > 4 && CurrentEntry.BaseDllName.szBuffer)
 			{
-				if (NameBuffer[CurrentEntry.BaseDllName.Length / 2 - 1] == 'e')
+				if (ReadProcessMemory(m_hCurrentProcess, MPTR(CurrentEntry.BaseDllName.szBuffer), NameBuffer, CurrentEntry.BaseDllName.Length, nullptr))
 				{
-					return MPTR(CurrentEntry.EntryPoint);
+					std::wstring Name = NameBuffer + CurrentEntry.BaseDllName.Length / sizeof(wchar_t) - 3; //std::wstring::ends_with doesn't support case insensitive comparisons...
+					if (lstrcmpiW(Name.c_str(), L"exe") == 0)
+					{
+						return MPTR(CurrentEntry.EntryPoint);
+					}
 				}
 			}
 		}

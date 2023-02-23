@@ -4,18 +4,19 @@
 
 #include "Error.h"
 #include "Download Manager.h"
+#include "Tools.h"
 
 class SYMBOL_LOADER
 {
 	HANDLE			m_hPdbFile		= NULL;
-	std::wstring	m_szPdbPath		= std::wstring(L"");
-	std::wstring	m_szModulePath	= std::wstring(L"");
+	std::wstring	m_szPdbPath		= std::wstring();
+	std::wstring	m_szModulePath	= std::wstring();
 	DWORD			m_Filesize		= 0;
 
 	HANDLE	m_hInterruptEvent = NULL;
 	bool	m_bInterruptEvent = false;
 
-	DownloadManager m_DlMgr;
+	DownloadManager m_DlMgr		= DownloadManager(false);
 	float	m_fProgress			= 0.0f;
 	bool	m_bStartDownload	= false;
 	

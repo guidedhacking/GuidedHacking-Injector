@@ -51,7 +51,7 @@ using _##name##_32	= _##name##suffix##_32;
 			DEF_STRUCT_DEFAULT_32(LDR_DDAG_NODE, _WIN81)
 		#endif
 	#elif (_WIN32_WINNT == _WIN32_WINNT_WIN10) //includes Win11
-		#if (WDK_NTDDI_VERSION == NTDDI_WIN10_CO) //Win11 SDK is called NTDDI_WIN10_CO
+		#if (WDK_NTDDI_VERSION >= NTDDI_WIN10_CO) //Win11 SDK is called NTDDI_WIN10_CO
 			DEF_STRUCT_DEFAULT(LDR_DATA_TABLE_ENTRY, _WIN11)
 			DEF_STRUCT_DEFAULT(LDR_DDAG_NODE, _WIN11)
 
@@ -302,6 +302,11 @@ using f_LdrUnlockLoaderLock = NTSTATUS (__stdcall *)
 (
 	ULONG		Flags, 
 	ULONG_PTR	Cookie
+);
+
+using f_LdrpDereferenceModule = NTSTATUS(__fastcall *)
+(
+	LDR_DATA_TABLE_ENTRY * pEntry
 );
 
 using f_memmove = VOID (__cdecl *)

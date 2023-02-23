@@ -1,19 +1,85 @@
 #include "pch.h"
 
 #include "Tools.h"
+#include "Import Handler.h"
 
 std::wstring InjectionModeToString(INJECTION_MODE mode);
 std::wstring LaunchMethodToString(LAUNCH_METHOD method);
 std::wstring BuildNumberToVersionString(int OSBuildNumber);
 
-bool FileExists(const wchar_t * szFile)
+bool IsWin7OrGreater()
 {
-	return (GetFileAttributesW(szFile) != INVALID_FILE_ATTRIBUTES);
+	return (GetOSVersion() >= g_Win7);
 }
 
-DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
+bool IsWin8OrGreater()
 {
-	std::ifstream File(szFile, std::ios::binary | std::ios::ate);
+	return (GetOSVersion() >= g_Win8);
+}
+
+bool IsWin81OrGreater()
+{
+	return (GetOSVersion() >= g_Win81);
+}
+
+bool IsWin10OrGreater()
+{
+	return (GetOSVersion() >= g_Win10);
+}
+
+bool IsWin11OrGreater()
+{
+	return (GetOSVersion() >= g_Win10 && GetOSBuildVersion() >= g_Win11_21H2);
+}
+
+DWORD GetOSVersion(DWORD * error_code)
+{
+	if (g_OSVersion != 0)
+	{
+		return g_OSVersion;
+	}
+
+#ifdef _WIN64
+	PEB * pPEB = ReCa<PEB *>(__readgsqword(0x60));
+#else
+	PEB * pPEB = ReCa<PEB *>(__readfsdword(0x30));
+#endif
+
+	if (!pPEB)
+	{
+		if (error_code)
+		{
+			*error_code = INJ_ERR_CANT_GET_PEB;
+		}
+
+		return 0;
+	}
+
+	DWORD v_hi = pPEB->OSMajorVersion;
+	DWORD v_lo = pPEB->OSMinorVersion;
+
+	for (; v_lo >= 10; v_lo /= 10);
+
+	g_OSVersion = v_hi * 10 + v_lo;
+
+	g_OSBuildNumber = pPEB->OSBuildNumber;
+
+	return g_OSVersion;
+}
+
+DWORD GetOSBuildVersion()
+{
+	return g_OSBuildNumber;
+}
+
+bool FileExistsW(const std::wstring & FilePath)
+{
+	return (GetFileAttributesW(FilePath.c_str()) != INVALID_FILE_ATTRIBUTES);
+}
+
+DWORD ValidateDllFile(const std::wstring & FilePath, DWORD target_machine)
+{
+	std::ifstream File(FilePath, std::ios::binary | std::ios::ate);
 	if (!File.good())
 	{
 		LOG(1, "Can't open file\n");
@@ -25,6 +91,8 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	if (FileSize < 0x1000)
 	{
 		LOG(1, "Specified file is too small\n");
+
+		File.close();
 
 		return FILE_ERR_INVALID_FILE_SIZE;
 	}
@@ -41,10 +109,9 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	File.read(ReCa<char *>(headers), 0x1000);
 	File.close();
 
-	auto * pDos = ReCa<IMAGE_DOS_HEADER *>(headers);
-	WORD magic = pDos->e_magic;
+	auto * dos_header = ReCa<IMAGE_DOS_HEADER *>(headers);
 	
-	if (magic != IMAGE_DOS_SIGNATURE)
+	if (dos_header->e_magic != IMAGE_DOS_SIGNATURE) //"MZ"
 	{
 		delete[] headers;
 
@@ -53,7 +120,7 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 		return FILE_ERR_INVALID_FILE;
 	}
 
-	if (pDos->e_lfanew > 0x1000)
+	if (dos_header->e_lfanew > 0x1000)
 	{
 		delete[] headers;
 
@@ -62,16 +129,31 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 		return FILE_ERR_INVALID_FILE;
 	}
 
-	auto * pNT = ReCa<IMAGE_NT_HEADERS *>(headers + pDos->e_lfanew); //no need for correct nt headers type
-	DWORD	signature	= pNT->Signature;
-	WORD	machine		= pNT->FileHeader.Machine;
-	WORD	character	= pNT->FileHeader.Characteristics;
+	auto nt_headers = ReCa<IMAGE_NT_HEADERS *>(headers + dos_header->e_lfanew);
+	if (nt_headers->Signature != IMAGE_NT_SIGNATURE)  //"PE"
+	{
+		LOG(1, "Not a valid PE file (nt signature mismatch)\n");
+
+		delete[] headers;
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	WORD character = nt_headers->FileHeader.Characteristics;
+	if (!(character & IMAGE_FILE_DLL))
+	{
+		LOG(1, "Not a valid DLL (characteristics mismatch)\n");
+
+		delete[] headers;
+
+		return FILE_ERR_INVALID_FILE;
+	}
 
 	delete[] headers;
 
-	if (signature != IMAGE_NT_SIGNATURE || machine != desired_machine || !(character & IMAGE_FILE_DLL)) //"MZ" & "PE"
+	if (nt_headers->FileHeader.Machine != target_machine)
 	{
-		LOG(1, "Invalid PE header\n");
+		LOG(1, "DLL platform mismatch\n");
 
 		return FILE_ERR_INVALID_FILE;
 	}
@@ -79,46 +161,97 @@ DWORD ValidateFile(const wchar_t * szFile, DWORD desired_machine)
 	return FILE_ERR_SUCCESS;
 }
 
-bool GetOwnModulePathA(char * pOut, size_t BufferCchSize)
+DWORD ValidateDllFileInMemory(const BYTE * RawData, DWORD RawSize, DWORD target_machine)
 {
-	DWORD mod_ret = GetModuleFileNameA(g_hInjMod, pOut, (DWORD)BufferCchSize);
+	if (RawSize < 0x1000)
+	{
+		LOG(1, "Specified file is too small\n");
+
+		return FILE_ERR_INVALID_FILE_SIZE;
+	}
+
+	auto * dos_header = ReCa<const IMAGE_DOS_HEADER *>(RawData);
+
+	if (dos_header->e_magic != IMAGE_DOS_SIGNATURE) //"MZ"
+	{
+		LOG(1, "Invalid DOS header signature\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	if (dos_header->e_lfanew > 0x1000)
+	{
+		LOG(1, "Invalid nt header offset\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	auto nt_headers = ReCa<const IMAGE_NT_HEADERS *>(RawData + dos_header->e_lfanew);
+	if (nt_headers->Signature != IMAGE_NT_SIGNATURE)  //"PE"
+	{
+		LOG(1, "Not a valid PE file (nt signature mismatch)\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	WORD character = nt_headers->FileHeader.Characteristics;
+	if (!(character & IMAGE_FILE_DLL))
+	{
+		LOG(1, "Not a valid DLL (characteristics mismatch)\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	if (nt_headers->FileHeader.Machine != target_machine)
+	{
+		LOG(1, "DLL platform mismatch\n");
+
+		return FILE_ERR_INVALID_FILE;
+	}
+
+	return FILE_ERR_SUCCESS;
+}
+
+bool GetOwnModulePathA(std::string & out)
+{
+	char buffer[MAX_PATH * 2]{ 0 };
+	DWORD mod_ret = GetModuleFileNameA(g_hInjMod, buffer, sizeof(buffer));
 	if (!mod_ret || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
 	{
 		return false;
 	}
 
-	HRESULT hr = StringCchLengthA(pOut, BufferCchSize, &BufferCchSize);
-	if (FAILED(hr) || !BufferCchSize)
+	std::string temp = buffer;
+	auto pos = temp.find_last_of('\\');
+	if (pos == std::string::npos)
 	{
 		return false;
 	}
 
-	pOut += BufferCchSize;
-	while (*(--pOut - 1) != '\\');
-	*pOut = '\0';
+	out = temp.substr(0, pos + 1);
 
 	return true;
 }
 
-bool GetOwnModulePathW(wchar_t * pOut, size_t BufferCchSize)
+bool GetOwnModulePathW(std::wstring & out)
 {
-	DWORD mod_ret = GetModuleFileNameW(g_hInjMod, pOut, (DWORD)BufferCchSize);
+	wchar_t buffer[MAX_PATH * 2]{ 0 };
+	DWORD mod_ret = GetModuleFileNameW(g_hInjMod, buffer, sizeof(buffer) / sizeof(wchar_t));
 	if (!mod_ret || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
 	{
 		return false;
 	}
 
-	HRESULT hr = StringCchLengthW(pOut, BufferCchSize, &BufferCchSize);
-	if (FAILED(hr) || !BufferCchSize)
+	std::wstring temp = buffer;
+	auto pos = temp.find_last_of('\\');
+	if (pos == std::string::npos)
 	{
 		return false;
 	}
 
-	pOut += BufferCchSize;
-	while (*(--pOut - 1) != '\\');
-	*pOut = '\0';
+	out = temp.substr(0, pos + 1);
 
-	return true;	
+	return true;
 }
 
 bool IsNativeProcess(HANDLE hTargetProc)
@@ -135,7 +268,7 @@ ULONG GetSessionId(HANDLE hTargetProc, NTSTATUS & ntRetOut)
 	ntRetOut = NATIVE::NtQueryInformationProcess(hTargetProc, PROCESSINFOCLASS::ProcessSessionInformation, &psi, sizeof(psi), nullptr);
 	if (NT_FAIL(ntRetOut))
 	{
-		return (ULONG)-1;
+		return SESSION_ID_INVALID;
 	}
 
 	return psi.SessionId;
@@ -168,46 +301,46 @@ void ErrorLog(const ERROR_INFO & info)
 	wchar_t szTime[30]{ 0 };
 	wcsftime(szTime, 30, L"%d-%m-%Y %H:%M:%S", &time_info);
 
-	const wchar_t * szWinProductName	= nullptr;
-	auto szWinReleaseId	= BuildNumberToVersionString(GetOSBuildVersion());
-	wchar_t szWinCurrentBuild[10]{ 0 };
-
-	StringCchPrintfW(szWinCurrentBuild, sizeof(szWinCurrentBuild) / sizeof(wchar_t), L"%d", GetOSBuildVersion());
-
+	std::wstring szWinCurrentBuild	= std::format(L"{:d}", GetOSBuildVersion());
+	std::wstring szWinReleaseId		= BuildNumberToVersionString(GetOSBuildVersion());
+	
+	std::wstring WinProductName;
 	switch (GetOSVersion())
 	{
 		case g_Win7:
-			szWinProductName = L"Windows 7";
+			WinProductName = L"Windows 7";
 			break;
 			
 		case g_Win8:
-			szWinProductName = L"Windows 8";
+			WinProductName = L"Windows 8";
 			break;
 
 		case g_Win81:
-			szWinProductName = L"Windows 8.1";
+			WinProductName = L"Windows 8.1";
 			break;
 
 		default:
-			szWinProductName = L"Windows 10";
+			WinProductName = L"Windows 10";
 	}
 
 	if (GetOSVersion() == g_Win10 && GetOSBuildVersion() >= g_Win11_21H2)
 	{
-		szWinProductName = L"Windows 11";	
+		WinProductName = L"Windows 11";
 	}
 
-	wchar_t szFlags			[9]{ 0 };
-	wchar_t szErrorCode		[9]{ 0 };
-	wchar_t szAdvErrorCode	[9]{ 0 };
-	wchar_t szHandleValue	[9]{ 0 };
-	StringCchPrintfW(szFlags,			9, L"%08X", info.Flags);
-	StringCchPrintfW(szErrorCode,		9, L"%08X", info.ErrorCode);
-	StringCchPrintfW(szAdvErrorCode,	9, L"%08X", info.AdvErrorCode);
-	StringCchPrintfW(szHandleValue,		9, L"%08X", info.HandleValue);
+	auto Flags			= std::format(L"{:08X}", info.Flags);
+	auto ErrorCode		= std::format(L"{:08X}", info.ErrorCode);
+	auto AdvErrorCode	= std::format(L"{:08X}", info.AdvErrorCode);
+	auto HandleValue	= std::format(L"{:08X}", info.HandleValue);
+
+	auto RawSize = std::format(L"{:08X}", info.RawSize);
+#ifdef _WIN64
+	auto RawData = std::format(L"{:016X}", ReCa<ULONG_PTR>(info.RawData));
+#else
+	auto RawData = std::format(L"{:08X}", ReCa<ULONG_PTR>(info.RawData));
+#endif
 
 	std::wstringstream old_log;
-
 	std::wifstream error_log_in(FullPath);
 	if (error_log_in.good())
 	{
@@ -228,24 +361,43 @@ void ErrorLog(const ERROR_INFO & info)
 
 	if (szWinReleaseId.length() > 1)
 	{
-		error_log_out << L"OS                 : " << szWinProductName << L" " << szWinReleaseId.c_str() << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+		error_log_out << L"OS                 : " << WinProductName << L" " << szWinReleaseId << L" (Build " << szWinCurrentBuild << L")" << std::endl;
 	}
 	else
 	{
-		error_log_out << L"OS                 : " << szWinProductName << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+		error_log_out << L"OS                 : " << WinProductName << L" (Build " << szWinCurrentBuild << L")" << std::endl;
+	}
+	
+	if (info.RawData)
+	{
+		error_log_out << L"RawData            : 0x" << RawData << std::endl;
+		error_log_out << L"RawSize            : 0x" << RawSize << L" bytes" << std::endl;
+	}
+	else
+	{
+		error_log_out << L"File               : " << info.DllFileName.c_str() << std::endl;
 	}
 
-	error_log_out << L"File               : "	<< (info.szDllFileName ? info.szDllFileName : L"(nullptr)")										<< std::endl;
-	error_log_out << L"Target             : "	<< (info.szTargetProcessExeFileName[0] ? info.szTargetProcessExeFileName : L"(undetermined)")	<< std::endl;
-	error_log_out << L"Target PID         : "	<< info.TargetProcessId																			<< std::endl;
-	error_log_out << L"Source             : "	<< info.szSourceFile << L" in " << info.szFunctionName << L" at line " << info.Line				<< std::endl;
-	error_log_out << L"Errorcode          : 0x"	<< szErrorCode																					<< std::endl;
-	error_log_out << L"Advanced errorcode : 0x"	<< szAdvErrorCode																				<< std::endl;
-	error_log_out << L"Injectionmode      : "	<< InjectionModeToString(info.InjectionMode)													<< std::endl;
-	error_log_out << L"Launchmethod       : "	<< LaunchMethodToString(info.LaunchMethod)														<< std::endl;
-	error_log_out << L"Platform           : "	<< (info.bNative > 0 ? L"x64/x86 (native)" : (info.bNative == 0 ? L"wow64" : L"---"))			<< std::endl;
-	error_log_out << L"HandleValue        : 0x"	<< szHandleValue																				<< std::endl;
-	error_log_out << L"Flags              : 0x"	<< szFlags																						<< std::endl;
+	error_log_out << L"Target             : "	<< info.TargetProcessExeFileName.c_str()												<< std::endl;
+	error_log_out << L"Target PID         : "	<< info.TargetProcessId																	<< std::endl;
+	error_log_out << L"Source             : "	<< info.SourceFile << L" in " << info.FunctionName << L" at line " << info.Line			<< std::endl;
+	error_log_out << L"Errorcode          : 0x"	<< ErrorCode																			<< std::endl;
+	error_log_out << L"Advanced errorcode : 0x"	<< AdvErrorCode																			<< std::endl;
+	error_log_out << L"Injectionmode      : "	<< InjectionModeToString(info.InjectionMode)											<< std::endl;
+	error_log_out << L"Launchmethod       : "	<< LaunchMethodToString(info.LaunchMethod)												<< std::endl;
+	error_log_out << L"Platform           : "	<< (info.bNative > 0 ? L"x64/x86 (native)" : (info.bNative == 0 ? L"wow64" : L"---"))	<< std::endl;
+	error_log_out << L"HandleValue        : 0x"	<< HandleValue																			<< std::endl;
+	error_log_out << L"Flags              : 0x"	<< Flags																				<< std::endl;
+
+	if (info.IsDotNet)
+	{
+		error_log_out << L".NET Version       : " << info.Version	<< std::endl;
+		error_log_out << L"Namespace          : " << info.Namespace << std::endl;
+		error_log_out << L"Classname          : " << info.ClassName << std::endl;
+		error_log_out << L"Method             : " << info.Method	<< std::endl;
+		error_log_out << L"Argument           : " << info.Argument	<< std::endl;
+	}
+
 	error_log_out << std::endl;
 
 	if (old_log.rdbuf()->in_avail() > 0)
@@ -254,6 +406,37 @@ void ErrorLog(const ERROR_INFO & info)
 	}
 
 	error_log_out.close();
+}
+
+std::wstring CharArrayToStdWstring(const char * szString)
+{
+	if (!szString)
+	{
+		return std::wstring();
+	}
+
+	std::string s(szString);
+	std::vector<char> v(s.begin(), s.end());
+	return std::wstring(v.begin(), v.end());
+}
+
+bool StdWStringToWCharArray(const std::wstring & Source, wchar_t * szBuffer, size_t Size)
+{
+	if (!szBuffer)
+	{
+		return false;
+	}
+
+	auto len = Source.length();
+	if (len >= Size)
+	{
+		return false;
+	}
+
+	Source.copy(szBuffer, len);
+	szBuffer[len + 1] = '\0';
+
+	return true;
 }
 
 std::wstring InjectionModeToString(INJECTION_MODE mode)
@@ -378,16 +561,13 @@ int section_index = 0;
 
 void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 {
-	wchar_t Shellcodename[] = L"Shellcodes.txt";
-
-	wchar_t FullPath[MAX_PATH]{ 0 };
-	StringCbCopyW(FullPath, sizeof(FullPath), g_RootPathW.c_str());
-	StringCbCatW(FullPath, sizeof(FullPath), Shellcodename);
+	auto FullPath = g_RootPathW;
+	FullPath += L"Shellcodes.txt";
 
 	std::wofstream shellcodes(FullPath, std::ios_base::out | std::ios_base::app);
 	if (!shellcodes.good())
 	{
-		LOG(2, "Failed to open/create shellcodename.txt file:\n%ls\n", FullPath);
+		LOG(2, "Failed to open/create Shellcodes.txt:\n%ls\n", FullPath.c_str());
 
 		return;
 	}
@@ -399,7 +579,7 @@ void DumpShellcode(BYTE * start, int length, const wchar_t * szShellname)
 
 	shellcodes << "#pragma section(\"wow64_sec$" << sec_idx << "\", read, write)\n";
 	shellcodes << "__declspec(allocate(\"wow64_sec$" << sec_idx << "\"))";
-	shellcodes << L"inline unsigned char " << szShellname << L"[] =\n{";
+	shellcodes << L" inline unsigned char " << szShellname << L"[] =\n{";
 
 	int row_length = 500;
 	int char_count = 6 * length - 2 + (length / row_length + 1) * 2 + 1; 
@@ -454,7 +634,7 @@ float __stdcall GetDownloadProgressEx(int index, bool bWow64)
 {
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
-	if (index == 0)
+	if (index == PDB_DOWNLOAD_INDEX_NTDLL)
 	{
 #ifdef _WIN64
 		if (bWow64)
@@ -471,7 +651,7 @@ float __stdcall GetDownloadProgressEx(int index, bool bWow64)
 		return sym_ntdll_native.GetDownloadProgress();
 #endif
 	}
-	else if (index == 1)
+	else if (index == PDB_DOWNLOAD_INDEX_KERNEL32 && GetOSVersion() == g_Win7)
 	{
 #ifdef _WIN64
 		if (bWow64)
@@ -622,4 +802,87 @@ DWORD __stdcall InterruptInjectionEx(void * Timeout)
 #pragma EXPORT_FUNCTION(__FUNCTION__, __FUNCDNAME__)
 
 	return InterruptInjection(MDWD(Timeout));
+}
+
+DWORD CreateTempFileCopy(std::wstring & FilePath, DWORD & win32err)
+{
+	auto FileNamePos = FilePath.find_last_of('\\');
+	if (FileNamePos == std::wstring::npos)
+	{
+		return INJ_ERR_INVALID_FILEPATH;
+	}
+
+	auto FileName = std::wstring(FilePath.substr(FileNamePos + 1));
+	
+	wchar_t szTempPath[MAXPATH_IN_TCHAR]{ 0 };
+	if (!GetTempPathW(sizeof(szTempPath) / sizeof(wchar_t), szTempPath))
+	{
+		win32err = GetLastError();
+
+		return INJ_ERR_CANT_GET_TEMP_DIR;
+	}
+
+	std::wstring TempPath = szTempPath;
+	TempPath += FileName;
+
+	if (!CopyFileW(FilePath.c_str(), TempPath.c_str(), FALSE))
+	{
+		win32err = GetLastError();
+
+		return INJ_ERR_CANT_COPY_FILE;
+	}
+
+	FilePath = TempPath;
+
+	return FILE_ERR_SUCCESS;
+}
+
+DWORD ScrambleFileName(std::wstring & FilePath, UINT Length, DWORD & win32err)
+{
+	auto FileNamePos = FilePath.find_last_of('\\');
+	if (FileNamePos == std::wstring::npos)
+	{
+		return INJ_ERR_INVALID_FILEPATH;
+	}
+
+	auto NewPath = std::wstring(FilePath.substr(0, FileNamePos + 1));
+	
+	int seed = rand() + (int)(MDWD(&NewPath) & 0x7FFFFFFF); //epic rng
+	LARGE_INTEGER pfc{ 0 };
+	QueryPerformanceCounter(&pfc);
+	seed += pfc.LowPart;
+	srand(seed);
+
+	for (UINT i = 0; i != Length; ++i)
+	{
+		auto val = rand() % 3;
+		if (val == 0)
+		{
+			val = rand() % 10;
+			NewPath += wchar_t('0' + val);
+		}
+		else if (val == 1)
+		{
+			val = rand() % 26;
+			NewPath += wchar_t('A' + val);
+		}
+		else
+		{
+			val = rand() % 26;
+			NewPath += wchar_t('a' + val);
+		}
+	}
+	NewPath += L".dll";
+
+	auto ren_ret = _wrename(FilePath.c_str(), NewPath.c_str());
+	if (ren_ret)
+	{
+		win32err = (DWORD)errno;
+
+		return INJ_ERR_CANT_RENAME_FILE;
+	}
+
+	FilePath = NewPath;
+
+	return FILE_ERR_SUCCESS;
 }

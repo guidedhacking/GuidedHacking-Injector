@@ -145,10 +145,6 @@ DWORD SYMBOL_LOADER::Initialize(const std::wstring & szModulePath, const std::ws
 	{
 		m_bStartDownload = true;
 	}
-	else
-	{
-		m_bStartDownload = false;
-	}
 
 	LOG(1, "SYMBOL_LOADER::Initialize called in thread %08X (%d)\n", GetCurrentThreadId(), GetCurrentThreadId());
 
@@ -307,10 +303,8 @@ DWORD SYMBOL_LOADER::Initialize(const std::wstring & szModulePath, const std::ws
 		}
 	}
 
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-
-	std::wstring szPdbFileName(conv.from_bytes(pdb_info->PdbFileName));
-	m_szPdbPath += szPdbFileName;
+	auto PdbFileName = CharArrayToStdWstring(pdb_info->PdbFileName);
+	m_szPdbPath += PdbFileName;
 
 	LOG(1, "SYMBOL_LOADER: PDB path = %ls\n", m_szPdbPath.c_str());
 		
@@ -365,12 +359,12 @@ DWORD SYMBOL_LOADER::Initialize(const std::wstring & szModulePath, const std::ws
 		}
 		
 		std::wstring url = L"https://msdl.microsoft.com/download/symbols/";
-		url += szPdbFileName;
+		url += PdbFileName;
 		url += '/';
 		url += guid_filtered;
 		url += std::to_wstring(pdb_info->Age);
 		url += '/';
-		url += szPdbFileName;
+		url += PdbFileName;
 
 		LOG(1, "SYMBOL_LOADER: URL = %ls\n", url.c_str());
 

@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "Tools.h"
+#include "Import Handler.h"
 
 #if !defined(_WIN64) && defined (DUMP_SHELLCODE)
 #include "Manual Mapping.h"
@@ -18,26 +18,23 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 #if !defined(_WIN64) && defined (DUMP_SHELLCODE)
 		HINSTANCE	dummy_instance{ 0 };
 		ERROR_DATA	dummy_data{ 0 };
-		InjectDLL(nullptr, nullptr, INJECTION_MODE::IM_LoadLibraryExW, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
-		MMAP_NATIVE::ManualMap(nullptr, nullptr, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
+		INJECTION_SOURCE s;
+		InjectDLL(s, nullptr, INJECTION_MODE::IM_LoadLibraryExW, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
+		MMAP_NATIVE::ManualMap(s, nullptr, LAUNCH_METHOD::LM_NtCreateThreadEx, NULL, dummy_instance, 0, dummy_data);
 #endif
 
 		LOG(0, "GH Injector V%ls loaded\nImagebase = %p\n", GH_INJ_VERSIONW, hDll);
 
 		g_hInjMod = hDll;
 
-		wchar_t szRootPathW[MAX_PATH]{ 0 };
-		if (!GetOwnModulePathW(szRootPathW, sizeof(szRootPathW) / sizeof(szRootPathW[0])))
+		if (!GetOwnModulePathW(g_RootPathW))
 		{
 			LOG(0, "Couldn't resolve own module path (unicode)\n");
 
 			return FALSE;
 		}
 
-		LOG(0, "Rootpath is %ls\n", szRootPathW);
-
 		wchar_t * szWindowsDir = nullptr;
-
 		if (_wdupenv_s(&szWindowsDir, nullptr, L"WINDIR") || !szWindowsDir)
 		{
 			LOG(0, "Couldn't resolve %%WINDIR%%\n");
@@ -49,8 +46,6 @@ BOOL WINAPI DllMain(HINSTANCE hDll, DWORD dwReason, void * pReserved)
 
 			return FALSE;
 		}
-
-		g_RootPathW = szRootPathW;
 
 		std::wstring szNtDllNative = szWindowsDir;
 		szNtDllNative += L"\\System32\\ntdll.dll";
