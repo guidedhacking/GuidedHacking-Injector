@@ -64,6 +64,7 @@ Additionally GetDownloadProgress can be used to determine the progress of the do
 HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
 	
 auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
+//auto Memory_Inject = (f_Memory_Inject)GetProcAddress(hInjectionMod, "Memory_Inject");
 auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
 auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
 auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
@@ -107,7 +108,7 @@ INJECTIONDATAA data =
 	TargetProcessId,
 	INJECTION_MODE::IM_LoadLibraryExW,
 	LAUNCH_METHOD::LM_NtCreateThreadEx,
-	NULL,
+	MM_DEFAULT,
 	0,
 	NULL,
 	NULL,
@@ -117,6 +118,31 @@ INJECTIONDATAA data =
 strcpy(data.szDllPath, DllPathToInject);
 
 InjectA(&data);
+
+//Memory Inject
+std::string dllFileName("dll-path");
+std::ifstream instream(dllFileName.c_str(), std::ios::in | std::ios::binary);
+
+if (instream)
+{
+	std::vector<uint8_t> dllBuff((std::istreambuf_iterator<char>(instream)), std::istreambuf_iterator<char>());
+
+	MEMORY_INJECTIONDATA pData =
+	{
+		dllBuff.data(),
+		dllBuff.size(),
+		processInfo.dwProcessId,
+		INJECTION_MODE::IM_ManualMap,
+		LAUNCH_METHOD::LM_NtCreateThreadEx,
+		MM_DEFAULT,
+		0,
+		NULL,
+		NULL,
+		true
+	};
+
+	Memory_Inject(&pData);
+}
 
 ```
 
