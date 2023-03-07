@@ -20,8 +20,8 @@
 
 #pragma once
 
-#define GH_INJ_VERSIONW L"4.6"
-#define GH_INJ_VERSIONA "4.6"
+#define GH_INJ_VERSIONW L"4.8"
+#define GH_INJ_VERSIONA "4.8"
 
 #define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
 #define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
@@ -85,6 +85,21 @@ struct INJECTIONDATAW
 {
 	wchar_t			szDllPath[MAX_PATH * 2];
 	wchar_t			szTargetProcessExeFileName[MAX_PATH];	//exe name of the target process, this value gets set automatically and should be initialized with 0s
+	DWORD			ProcessID;
+	INJECTION_MODE	Mode;
+	LAUNCH_METHOD	Method;
+	DWORD			Flags;
+	DWORD			Timeout;
+	DWORD			hHandleValue;
+	HINSTANCE		hDllOut;
+	bool			GenerateErrorLog;
+};
+
+//use this to load a file from memory (manual mapping only, other methods will be ignored, make sure to set appropriate manual mapping flags)
+struct MEMORY_INJECTIONDATA
+{
+	BYTE* RawData;	//pointer to raw file data
+	DWORD			RawSize;	//size in bytes of RawData
 	DWORD			ProcessID;
 	INJECTION_MODE	Mode;
 	LAUNCH_METHOD	Method;
@@ -168,3 +183,6 @@ using f_InterruptDownload = void(__stdcall *)();
 
 using f_raw_print_callback = void(__stdcall *)(const char * szText);
 using f_SetRawPrintCallback = DWORD(__stdcall *)(f_raw_print_callback callback);
+
+using f_Memory_Inject = DWORD(__stdcall*)(MEMORY_INJECTIONDATA* pData);
+
