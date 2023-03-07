@@ -57,6 +57,8 @@ On first run the injection module has to download PDB files for the native (and 
 The injector can only function if the downloads are finished. The injection module exports GetSymbolState and GetImportState which will return INJ_ERROR_SUCCESS (0) if the PDB download and resolving of all required addresses is completed.
 Additionally GetDownloadProgress can be used to determine the progress of the download as percentage. If the injection module is to be unloaded during the download process call InterruptDownload or there's a chance that the dll will deadlock your process.
 
+### Load DLL From Path
+
 ```cpp
 
 #include "Injection.h"
@@ -64,7 +66,6 @@ Additionally GetDownloadProgress can be used to determine the progress of the do
 HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
 	
 auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
-//auto Memory_Inject = (f_Memory_Inject)GetProcAddress(hInjectionMod, "Memory_Inject");
 auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
 auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
 auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
@@ -119,7 +120,54 @@ strcpy(data.szDllPath, DllPathToInject);
 
 InjectA(&data);
 
-//Memory Inject
+```
+
+### Load DLL From Memory
+
+```cpp
+
+#include "Injection.h"
+
+HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
+	
+auto Memory_Inject = (f_Memory_Inject)GetProcAddress(hInjectionMod, "Memory_Inject");
+auto GetSymbolState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetSymbolState");
+auto GetImportState = (f_GetSymbolState)GetProcAddress(hInjectionMod, "GetImportState");
+auto StartDownload = (f_StartDownload)GetProcAddress(hInjectionMod, "StartDownload");
+auto GetDownloadProgressEx = (f_GetDownloadProgressEx)GetProcAddress(hInjectionMod, "GetDownloadProgressEx");
+
+//due to a minor bug in the current version you have to wait a bit before starting the download
+	//will be fixed in version 4.7
+Sleep(500);
+
+StartDownload();
+
+//since GetSymbolState and GetImportState only return after the downloads are finished 
+	//checking the download progress is not necessary
+while (GetDownloadProgressEx(PDB_DOWNLOAD_INDEX_NTDLL, false) != 1.0f)
+{
+	Sleep(10);
+}
+
+#ifdef _WIN64
+while (GetDownloadProgressEx(PDB_DOWNLOAD_INDEX_NTDLL, true) != 1.0f)
+{
+	Sleep(10);
+}
+#endif
+
+while (GetSymbolState() != 0)
+{
+	Sleep(10);
+}
+
+while (GetImportState() != 0)
+{
+	Sleep(10);
+}
+
+DWORD TargetProcessId;
+
 std::string dllFileName("dll-path");
 std::ifstream instream(dllFileName.c_str(), std::ios::in | std::ios::binary);
 
@@ -131,7 +179,7 @@ if (instream)
 	{
 		dllBuff.data(),
 		dllBuff.size(),
-		processInfo.dwProcessId,
+		TargetProcessId,
 		INJECTION_MODE::IM_ManualMap,
 		LAUNCH_METHOD::LM_NtCreateThreadEx,
 		MM_DEFAULT,
