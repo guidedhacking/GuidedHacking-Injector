@@ -11,10 +11,10 @@ if (e.Flink && e.Blink)			\
 
 using namespace NATIVE;
 
-DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_INTERNAL * pData);
+DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_MAPPED * pData);
 DWORD __declspec(code_seg(".inj_sec$2")) INJ_SEC_END();
 
-DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
+DWORD InjectDLL(const INJECTION_SOURCE & Source, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
 #if !defined(_WIN64) && defined (DUMP_SHELLCODE)
 	DUMP_WOW64(InjectionShell, INJ_SEC_END);
@@ -28,38 +28,29 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	{
 		LOG(1, "Forwarding call to ManualMap\n");
 
-		return MMAP_NATIVE::ManualMap(szDllFile, hTargetProc, Method, Flags, hOut, Timeout, error_data);
+		return MMAP_NATIVE::ManualMap(Source, hTargetProc, Method, Flags, hOut, Timeout, error_data);
 	}
 
-	INJECTION_DATA_INTERNAL data{ 0 };
+	INJECTION_DATA_MAPPED data{ 0 };
 	data.Flags			= Flags;
 	data.Mode			= Mode;
 	data.OSVersion		= GetOSVersion();
 	data.OSBuildNumber	= GetOSBuildVersion();
 
-	size_t len = 0;
-	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.Path), &len);
-	if (FAILED(hr))
+	size_t len = Source.DllPath.length();
+	size_t max_len = sizeof(data.Path) / sizeof(wchar_t);
+	if (len > max_len)
 	{
-		INIT_ERROR_DATA(error_data, (DWORD)hr);
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG(1, "StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "Path too long: %d characters, buffer size: %d\n", len, max_len);
 
-		return INJ_ERR_STRINGC_XXX_FAIL;
+		return INJ_ERR_STRING_TOO_LONG;
 	}
-
-	data.ModuleFileName.Length		= (WORD)len;
+		
+	data.ModuleFileName.Length		= (WORD)(len * sizeof(wchar_t));
 	data.ModuleFileName.MaxLength	= (WORD)sizeof(data.Path);
-
-	hr = StringCbCopyW(data.Path, sizeof(data.Path), szDllFile);
-	if (FAILED(hr))
-	{
-		INIT_ERROR_DATA(error_data, (DWORD)hr);
-
-		LOG(1, "StringCbCopyW failed: %08X\n", hr);
-
-		return INJ_ERR_STRINGC_XXX_FAIL;
-	}
+	Source.DllPath.copy(data.Path, Source.DllPath.length());
 
 	LOG(1, "Shell data initialized\n");
 
@@ -71,11 +62,11 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		VEHShellSize = 0;
 	}
 
-	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL) + ShellSize + BASE_ALIGNMENT;
+	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_MAPPED) + ShellSize + BASE_ALIGNMENT;
 	BYTE * pAllocBase		= ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 
 	BYTE * pArg			= pAllocBase;
-	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_INTERNAL), BASE_ALIGNMENT));
+	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg) + sizeof(INJECTION_DATA_MAPPED), BASE_ALIGNMENT));
 	BYTE * pVEHShell	= nullptr;
 
 	if (!pArg)
@@ -116,7 +107,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 		LOG(2, "pVEHShell   = %p\n", pVEHShell);
 	}
 
-	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL), nullptr))
+	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_MAPPED), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
@@ -202,7 +193,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 
 	LOG(1, "Fetching routine data\n");
 
-	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL), nullptr))
+	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_MAPPED), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
@@ -253,7 +244,7 @@ DWORD InjectDLL(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mo
 	return INJ_ERR_SUCCESS;
 }
 
-DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_INTERNAL * pData)
+DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA_MAPPED * pData)
 {
 	if (!pData)
 	{
@@ -355,6 +346,10 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		if (!entry_out)
 		{
 			return INJ_ERR_LDR_ENTRY_IS_NULL;
+		}
+		else
+		{
+			f->LdrpDereferenceModule(entry_out);
 		}
 
 		pData->hRet = ReCa<HINSTANCE>(entry_out->DllBase);
@@ -532,8 +527,8 @@ DWORD __declspec(code_seg(".inj_sec$1")) __stdcall InjectionShell(INJECTION_DATA
 		veh_shell_data->ImgBase		= ReCa<ULONG_PTR>(pEntry->DllBase);
 		veh_shell_data->ImgSize		= pEntry->SizeOfImage;
 		veh_shell_data->OSVersion	= pData->OSVersion;
-		veh_shell_data->_LdrpInvertedFunctionTable	= f->LdrpInvertedFunctionTable;
-		veh_shell_data->_LdrProtectMrdata			= f->LdrProtectMrdata;
+		veh_shell_data->LdrpInvertedFunctionTable	= f->LdrpInvertedFunctionTable;
+		veh_shell_data->LdrProtectMrdata			= f->LdrProtectMrdata;
 
 		bool veh_shell_fixed = FindAndReplacePtr(pData->pVEHShell, pData->VEHShellSize, VEHDATASIG, ReCa<UINT_PTR>(veh_shell_data));
 
@@ -627,6 +622,7 @@ INJECTION_FUNCTION_TABLE::INJECTION_FUNCTION_TABLE()
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpLoadDllInternal);
 
 	NT_FUNC_CONSTRUCTOR_INIT(LdrpPreprocessDllName);
+	NT_FUNC_CONSTRUCTOR_INIT(LdrpDereferenceModule);
 
 	WIN32_FUNC_CONSTRUCTOR_INIT(GetLastError);
 

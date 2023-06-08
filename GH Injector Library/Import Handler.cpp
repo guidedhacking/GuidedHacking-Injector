@@ -2,71 +2,6 @@
 
 #include "Import Handler.h"
 
-bool IsWin7OrGreater()
-{
-	return (GetOSVersion() >= g_Win7);
-}
-
-bool IsWin8OrGreater()
-{
-	return (GetOSVersion() >= g_Win8);
-}
-
-bool IsWin81OrGreater()
-{
-	return (GetOSVersion() >= g_Win81);
-}
-
-bool IsWin10OrGreater()
-{
-	return (GetOSVersion() >= g_Win10);
-}
-
-bool IsWin11OrGreater()
-{
-	return (GetOSVersion() >= g_Win10 && GetOSBuildVersion() >= g_Win11_21H2);
-}
-
-DWORD GetOSVersion(DWORD * error_code)
-{
-	if (g_OSVersion != 0)
-	{
-		return g_OSVersion;
-	}
-
-#ifdef _WIN64
-	PEB * pPEB = ReCa<PEB *>(__readgsqword(0x60));
-#else
-	PEB * pPEB = ReCa<PEB *>(__readfsdword(0x30));
-#endif
-
-	if (!pPEB)
-	{
-		if (error_code)
-		{
-			*error_code = INJ_ERR_CANT_GET_PEB;
-		}
-
-		return 0;
-	}
-
-	DWORD v_hi = pPEB->OSMajorVersion;
-	DWORD v_lo = pPEB->OSMinorVersion;
-
-	for (; v_lo >= 10; v_lo /= 10);
-
-	g_OSVersion = v_hi * 10 + v_lo;
-
-	g_OSBuildNumber = pPEB->OSBuildNumber;
-
-	return g_OSVersion;
-}
-
-DWORD GetOSBuildVersion()
-{
-	return g_OSBuildNumber;
-}
-
 using namespace NATIVE;
 
 #define S_FUNC(f) NATIVE::f, #f
@@ -135,7 +70,7 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 
 	LOG(1, "ntdll.dll    loaded at %p\n", g_hNTDLL);
 	LOG(1, "kernel32.dll loaded at %p\n", g_hKERNEL32);
-	LOG(1, "OSVersion = %d\n   OSBuildVersion = %d\n", GetOSVersion(), GetOSBuildVersion());
+	LOG(1, "OSVersion = %d\nOSBuildVersion = %d\n", GetOSVersion(), GetOSBuildVersion());
 
 	HINSTANCE hK32 = GetModuleHandle(TEXT("kernel32.dll"));
 	if (!hK32)
@@ -208,7 +143,7 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 		return INJ_ERR_SYMBOL_PARSE_FAIL;
 	}
 
-	LOG(1, "LoadLibrary: %p\n", LoadLibraryExW);
+	LOG(1, "LoadLibraryExW: %p\n", &LoadLibraryExW);
 
 	LOG(1, "Start loading native ntdll symbols\n");
 
@@ -266,7 +201,7 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	if (LoadSymbolNative(S_FUNC(LdrpVectorHandlerList)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	if (LoadSymbolNative(S_FUNC(LdrpTlsList)))							return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	
-	if (IsWin10OrGreater() && (GetOSBuildVersion() >= g_Win10_22H2 && GetOSBuildVersion() < g_Win11_21H2 || GetOSBuildVersion() >= g_Win11_22H2))
+	if (IsWin11OrGreater() && GetOSBuildVersion() >= g_Win11_22H2)
 	{
 		if (LoadSymbolNative(LdrpInvertedFunctionTable, "LdrpInvertedFunctionTables")) return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
@@ -299,6 +234,7 @@ DWORD ResolveImports(ERROR_DATA & error_data)
 	{
 		if (LoadSymbolNative(S_FUNC(LdrpPreprocessDllName)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 		if (LoadSymbolNative(S_FUNC(LdrpLoadDllInternal)))				return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
+		if (LoadSymbolNative(S_FUNC(LdrpDereferenceModule)))			return INJ_ERR_GET_SYMBOL_ADDRESS_FAILED;
 	}
 
 #ifdef _WIN64

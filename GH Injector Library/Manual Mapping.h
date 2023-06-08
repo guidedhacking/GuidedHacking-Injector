@@ -7,14 +7,14 @@
 
 namespace MMAP_NATIVE
 {
-	DWORD ManualMap(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data);
+	DWORD ManualMap(const INJECTION_SOURCE & DllPath, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data);
 }
 
 #ifdef _WIN64
 
 namespace MMAP_WOW64
 {
-	DWORD ManualMap_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data);
+	DWORD ManualMap_WOW64(const INJECTION_SOURCE & DllPath, HANDLE hTargetProc, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data);
 }
 
 #endif

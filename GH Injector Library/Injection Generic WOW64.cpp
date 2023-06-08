@@ -7,7 +7,7 @@
 
 using namespace WOW64;
 
-DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
+DWORD InjectDLL_WOW64(const INJECTION_SOURCE & Source, HANDLE hTargetProc, INJECTION_MODE Mode, LAUNCH_METHOD Method, DWORD Flags, HINSTANCE & hOut, DWORD Timeout, ERROR_DATA & error_data)
 {
 	LOG(1, "Begin InjectDLL_WOW64\n");
 
@@ -15,38 +15,29 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 	{
 		LOG(1, "Forwarding call to ManualMap_WOW64\n");
 
-		return MMAP_WOW64::ManualMap_WOW64(szDllFile, hTargetProc, Method, Flags, hOut, Timeout, error_data);
+		return MMAP_WOW64::ManualMap_WOW64(Source, hTargetProc, Method, Flags, hOut, Timeout, error_data);
 	}
 
-	INJECTION_DATA_INTERNAL_WOW64 data{ 0 };
+	INJECTION_DATA_MAPPED_WOW64 data{ 0 };
 	data.Flags			= Flags;
 	data.Mode			= Mode;
 	data.OSVersion		= GetOSVersion();
 	data.OSBuildNumber	= GetOSBuildVersion();
 
-	size_t len = 0;
-	HRESULT hr = StringCbLengthW(szDllFile, sizeof(data.Path), &len);
-	if (FAILED(hr))
+	size_t len = Source.DllPath.length();
+	size_t max_len = sizeof(data.Path) / sizeof(wchar_t);
+	if (len > max_len)
 	{
-		INIT_ERROR_DATA(error_data, (DWORD)hr);
+		INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
-		LOG(1, "StringCbLengthW failed: %08X\n", hr);
+		LOG(1, "Path too long: %d characters, buffer size: %d\n", len, max_len);
 
-		return INJ_ERR_STRINGC_XXX_FAIL;
+		return INJ_ERR_STRING_TOO_LONG;
 	}
 		
-	data.ModuleFileName.Length		= (WORD)len;
+	data.ModuleFileName.Length		= (WORD)(len * sizeof(wchar_t));
 	data.ModuleFileName.MaxLength	= (WORD)sizeof(data.Path);
-
-	hr = StringCbCopyW(data.Path, sizeof(data.Path), szDllFile);
-	if (FAILED(hr))
-	{
-		INIT_ERROR_DATA(error_data, (DWORD)hr);
-
-		LOG(1, "StringCbCopyW failed: %08X\n", hr);
-
-		return INJ_ERR_STRINGC_XXX_FAIL;
-	}
+	Source.DllPath.copy(data.Path, Source.DllPath.length());
 
 	LOG(1, "Shell data initialized\n");
 
@@ -58,11 +49,11 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		VEHShellSize = 0;
 	}
 
-	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_INTERNAL_WOW64) + ShellSize + BASE_ALIGNMENT;
+	SIZE_T AllocationSize	= sizeof(INJECTION_DATA_MAPPED_WOW64) + ShellSize + BASE_ALIGNMENT;
 	BYTE * pAllocBase = ReCa<BYTE *>(VirtualAllocEx(hTargetProc, nullptr, AllocationSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 	
 	BYTE * pArg			= pAllocBase;
-	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_INTERNAL_WOW64)), BASE_ALIGNMENT));
+	BYTE * pShell		= ReCa<BYTE *>(ALIGN_UP(ReCa<ULONG_PTR>(pArg + sizeof(INJECTION_DATA_MAPPED_WOW64)), BASE_ALIGNMENT));
 	BYTE * pVEHShell	= nullptr;
 
 	if (!pArg)
@@ -104,7 +95,7 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 		LOG(2, "pVEHShell   = %08X\n", MDWD(pVEHShell));
 	}
 
-	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL_WOW64), nullptr))
+	if (!WriteProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_MAPPED_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
@@ -190,7 +181,7 @@ DWORD InjectDLL_WOW64(const wchar_t * szDllFile, HANDLE hTargetProc, INJECTION_M
 
 	LOG(1, "Fetching routine data\n");
 
-	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_INTERNAL_WOW64), nullptr))
+	if (!ReadProcessMemory(hTargetProc, pArg, &data, sizeof(INJECTION_DATA_MAPPED_WOW64), nullptr))
 	{
 		INIT_ERROR_DATA(error_data, GetLastError());
 
@@ -249,6 +240,7 @@ INJECTION_FUNCTION_TABLE_WOW64::INJECTION_FUNCTION_TABLE_WOW64()
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpLoadDllInternal);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpPreprocessDllName);
+	WOW64_FUNC_CONSTRUCTOR_INIT(LdrpDereferenceModule);
 
 	WOW64_FUNC_CONSTRUCTOR_INIT(GetLastError);
 

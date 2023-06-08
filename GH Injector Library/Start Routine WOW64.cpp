@@ -25,14 +25,14 @@ DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pAr
 			ULONG OwnSession	= GetSessionId(GetCurrentProcess(), ntRet);
 			ULONG TargetSession = GetSessionId(hTargetProc, ntRet);
 
-			if (TargetSession == (ULONG)-1)
+			if (TargetSession == SESSION_ID_INVALID)
 			{
 				INIT_ERROR_DATA(error_data, (DWORD)ntRet);
 
 				Ret = SR_ERR_CANT_QUERY_SESSION_ID;
 				break;
 			}
-			else if (OwnSession != 0 && OwnSession != TargetSession)
+			else if (OwnSession != SESSION_ID_LOCAL_SYSTEM && OwnSession != TargetSession)
 			{
 				INIT_ERROR_DATA(error_data, INJ_ERR_ADVANCED_NOT_DEFINED);
 
@@ -41,7 +41,7 @@ DWORD StartRoutine_WOW64(HANDLE hTargetProc, f_Routine_WOW64 pRoutine, DWORD pAr
 			}
 			else if (TargetSession == OwnSession)
 			{
-				TargetSession = (ULONG)-1;
+				TargetSession = SESSION_ID_INVALID;
 			}
 
 			if (Method == LAUNCH_METHOD::LM_SetWindowsHookEx)

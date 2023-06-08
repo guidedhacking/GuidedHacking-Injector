@@ -23,51 +23,59 @@ BOOL CALLBACK _KC_EnumWindowsCallback(HWND hWnd, LPARAM lParam)
 
 DWORD _KernelCallbackTable()
 {
-	wchar_t InfoPath[MAX_PATH * 2]{ 0 };
-	GetModuleFileNameW(GetModuleHandleW(nullptr), InfoPath, sizeof(InfoPath) / sizeof(InfoPath[0]));
+	auto ModuleBase = GetModuleHandleW(nullptr);
+	if (!ModuleBase)
+	{
+		return KC_ERR_NO_MODULEBASE;
+	}
 
-	size_t size_out = 0;
-	if (FAILED(StringCchLengthW(InfoPath, MAX_PATH * 2, &size_out)))
+	wchar_t szInfoPath[MAX_PATH * 2]{ 0 };
+	size_t max_size = sizeof(szInfoPath) / sizeof(wchar_t);
+
+	DWORD dwRet = GetModuleFileNameW(ModuleBase, szInfoPath, (DWORD)max_size);
+	if (!dwRet || GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+	{
+		return KC_ERR_NO_PATH;
+	}
+
+	std::wstring InfoPath = szInfoPath;
+	auto pos = InfoPath.find_last_of('\\');
+	if (pos == std::wstring::npos)
 	{
 		return KC_ERR_INVALID_PATH;
 	}
 
-	wchar_t * pInfoEnd = InfoPath;
-	pInfoEnd += size_out;
-	while (*pInfoEnd-- != '\\');
-	*(pInfoEnd + 2) = 0;
+	InfoPath.erase(pos, InfoPath.back());
+	InfoPath += FILENAME;
 
-	StringCbCatW(InfoPath, sizeof(InfoPath), FILENAME);
-
-	std::ifstream File(InfoPath, std::ios::ate);
+	std::ifstream File(InfoPath);
 	if (!File.good())
 	{
+		File.close();
+
+		DeleteFileW(InfoPath.c_str());
+
 		return KC_ERR_CANT_OPEN_FILE;
 	}
 
-	auto FileSize = File.tellg();
-	if (!FileSize)
-	{
-		File.close();
-		return KC_ERR_EMPTY_FILE;
-	}
-
-	File.seekg(0, std::ios::beg);
-
-	char * info = new(std::nothrow) char[static_cast<size_t>(FileSize)];
-	File.read(info, FileSize);
+	std::stringstream info;
+	info << File.rdbuf();
 
 	File.close();
 
-	DeleteFileW(InfoPath);
+	DeleteFileW(InfoPath.c_str());
 
-	DWORD ProcID = strtol(info, nullptr, 10);
+	std::string sPID = info.str();
+	if (sPID.length() < 1)
+	{
+		return KC_ERR_EMPTY_FILE;
+	}
 
-	delete[] info;
+	DWORD ProcID = strtol(sPID.c_str(), nullptr, 10);
 
 	if (!ProcID)
 	{
-		return SWHEX_ERR_INVALID_INFO;
+		return KC_ERR_INVALID_INFO;
 	}
 
 	EnumWindowsCallback_Data data;
@@ -92,7 +100,7 @@ DWORD _KernelCallbackTable()
 	cds.lpData = msg;
 	cds.cbData = sizeof(msg);	
 
-	for (auto i : data.m_HookData)
+	for (const auto & i : data.m_HookData)
 	{
 		SendMessage(i.m_hWnd, WM_COPYDATA, reinterpret_cast<WPARAM>(i.m_hWnd), reinterpret_cast<LPARAM>(&cds));
 	}

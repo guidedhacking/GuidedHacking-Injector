@@ -23,8 +23,8 @@ ALIGN struct VEH_SHELL_DATA
 	DWORD		ImgSize;
 	DWORD		OSVersion;
 
-	f_LdrpInvertedFunctionTable _LdrpInvertedFunctionTable;
-	f_LdrProtectMrdata			_LdrProtectMrdata;
+	f_LdrpInvertedFunctionTable LdrpInvertedFunctionTable;
+	f_LdrProtectMrdata			LdrProtectMrdata;
 };
 
 LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * EP);

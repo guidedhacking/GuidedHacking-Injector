@@ -4,7 +4,7 @@
 
 DownloadManager::DownloadManager(bool ForceRedownload)
 {
-    m_bForceRedownload  = ForceRedownload;
+    m_bForceRedownload = ForceRedownload;
 }
 
 DownloadManager::~DownloadManager()
@@ -132,7 +132,7 @@ HRESULT __stdcall DownloadManager::OnProgress(ULONG ulProgress, ULONG ulProgress
 
         if (m_fProgress - m_fOldProgress >= 0.095f)
         {
-            LOG(2, "DownloadManager: %2.0f%%\n", (float)100.0f * m_fProgress);
+            LOG(2, "DownloadManager: %2.0f%%\n", (double)100.0f * m_fProgress);
             m_fOldProgress = m_fProgress;
         }
     }

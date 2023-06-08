@@ -9,7 +9,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	std::wstring InfoPath = g_RootPathW;
 	InfoPath += SM_INFO_FILENAME;
 		
-	if (FileExists(InfoPath.c_str()))
+	if (FileExistsW(InfoPath))
 	{
 		DeleteFileW(InfoPath.c_str());
 	}
@@ -153,8 +153,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 	swhex_info << std::dec << GetProcessId(hTargetProc) << '!' << std::hex << ReCa<ULONG_PTR>(pRemoteFunc) << std::endl;
 	swhex_info.close();
 
-	std::wstring smPath = g_RootPathW;
-	smPath += SM_EXE_FILENAME;
+	std::wstring smPath = g_RootPathW + SM_EXE_FILENAME;
 
 	wchar_t cmdLine[] = L"\"" SM_EXE_FILENAME "\" " ID_SWHEX;
 
@@ -166,7 +165,7 @@ DWORD SR_SetWindowsHookEx(HANDLE hTargetProc, f_Routine pRoutine, void * pArg, U
 
 	LOG(2, "Data and command line prepared\n");
 
-	if (TargetSessionId != -1)
+	if (TargetSessionId != SESSION_ID_INVALID)
 	{
 		LOG(2, "Target process is in a different session\n");
 

@@ -3,15 +3,12 @@
 
 #include "VEH Shell.h"
 
-__forceinline UINT_PTR bit_rotate_l(UINT_PTR val, int count)
-{
-	return (val << count) | (val >> (-count));
-}
-
 #pragma optimize( "", off ) //even with volatile this doesn't work, disabling optimizations seems to be the only way
 
 // This code is 100% stolen from DarthTon:
 // https://github.com/DarthTon/Blackbone/blob/master/src/BlackBone/ManualMap/MExcept.cpp
+// Also Raymond Chen - of course - has written an article about C++ exception handling more than a decade ago:
+// https://devblogs.microsoft.com/oldnewthing/20100730-00/?p=13273
 
 #ifdef _WIN64
 
@@ -37,6 +34,11 @@ LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION
 
 #else
 
+__forceinline UINT_PTR bit_rotate_l(UINT_PTR val, int count)
+{
+	return (val << count) | (val >> (-count));
+}
+
 LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION_POINTERS * ExceptionInfo)
 {
 	UNREFERENCED_PARAMETER(ExceptionInfo);
@@ -56,23 +58,23 @@ LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION
 
 	if (UseWin7Table)
 	{
-		Entries = &(ReCa<RTL_INVERTED_FUNCTION_TABLE_WIN7 *>(pData->_LdrpInvertedFunctionTable))->Entries[0];
+		Entries = &(ReCa<RTL_INVERTED_FUNCTION_TABLE_WIN7 *>(pData->LdrpInvertedFunctionTable))->Entries[0];
 	}
 	else
 	{
-		Entries = &pData->_LdrpInvertedFunctionTable->Entries[0];
+		Entries = &pData->LdrpInvertedFunctionTable->Entries[0];
 	}
 
 	if (pData->OSVersion >= g_Win81)
 	{
-		pData->_LdrProtectMrdata(FALSE);
+		pData->LdrProtectMrdata(FALSE);
 	}
 
 	auto cookie = *P_KUSER_SHARED_DATA_COOKIE;
 
 	for (; pERR && pERR != ReCa<EXCEPTION_REGISTRATION_RECORD *>(0xFFFFFFFF) && pERR->Next != ReCa<EXCEPTION_REGISTRATION_RECORD *>(0xFFFFFFFF); pERR = pERR->Next)
 	{
-		for (ULONG idx = 0; idx < pData->_LdrpInvertedFunctionTable->Count; ++idx)
+		for (ULONG idx = 0; idx < pData->LdrpInvertedFunctionTable->Count; ++idx)
 		{
 			if (!UseWin7Table && idx == 0)
 			{
@@ -136,7 +138,7 @@ LONG __declspec(code_seg(".veh_sec$01")) CALLBACK VectoredHandlerShell(EXCEPTION
 
 	if (pData->OSVersion >= g_Win81)
 	{
-		pData->_LdrProtectMrdata(TRUE);
+		pData->LdrProtectMrdata(TRUE);
 	}
 
 	return EXCEPTION_CONTINUE_SEARCH;

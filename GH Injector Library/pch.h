@@ -1,23 +1,25 @@
 #pragma once
 
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING //ur mom
-
 //winapi shit
 #include <Windows.h>
+
+#if (NTDDI_VERSION < NTDDI_WIN7)
+#error The mininum requirement for this library is Windows 7.
+#endif
 
 //enum shit
 #include <TlHelp32.h>
 #include <Psapi.h>
 
 //string shit
-#include <codecvt> 
+#include <format>
 #include <sstream>
 #include <string>
-#include <strsafe.h>
 #include <tchar.h>
 
 //file shit
 #include <fstream>
+#include <shlwapi.h>
 
 //dank shit
 #include <ctime>
@@ -64,12 +66,19 @@
 #define SM_INFO_FILENAME64 L"SM64.txt"
 #define SM_INFO_FILENAME86 L"SM86.txt"
 
+#define DNP_DLL_FILENAME64 L"GH Injector DNP - x64.dll"
+#define DNP_DLL_FILENAME86 L"GH Injector DNP - x86.dll"
+
+#define DNP_INFO_FILENAME L"DNPD.txt"
+
 #ifdef _WIN64
 #define SM_INFO_FILENAME SM_INFO_FILENAME64
 #define SM_EXE_FILENAME SM_EXE_FILENAME64
+#define DNP_DLL_FILENAME DNP_DLL_FILENAME64
 #else
 #define SM_INFO_FILENAME SM_INFO_FILENAME86
 #define SM_EXE_FILENAME SM_EXE_FILENAME86
+#define DNP_DLL_FILENAME DNP_DLL_FILENAME86
 #endif
 
 //Enum to define the injection mode.
@@ -125,7 +134,7 @@ using f_raw_print_callback = void *;
 DWORD __stdcall SetRawPrintCallback(f_raw_print_callback print);
 
 #ifdef DEBUG_INFO
-#define LOG custom_print
+	#define LOG custom_print
 #else
 	#define LOG
 #endif

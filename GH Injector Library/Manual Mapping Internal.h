@@ -113,6 +113,8 @@ namespace MMAP_NATIVE
 		ALIGN NT_FUNC_LOCAL(LdrLockLoaderLock);
 		ALIGN NT_FUNC_LOCAL(LdrUnlockLoaderLock);
 
+		ALIGN NT_FUNC_LOCAL(LdrpDereferenceModule);
+
 		ALIGN NT_FUNC_LOCAL(LdrProtectMrdata);
 
 		ALIGN NT_FUNC_LOCAL(RtlAddVectoredExceptionHandler);
@@ -172,10 +174,11 @@ namespace MMAP_NATIVE
 		ALIGN VEH_SHELL_DATA	*	pVEHShellData		= nullptr;
 		ALIGN void				*	pFakeSEHDirectory	= nullptr;
 
-		ALIGN BYTE * pAllocationBase	= nullptr;
-		ALIGN BYTE * pImageBase			= nullptr;
-		ALIGN BYTE * pRawData			= nullptr;
-		ALIGN HANDLE hDllFile			= nullptr;
+		ALIGN BYTE *	pAllocationBase	= nullptr;
+		ALIGN BYTE *	pImageBase		= nullptr;
+		ALIGN BYTE *	pRawData		= nullptr;
+		ALIGN DWORD		RawSize			= 0;
+		ALIGN HANDLE	hDllFile		= nullptr;
 		
 		ALIGN IMAGE_DOS_HEADER		* pDosHeader		= nullptr;
 		ALIGN IMAGE_NT_HEADERS		* pNtHeaders		= nullptr;
@@ -184,7 +187,6 @@ namespace MMAP_NATIVE
 
 		ALIGN MM_DEPENDENCY_RECORD * pImportsHead		= nullptr;
 		ALIGN MM_DEPENDENCY_RECORD * pDelayImportsHead	= nullptr;
-		ALIGN MM_DEPENDENCY_RECORD * pCurrentEntry		= nullptr;
 
 		ALIGN MANUAL_MAPPING_FUNCTION_TABLE * FunctionTable = nullptr;
 	};
@@ -236,6 +238,8 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrLockLoaderLock);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrUnlockLoaderLock);
 
+		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrpDereferenceModule);
+
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(LdrProtectMrdata);
 
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(RtlAddVectoredExceptionHandler);
@@ -261,6 +265,7 @@ namespace MMAP_WOW64
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIP_CleanDataDirectories);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIP_CloakHeader);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIP_CleanUp);
+
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIHP_ResolveFilePath);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIHP_PreprocessModuleName);
 		ALIGN_86 WOW64_FUNCTION_POINTER_LOCAL(MMIHP_LoadModule);
@@ -297,6 +302,7 @@ namespace MMAP_WOW64
 		ALIGN_86 DWORD pAllocationBase	= 0;
 		ALIGN_86 DWORD pImageBase		= 0;
 		ALIGN_86 DWORD pRawData			= 0;
+		ALIGN_86 DWORD RawSize			= 0;
 		ALIGN_86 DWORD hDllFile			= 0;
 		
 		ALIGN_86 DWORD pDosHeader		= 0;
@@ -306,7 +312,6 @@ namespace MMAP_WOW64
 
 		ALIGN_86 DWORD pImportsHead			= 0;
 		ALIGN_86 DWORD pDelayImportsHead	= 0;
-		ALIGN_86 DWORD pCurrentEntry		= 0;
 
 		ALIGN_86 DWORD FunctionTable = 0;
 	};
