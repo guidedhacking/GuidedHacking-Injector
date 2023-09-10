@@ -1,3 +1,8 @@
+/*
+ * Author:       Broihon
+ * Copyright:    Guided Hacking™ © 2012-2023 Guided Hacking LLC
+*/
+
 //Stolen from here:
 //https://stackoverflow.com/a/5292277
 //by User Hans Passant

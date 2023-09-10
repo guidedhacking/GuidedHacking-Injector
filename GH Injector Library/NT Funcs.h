@@ -1,3 +1,8 @@
+/*
+ * Author:       Broihon
+ * Copyright:    Guided Hacking™ © 2012-2023 Guided Hacking LLC
+*/
+
 #pragma once
 
 //I honestly can't give proper credit here as most of the stuff is stolen from somewhere ages ago
