@@ -1,6 +1,6 @@
 /*
  * Author:       Broihon
- * Copyright:    Guided Hacking™ © 2012-2023 Guided Hacking LLC
+ * Copyright:    Guided Hackingâ„¢ Â© 2012-2023 Guided Hacking LLC
 */
 
 #include "pch.h"
@@ -154,15 +154,16 @@ DWORD ValidateDllFile(const std::wstring & FilePath, DWORD target_machine)
 		return FILE_ERR_INVALID_FILE;
 	}
 
-	delete[] headers;
-
 	if (nt_headers->FileHeader.Machine != target_machine)
 	{
 		LOG(1, "DLL platform mismatch\n");
+		
+		delete[] headers;
 
 		return FILE_ERR_INVALID_FILE;
 	}
 
+	delete[] headers;
 	return FILE_ERR_SUCCESS;
 }
 
