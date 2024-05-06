@@ -69,6 +69,8 @@ Release Downloads: [Download DLL Injector Here ](https://guidedhacking.com/resou
 	<li><a href="https://guidedhacking.com/forums/java-game-hacking-course-jgh100.553/" target="_blank">Java Game Hacking Course</a>&nbsp;- 6 Chapter Beginner Guide</li>
 </ul>
 
+----
+
 ### Where to download the compiled binaries?
 This repo doesn't contain the compiled binaries, just the source code for the library. If you want to download the compiled program, you must be a paying customer on our website where you can download it. If you can compile it yourself and get it working, then great, enjoy it, but you do not have permission/license to distribute the compiled binaries or any of our other content from our website.
 
