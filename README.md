@@ -153,6 +153,8 @@ DLL injection is so popular for game hacking for the same reasons. Rather than m
 
 ### DLL Injector Credits
 
+Special thank you to [Kage](https://guidedhacking.com/members/kage.109622/) / [Multikill](https://github.com/multikill) for developing the Qt GUI of the GH Injector, it's a a huge improvement.
+
 First of all I want to credit Joachim Bauch whose Memory Module Library was a great source to learn from:  
 https://github.com/fancycode/MemoryModule
 
