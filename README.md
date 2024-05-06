@@ -9,7 +9,10 @@ If you want to use this library with a GUI check out the [GH Injector GUI](https
 
 Release Downloads: [Download DLL Injector Here ](https://guidedhacking.com/resources/guided-hacking-dll-injector.4/)
 
-![](https://i.gyazo.com/23b497942ade7bc6a13b2d7029567c6b.png)
+![image](https://github.com/guided-hacking/GH-Injector-Library/assets/15186628/d5c6670c-538f-4a48-a565-bb277e4dc46e)
+![image](https://github.com/guided-hacking/GH-Injector-Library/assets/15186628/3ca83e0f-0e8b-4bc9-a101-0bb28e105698)![image](https://github.com/guided-hacking/GH-Injector-Library/assets/15186628/d070f0f0-8469-48f1-9744-6b199f0d1b73)
+
+
 
 ----
 
