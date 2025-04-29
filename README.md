@@ -180,3 +180,5 @@ I also want to thank Akaion/Dewera for helping me with SEH support and their C# 
 
 Big thanks to mambda who made this PDB parser which I could steal code from to verify GUIDs:  
 [C++ Windows PDB Parser](https://guidedhacking.com/threads/windows-c-pdb-parser.12159/)
+
+GuidedHacking® - The Game Hacking Bible® - © 2025 Guided Hacking LLC. All Rights Reserved.
